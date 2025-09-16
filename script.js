@@ -636,6 +636,7 @@ const UI = {
     rebirthPotential: document.getElementById('rebirthPotential'),
     rebirthHighestStage: document.getElementById('rebirthHighestStage'),
     rebirthCount: document.getElementById('rebirthCount'),
+    equipmentSummary: document.getElementById('equipmentSummary'),
     equipmentTapBonus: document.getElementById('equipmentTapBonus'),
     equipmentHeroBonus: document.getElementById('equipmentHeroBonus'),
     equipmentSkillBonus: document.getElementById('equipmentSkillBonus'),
@@ -784,12 +785,37 @@ class GameUI {
     }
 
     updateEquipmentSummary() {
-        if (!UI.equipmentTapBonus) return;
         const equipmentBonuses = this.state.getEquipmentBonuses();
         const rebirthBonuses = this.state.getRebirthBonusSummary();
-        this.setBonusDisplay(UI.equipmentTapBonus, equipmentBonuses.tap ?? 0, rebirthBonuses.tap ?? 0);
-        this.setBonusDisplay(UI.equipmentHeroBonus, equipmentBonuses.hero ?? 0, rebirthBonuses.hero ?? 0);
-        this.setBonusDisplay(UI.equipmentSkillBonus, equipmentBonuses.skill ?? 0, rebirthBonuses.skill ?? 0);
+        const equipmentElements = {
+            tap: UI.equipmentTapBonus,
+            hero: UI.equipmentHeroBonus,
+            skill: UI.equipmentSkillBonus,
+        };
+
+        const summaryData = EQUIPMENT_TYPES.map(({ id, label }) => {
+            const equipmentValue = equipmentBonuses[id] ?? 0;
+            const rebirthValue = rebirthBonuses[id] ?? 0;
+            this.setBonusDisplay(equipmentElements[id], equipmentValue, rebirthValue);
+            return { label, equipmentValue, rebirthValue };
+        });
+
+        if (UI.equipmentSummary) {
+            const summaryText = summaryData
+                .map(({ label, equipmentValue, rebirthValue }) => {
+                    const total = (equipmentValue ?? 0) + (rebirthValue ?? 0);
+                    return `${label} +${formatPercent(total)}`;
+                })
+                .filter(Boolean)
+                .join(' · ');
+            UI.equipmentSummary.textContent = summaryText || '추가 보너스 없음';
+
+            const tooltipParts = summaryData.map(({ label, equipmentValue, rebirthValue }) => {
+                const breakdown = this.buildBonusBreakdown(equipmentValue, rebirthValue);
+                return `${label}: ${breakdown}`;
+            });
+            UI.equipmentSummary.title = tooltipParts.length > 0 ? tooltipParts.join('\n') : '추가 보너스 없음';
+        }
     }
 
     setBonusDisplay(element, equipmentValue = 0, rebirthValue = 0) {
