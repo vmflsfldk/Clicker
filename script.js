@@ -132,6 +132,11 @@ const EQUIPMENT_BOSS_DROP_CHANCE = 0.45;
 const EQUIPMENT_RARITY_MAP = new Map(EQUIPMENT_RARITIES.map((rarity) => [rarity.id, rarity]));
 const EQUIPMENT_TYPE_MAP = new Map(EQUIPMENT_TYPES.map((type) => [type.id, type]));
 
+const GACHA_SINGLE_COST = 1;
+const GACHA_MULTI_COUNT = 10;
+const GACHA_MULTI_COST = 9;
+const GACHA_TOKEN_DROP_CHANCE = 0.35;
+
 const BOSS_STAGE_INTERVAL = 5;
 const BOSS_TIME_LIMIT = 30000;
 const BOSS_TIME_LIMIT_SECONDS = Math.floor(BOSS_TIME_LIMIT / 1000);
@@ -242,13 +247,11 @@ const generateEquipmentItem = (stage, isBoss) => {
 };
 
 class Hero {
-    constructor({ id, name, description, baseCost, baseDamage, costMultiplier }, savedState) {
+    constructor({ id, name, description, baseDamage }, savedState) {
         this.id = id;
         this.name = name;
         this.description = description;
-        this.baseCost = baseCost;
         this.baseDamage = baseDamage;
-        this.costMultiplier = costMultiplier;
         this.level = savedState?.level ?? 0;
     }
 
@@ -258,16 +261,18 @@ class Hero {
         return this.baseDamage * this.level * scalingBonus;
     }
 
-    get nextCost() {
-        const cost = this.baseCost * Math.pow(this.costMultiplier, this.level);
-        return Math.ceil(cost);
+    get isUnlocked() {
+        return this.level > 0;
     }
 
-    levelUp(playerGold) {
-        const cost = this.nextCost;
-        if (playerGold < cost) return { success: false, message: '골드가 부족합니다.' };
-        this.level += 1;
-        return { success: true, cost };
+    get enhancementLevel() {
+        return Math.max(0, this.level - 1);
+    }
+
+    increaseLevel(amount = 1) {
+        const normalized = Number.isFinite(amount) ? Math.max(1, Math.floor(amount)) : 1;
+        this.level += normalized;
+        return this.level;
     }
 
     toJSON() {
@@ -344,7 +349,10 @@ class GameState {
         this.enemy = new Enemy(saved?.enemy?.stage ?? 1, saved?.enemy);
         const heroStates = saved?.heroes ?? [];
         this.heroes = defaultHeroes.map((hero) => new Hero(hero, heroStates.find((h) => h.id === hero.id)));
-        this.sortOrder = saved?.sortOrder ?? 'cost';
+        const loadedTokens = Number(saved?.gachaTokens ?? 0);
+        this.gachaTokens = Number.isFinite(loadedTokens) ? Math.max(0, Math.floor(loadedTokens)) : 0;
+        const savedSort = typeof saved?.sortOrder === 'string' ? saved.sortOrder : null;
+        this.sortOrder = savedSort === 'dps' ? 'dps' : 'level';
         this.inventory = Array.isArray(saved?.inventory)
             ? saved.inventory
                   .map((item) => this.normalizeEquipmentItem(item))
@@ -489,9 +497,6 @@ class GameState {
         this.lastSave = Date.now();
         this.enemy.reset(1);
         this.clearBossTimer();
-        this.heroes.forEach((hero) => {
-            hero.level = 0;
-        });
         this.frenzyCooldown = 0;
         this.frenzyActiveUntil = 0;
         this.currentRunHighestStage = 0;
@@ -536,13 +541,43 @@ class GameState {
         return { success: true, cost };
     }
 
-    buyHero(heroId) {
-        const hero = this.heroes.find((h) => h.id === heroId);
-        if (!hero) return { success: false, message: '알 수 없는 학생입니다.' };
-        const { success, cost, message } = hero.levelUp(this.gold);
-        if (!success) return { success, message };
-        this.gold -= cost;
-        return { success: true, hero };
+    getHeroById(heroId) {
+        return this.heroes.find((hero) => hero.id === heroId) ?? null;
+    }
+
+    getGachaCost(count) {
+        if (count === GACHA_MULTI_COUNT) return GACHA_MULTI_COST;
+        if (!Number.isFinite(count) || count <= 0) return GACHA_SINGLE_COST;
+        return Math.max(1, Math.floor(count)) * GACHA_SINGLE_COST;
+    }
+
+    rollGacha(count) {
+        const normalizedCount =
+            count === GACHA_MULTI_COUNT
+                ? GACHA_MULTI_COUNT
+                : Number.isFinite(count) && count > 0
+                ? Math.max(1, Math.floor(count))
+                : 1;
+        const cost = this.getGachaCost(normalizedCount);
+        if (this.gachaTokens < cost) {
+            return { success: false, message: '모집권이 부족합니다.' };
+        }
+        this.gachaTokens -= cost;
+        const results = [];
+        for (let i = 0; i < normalizedCount; i += 1) {
+            const hero = randomFromArray(this.heroes);
+            if (!hero) continue;
+            const previousLevel = hero.level;
+            hero.increaseLevel(1);
+            results.push({
+                hero,
+                isNew: previousLevel === 0,
+                previousLevel,
+                newLevel: hero.level,
+            });
+        }
+        this.lastSave = Date.now();
+        return { success: true, cost, count: normalizedCount, results };
     }
 
     isBossStage(stage = this.enemy.stage) {
@@ -584,6 +619,7 @@ class GameState {
         const reward = this.enemyReward();
         this.gold += reward;
         const drop = this.tryDropEquipment(defeatedStage);
+        const gacha = this.tryDropGachaToken(defeatedStage);
         this.highestStage = Math.max(this.highestStage, defeatedStage);
         this.currentRunHighestStage = Math.max(this.currentRunHighestStage, defeatedStage);
         this.enemy.advanceStage();
@@ -592,7 +628,7 @@ class GameState {
         } else {
             this.clearBossTimer();
         }
-        return { reward, drop, defeatedStage };
+        return { reward, drop, gacha, defeatedStage };
     }
 
     reset() {
@@ -605,6 +641,7 @@ class GameState {
         this.heroes.forEach((hero) => {
             hero.level = 0;
         });
+        this.gachaTokens = 0;
         this.frenzyCooldown = 0;
         this.frenzyActiveUntil = 0;
         this.inventory = [];
@@ -635,6 +672,7 @@ class GameState {
             highestStage: this.highestStage,
             currentRunHighestStage: this.currentRunHighestStage,
             bossDeadline: this.bossDeadline,
+            gachaTokens: this.gachaTokens,
             rebirthPoints: this.rebirthPoints,
             totalRebirths: this.totalRebirths,
             rebirthSkills: this.rebirthSkills,
@@ -788,6 +826,14 @@ class GameState {
         return { success: true, item, previous };
     }
 
+    tryDropGachaToken(stage) {
+        if (!this.isBossStage(stage)) return null;
+        if (Math.random() > GACHA_TOKEN_DROP_CHANCE) return null;
+        this.gachaTokens += 1;
+        this.lastSave = Date.now();
+        return { amount: 1 };
+    }
+
     tryDropEquipment(stage) {
         const isBoss = stage % BOSS_STAGE_INTERVAL === 0;
         const dropChance = isBoss ? EQUIPMENT_BOSS_DROP_CHANCE : EQUIPMENT_DROP_CHANCE;
@@ -806,6 +852,7 @@ class GameState {
 const UI = {
     stage: document.getElementById('stage'),
     gold: document.getElementById('gold'),
+    gachaTokensHeader: document.getElementById('gachaTokensHeader'),
     clickDamage: document.getElementById('clickDamage'),
     totalDps: document.getElementById('totalDps'),
     enemyName: document.getElementById('enemyName'),
@@ -816,6 +863,11 @@ const UI = {
     tapButton: document.getElementById('tapButton'),
     enemy: document.getElementById('enemy'),
     heroList: document.getElementById('heroList'),
+    gachaTokens: document.getElementById('gachaTokens'),
+    gachaSingle: document.getElementById('gachaSingle'),
+    gachaTen: document.getElementById('gachaTen'),
+    gachaResults: document.getElementById('gachaResults'),
+    gachaResultsEmpty: document.getElementById('gachaResultsEmpty'),
     upgradeClick: document.getElementById('upgradeClick'),
     log: document.getElementById('log'),
     sortHeroes: document.getElementById('sortHeroes'),
@@ -850,11 +902,12 @@ class GameUI {
         this.heroTemplate = document.getElementById('heroTemplate');
         this.heroElements = new Map();
         this.rebirthSkillElements = new Map();
-        this.sortState = state.sortOrder;
+        this.sortState = state.sortOrder === 'dps' ? 'dps' : 'level';
         this.tabButtons = [];
         this.tabPanels = new Map();
         this.setupTabs();
         this.setupEvents();
+        this.updateGachaHistoryVisibility();
         this.renderHeroes();
         this.renderEquipmentUI();
         this.renderRebirthUI();
@@ -914,6 +967,12 @@ class GameUI {
         UI.enemy.addEventListener('click', () => this.handleTap());
         UI.upgradeClick.addEventListener('click', () => this.handleClickUpgrade());
         UI.sortHeroes.addEventListener('click', () => this.toggleHeroSort());
+        if (UI.gachaSingle) {
+            UI.gachaSingle.addEventListener('click', () => this.handleGachaRoll(1));
+        }
+        if (UI.gachaTen) {
+            UI.gachaTen.addEventListener('click', () => this.handleGachaRoll(GACHA_MULTI_COUNT));
+        }
         UI.skillFrenzy.addEventListener('click', () => this.useFrenzy());
         UI.saveProgress.addEventListener('click', () => this.manualSave());
         UI.resetProgress.addEventListener('click', () => this.resetGame());
@@ -932,10 +991,15 @@ class GameUI {
         UI.heroList.innerHTML = '';
         this.heroElements.clear();
         const sorted = [...this.state.heroes];
-        if (this.sortState === 'cost') {
-            sorted.sort((a, b) => a.nextCost - b.nextCost);
-        } else {
+        if (this.sortState === 'dps') {
             sorted.sort((a, b) => this.state.getHeroEffectiveDps(b) - this.state.getHeroEffectiveDps(a));
+        } else {
+            sorted.sort((a, b) => {
+                if (a.level === b.level) {
+                    return a.name.localeCompare(b.name, 'ko');
+                }
+                return b.level - a.level;
+            });
         }
         sorted.forEach((hero) => this.addHero(hero));
     }
@@ -947,19 +1011,15 @@ class GameUI {
         const desc = node.querySelector('.hero__desc');
         const level = node.querySelector('.hero__level');
         const dps = node.querySelector('.hero__dps');
-        const button = node.querySelector('.btn');
+        const statusState = node.querySelector('.hero__status-state');
+        const statusDetail = node.querySelector('.hero__status-detail');
 
         name.textContent = hero.name;
         desc.textContent = hero.description;
-        level.textContent = `Lv. ${hero.level}`;
-        dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
-        const costText = formatNumber(hero.nextCost);
-        button.textContent = hero.level === 0 ? `${costText} 골드로 채용` : `레벨 업 (${costText} 골드)`;
-        button.disabled = hero.nextCost > this.state.gold;
-        button.addEventListener('click', () => this.handleHeroLevelUp(hero.id));
+        this.heroElements.set(hero.id, { node, level, dps, statusState, statusDetail });
+        this.updateHero(hero);
 
         UI.heroList.appendChild(node);
-        this.heroElements.set(hero.id, { node, level, dps, button });
     }
 
     updateHero(hero) {
@@ -967,9 +1027,15 @@ class GameUI {
         if (!heroUI) return;
         heroUI.level.textContent = `Lv. ${hero.level}`;
         heroUI.dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
-        const costText = formatNumber(hero.nextCost);
-        heroUI.button.textContent = hero.level === 0 ? `${costText} 골드로 채용` : `레벨 업 (${costText} 골드)`;
-        heroUI.button.disabled = hero.nextCost > this.state.gold;
+        heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
+        if (hero.isUnlocked) {
+            heroUI.statusState.textContent = '합류 완료';
+            heroUI.statusDetail.textContent =
+                hero.enhancementLevel > 0 ? `강화 +${hero.enhancementLevel}` : '강화 없음';
+        } else {
+            heroUI.statusState.textContent = '미합류';
+            heroUI.statusDetail.textContent = '가챠로 학생을 모집하세요.';
+        }
     }
 
     updateHeroes() {
@@ -1417,8 +1483,10 @@ class GameUI {
         UI.gold.textContent = formatNumber(this.state.gold);
         UI.clickDamage.textContent = formatNumber(this.state.effectiveClickDamage);
         UI.totalDps.textContent = formatNumber(this.state.totalDps);
-        const clickCost = Math.ceil(10 * Math.pow(1.2, this.state.clickLevel - 1));
-        UI.upgradeClick.textContent = `전술 교육 (${formatNumber(clickCost)} 골드)`;
+        if (UI.upgradeClick) {
+            const clickCost = Math.ceil(10 * Math.pow(1.2, this.state.clickLevel - 1));
+            UI.upgradeClick.textContent = `전술 교육 (${formatNumber(clickCost)} 골드)`;
+        }
         this.updateEquipmentSummary();
         this.updateRebirthUI();
     }
@@ -1466,6 +1534,7 @@ class GameUI {
 
     updateUI() {
         this.updateStats();
+        this.updateGachaUI();
         this.updateHeroes();
         this.updateEnemy();
         this.updateFrenzyUI();
@@ -1494,10 +1563,17 @@ class GameUI {
 
     handleEnemyDefeat() {
         const previousBest = this.state.currentRunHighestStage;
-        const { reward, drop, defeatedStage } = this.state.goNextEnemy();
+        const { reward, drop, gacha, defeatedStage } = this.state.goNextEnemy();
         this.addLog(`스테이지 ${defeatedStage}의 적을 처치하고 ${formatNumber(reward)} 골드를 획득했습니다!`);
         if (drop) {
             this.handleEquipmentDrop(drop);
+        }
+        if (gacha) {
+            this.addLog(
+                `보스 제압 보상으로 모집권 ${gacha.amount.toLocaleString('ko-KR')}개를 확보했습니다!`,
+                'success',
+            );
+            this.updateGachaUI();
         }
         if (this.state.isBossStage()) {
             this.addLog(
@@ -1510,17 +1586,6 @@ class GameUI {
         }
     }
 
-    handleHeroLevelUp(heroId) {
-        const result = this.state.buyHero(heroId);
-        if (!result.success) {
-            this.addLog(result.message, 'warning');
-            return;
-        }
-        this.addLog(`${result.hero.name} 레벨이 ${result.hero.level}이 되었습니다!`);
-        this.renderHeroes();
-        this.updateStats();
-    }
-
     handleClickUpgrade() {
         const result = this.state.levelUpClick();
         if (!result.success) {
@@ -1531,15 +1596,92 @@ class GameUI {
         this.updateStats();
     }
 
+    handleGachaRoll(count) {
+        const result = this.state.rollGacha(count);
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            this.updateGachaUI();
+            return;
+        }
+        if (result.results.length === 0) {
+            this.addLog('모집 결과가 없습니다.', 'info');
+            this.updateGachaUI();
+            return;
+        }
+        this.addGachaResults(result.results);
+        result.results.forEach((entry) => {
+            if (entry.isNew) {
+                this.addLog(`[가챠] ${entry.hero.name}이(가) 합류했습니다! Lv. ${entry.newLevel}`, 'success');
+            } else {
+                this.addLog(
+                    `[가챠] ${entry.hero.name} 강화 성공! Lv. ${entry.previousLevel} → ${entry.newLevel}`,
+                    'info',
+                );
+            }
+        });
+        this.renderHeroes();
+        this.updateStats();
+        this.updateGachaUI();
+        saveGame(this.state);
+    }
+
+    addGachaResults(entries) {
+        if (!UI.gachaResults) return;
+        entries.forEach((entry) => {
+            const item = document.createElement('li');
+            item.dataset.resultType = entry.isNew ? 'new' : 'duplicate';
+            if (entry.isNew) {
+                item.textContent = `${entry.hero.name} 합류! Lv. ${entry.newLevel}`;
+            } else {
+                item.textContent = `${entry.hero.name} 강화! Lv. ${entry.previousLevel} → ${entry.newLevel}`;
+            }
+            UI.gachaResults.prepend(item);
+        });
+        const maxEntries = 12;
+        while (UI.gachaResults.children.length > maxEntries) {
+            UI.gachaResults.removeChild(UI.gachaResults.lastChild);
+        }
+        this.updateGachaHistoryVisibility();
+    }
+
+    updateGachaHistoryVisibility() {
+        if (!UI.gachaResultsEmpty) return;
+        const hasEntries = (UI.gachaResults?.children.length ?? 0) > 0;
+        UI.gachaResultsEmpty.style.display = hasEntries ? 'none' : 'block';
+    }
+
+    clearGachaResults() {
+        if (UI.gachaResults) {
+            UI.gachaResults.innerHTML = '';
+        }
+        this.updateGachaHistoryVisibility();
+    }
+
+    updateGachaUI() {
+        const tokenText = this.state.gachaTokens.toLocaleString('ko-KR');
+        if (UI.gachaTokens) {
+            UI.gachaTokens.textContent = tokenText;
+        }
+        if (UI.gachaTokensHeader) {
+            UI.gachaTokensHeader.textContent = tokenText;
+        }
+        if (UI.gachaSingle) {
+            UI.gachaSingle.disabled = this.state.gachaTokens < GACHA_SINGLE_COST;
+        }
+        if (UI.gachaTen) {
+            UI.gachaTen.disabled = this.state.gachaTokens < GACHA_MULTI_COST;
+        }
+    }
+
     toggleHeroSort() {
-        this.sortState = this.sortState === 'cost' ? 'dps' : 'cost';
+        this.sortState = this.sortState === 'level' ? 'dps' : 'level';
         this.state.sortOrder = this.sortState;
         this.renderHeroes();
         this.updateSortButton();
     }
 
     updateSortButton() {
-        const label = this.sortState === 'cost' ? '비용 순' : 'DPS 순';
+        const label = this.sortState === 'level' ? '레벨 순' : 'DPS 순';
         UI.sortHeroes.textContent = `정렬 순서 변경 (${label})`;
     }
 
@@ -1585,6 +1727,7 @@ class GameUI {
         }
         this.updateEnemy();
         this.updateStats();
+        this.updateGachaUI();
         this.updateHeroes();
         this.updateBossTimerUI();
     }
@@ -1621,6 +1764,7 @@ class GameUI {
     resetGame() {
         if (!confirm('정말로 진행 상황을 초기화할까요?')) return;
         this.state.reset();
+        this.clearGachaResults();
         this.renderHeroes();
         this.renderEquipmentUI();
         this.renderRebirthUI();

@@ -23,6 +23,10 @@
                     <span id="gold" class="stat__value">0</span>
                 </div>
                 <div class="stat">
+                    <span class="stat__label">모집권</span>
+                    <span id="gachaTokensHeader" class="stat__value">0</span>
+                </div>
+                <div class="stat">
                     <span class="stat__label">전술 공격력</span>
                     <span id="clickDamage" class="stat__value">1</span>
                 </div>
@@ -119,6 +123,30 @@
                                 <h2>학생</h2>
                                 <button id="sortHeroes" class="btn btn-secondary">정렬 순서 변경</button>
                             </header>
+                            <section class="gacha-panel" aria-label="학생 모집">
+                                <div class="gacha-panel__header">
+                                    <div>
+                                        <h3 class="gacha-panel__title">학생 모집</h3>
+                                        <p class="gacha-panel__hint">보스를 처치하면 일정 확률로 모집권을 획득합니다.</p>
+                                    </div>
+                                    <div class="gacha-panel__tokens">
+                                        <span class="gacha-panel__tokens-label">보유 모집권</span>
+                                        <strong id="gachaTokens" class="gacha-panel__tokens-value">0</strong>
+                                    </div>
+                                </div>
+                                <div class="gacha-panel__actions">
+                                    <button id="gachaSingle" class="btn btn-gacha" type="button">1회 모집 (1)</button>
+                                    <button id="gachaTen" class="btn btn-gacha" type="button">10회 모집 (9)</button>
+                                </div>
+                                <p class="gacha-panel__notice">10회 모집 시 1회는 무료로 진행됩니다.</p>
+                                <ul
+                                    id="gachaResults"
+                                    class="gacha-results"
+                                    aria-live="polite"
+                                    aria-label="최근 가챠 결과"
+                                ></ul>
+                                <p id="gachaResultsEmpty" class="gacha-results__empty">아직 모집 기록이 없습니다.</p>
+                            </section>
                             <ul id="heroList" class="hero-list"></ul>
                         </section>
 
@@ -253,7 +281,7 @@
     </div>
 
     <template id="heroTemplate">
-        <li class="hero">
+        <li class="hero" data-recruited="false">
             <div class="hero__info">
                 <h3 class="hero__name"></h3>
                 <p class="hero__desc"></p>
@@ -262,7 +290,10 @@
                     <span class="hero__dps"></span>
                 </div>
             </div>
-            <button class="btn btn-hero"></button>
+            <div class="hero__status">
+                <span class="hero__status-state"></span>
+                <span class="hero__status-detail"></span>
+            </div>
         </li>
     </template>
 
