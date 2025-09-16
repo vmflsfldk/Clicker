@@ -13,6 +13,12 @@ const formatPercent = (value, fractionDigits = 1) => {
     return `${(value * 100).toFixed(fractionDigits)}%`;
 };
 
+const toNonNegativeNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(0, parsed);
+};
+
 const equipmentCatalog = [
     {
         id: 'training-blade',
@@ -24,7 +30,8 @@ const equipmentCatalog = [
         baseBonus: 0.15,
         bonusPerLevel: 0.08,
         maxLevel: 5,
-        initialDuplicates: 2,
+        materialsPerLevel: 1,
+        initialMaterials: 2,
     },
     {
         id: 'scout-armor',
@@ -36,7 +43,8 @@ const equipmentCatalog = [
         baseBonus: 0.12,
         bonusPerLevel: 0.07,
         maxLevel: 6,
-        initialDuplicates: 1,
+        materialsPerLevel: 1,
+        initialMaterials: 1,
     },
     {
         id: 'hunter-charm',
@@ -48,7 +56,8 @@ const equipmentCatalog = [
         baseBonus: 0.1,
         bonusPerLevel: 0.05,
         maxLevel: 7,
-        initialDuplicates: 1,
+        materialsPerLevel: 2,
+        initialMaterials: 2,
     },
 ];
 
@@ -57,6 +66,8 @@ const equipmentTypeLabels = {
     armor: '방어구',
     trinket: '장신구',
 };
+
+const getEquipmentMaterialKey = (definition) => `${definition.type}:${definition.grade}`;
 
 class EquipmentItem {
     constructor(definition, savedState) {
@@ -69,32 +80,23 @@ class EquipmentItem {
         this.baseBonus = definition.baseBonus;
         this.bonusPerLevel = definition.bonusPerLevel;
         this.maxLevel = definition.maxLevel;
-        this.level = savedState?.level ?? 0;
-        const savedDuplicates = savedState?.duplicates ?? definition.initialDuplicates ?? 0;
-        this.duplicates = Math.max(0, savedDuplicates);
+        this.materialKey = getEquipmentMaterialKey(definition);
+        this.materialsPerLevel = definition.materialsPerLevel ?? 1;
+        const savedLevel = Number(savedState?.level);
+        const initialLevel = Number.isFinite(savedLevel) ? savedLevel : 0;
+        this.level = Math.max(0, Math.min(this.maxLevel, initialLevel));
     }
 
     get totalBonus() {
         return this.baseBonus + this.level * this.bonusPerLevel;
     }
 
-    get canEnhance() {
-        return this.level < this.maxLevel && this.availableDuplicates > 0;
+    get isMaxLevel() {
+        return this.level >= this.maxLevel;
     }
 
-    get availableDuplicates() {
-        return this.duplicates;
-    }
-
-    consumeDuplicate(count = 1) {
-        if (this.availableDuplicates < count) return false;
-        this.duplicates -= count;
-        return true;
-    }
-
-    enhance() {
-        if (!this.canEnhance) return false;
-        if (!this.consumeDuplicate(1)) return false;
+    increaseLevel() {
+        if (this.isMaxLevel) return false;
         this.level += 1;
         return true;
     }
@@ -103,7 +105,6 @@ class EquipmentItem {
         return {
             id: this.id,
             level: this.level,
-            duplicates: this.duplicates,
         };
     }
 }
@@ -114,6 +115,29 @@ const createEquipmentInventory = (savedInventory) => {
         const state = saved.find((item) => item.id === definition.id);
         return new EquipmentItem(definition, state);
     });
+};
+
+const createEquipmentMaterials = (savedEquipment, savedMaterials) => {
+    const materials = {};
+    equipmentCatalog.forEach((definition) => {
+        const key = getEquipmentMaterialKey(definition);
+        const savedValue = savedMaterials ? Number(savedMaterials[key]) : NaN;
+        if (Number.isFinite(savedValue)) {
+            materials[key] = Math.max(0, savedValue);
+            return;
+        }
+
+        const savedEntry = savedEquipment?.find((item) => item.id === definition.id);
+        const legacyDuplicates = savedEntry ? Number(savedEntry.duplicates) : NaN;
+        if (Number.isFinite(legacyDuplicates)) {
+            materials[key] = Math.max(0, legacyDuplicates);
+            return;
+        }
+
+        const initial = definition.initialMaterials ?? 0;
+        materials[key] = toNonNegativeNumber(initial, 0);
+    });
+    return materials;
 };
 
 const getEquipmentBonuses = (equipmentList) => {
@@ -277,6 +301,7 @@ class GameState {
         this.heroes = defaultHeroes.map((hero) => new Hero(hero, heroStates.find((h) => h.id === hero.id)));
         this.sortOrder = saved?.sortOrder ?? 'cost';
         this.equipment = createEquipmentInventory(saved?.equipment);
+        this.equipmentMaterials = createEquipmentMaterials(saved?.equipment, saved?.equipmentMaterials);
     }
 
     get totalDps() {
@@ -292,6 +317,24 @@ class GameState {
 
     get equipmentBonuses() {
         return getEquipmentBonuses(this.equipment);
+    }
+
+    getEquipmentMaterialCount(materialKey) {
+        return this.equipmentMaterials?.[materialKey] ?? 0;
+    }
+
+    canEnhanceEquipment(item) {
+        if (!item || item.isMaxLevel) return false;
+        return this.getEquipmentMaterialCount(item.materialKey) >= item.materialsPerLevel;
+    }
+
+    consumeEquipmentMaterial(materialKey, amount = 1) {
+        if (!this.equipmentMaterials) {
+            this.equipmentMaterials = {};
+        }
+        const current = this.getEquipmentMaterialCount(materialKey);
+        const nextValue = Math.max(0, current - amount);
+        this.equipmentMaterials[materialKey] = nextValue;
     }
 
     get effectiveClickDamage() {
@@ -353,6 +396,7 @@ class GameState {
         this.frenzyCooldown = 0;
         this.frenzyActiveUntil = 0;
         this.equipment = createEquipmentInventory();
+        this.equipmentMaterials = createEquipmentMaterials();
     }
 
     toJSON() {
@@ -367,6 +411,7 @@ class GameState {
             frenzyCooldown: this.frenzyCooldown,
             frenzyActiveUntil: this.frenzyActiveUntil,
             equipment: this.equipment.map((item) => item.toJSON()),
+            equipmentMaterials: this.equipmentMaterials,
         };
     }
 
@@ -375,19 +420,22 @@ class GameState {
         if (!item) {
             return { success: false, message: '장비를 찾을 수 없습니다.' };
         }
-        if (item.level >= item.maxLevel) {
+        if (item.isMaxLevel) {
             return { success: false, message: '이미 최대 강화 단계입니다.' };
         }
-        if (!item.canEnhance) {
-            return { success: false, message: '강화에 필요한 동일 장비가 부족합니다.' };
+        const availableMaterials = this.getEquipmentMaterialCount(item.materialKey);
+        if (availableMaterials < item.materialsPerLevel) {
+            return { success: false, message: '강화에 필요한 동일 타입·등급 장비가 부족합니다.' };
         }
 
-        const enhanced = item.enhance();
+        const enhanced = item.increaseLevel();
         if (!enhanced) {
             return { success: false, message: '강화에 실패했습니다.' };
         }
 
-        return { success: true, item };
+        this.consumeEquipmentMaterial(item.materialKey, item.materialsPerLevel);
+
+        return { success: true, item, materialKey: item.materialKey };
     }
 }
 
@@ -466,7 +514,8 @@ class GameUI {
         name.textContent = hero.name;
         desc.textContent = hero.description;
         level.textContent = `Lv. ${hero.level}`;
-        dps.textContent = `DPS: ${formatNumber(hero.damagePerSecond)}`;
+        const dpsMultiplier = 1 + this.state.equipmentBonuses.dps;
+        dps.textContent = `DPS: ${formatNumber(hero.damagePerSecond * dpsMultiplier)}`;
         const costText = formatNumber(hero.nextCost);
         button.textContent = hero.level === 0 ? `${costText} 골드로 채용` : `레벨 업 (${costText} 골드)`;
         button.disabled = hero.nextCost > this.state.gold;
@@ -508,7 +557,7 @@ class GameUI {
         const grade = node.querySelector('.equipment__grade');
         const level = node.querySelector('.equipment__level');
         const bonus = node.querySelector('.equipment__bonus');
-        const duplicates = node.querySelector('.equipment__duplicates');
+        const materials = node.querySelector('.equipment__duplicates');
         const button = node.querySelector('.btn');
 
         if (name) name.textContent = item.name;
@@ -522,7 +571,7 @@ class GameUI {
         button.addEventListener('click', () => this.handleEquipmentEnhance(item.id));
 
         UI.equipmentList.appendChild(node);
-        this.equipmentElements.set(item.id, { node, level, bonus, duplicates, button });
+        this.equipmentElements.set(item.id, { node, level, bonus, materials, button });
         this.updateEquipmentItem(item);
     }
 
@@ -535,15 +584,17 @@ class GameUI {
         if (equipmentUI.bonus) {
             equipmentUI.bonus.textContent = `효과: ${this.getEquipmentBonusText(item)}`;
         }
-        if (equipmentUI.duplicates) {
-            equipmentUI.duplicates.textContent = `보유 중인 동일 장비: ${formatNumber(item.availableDuplicates)}개`;
+        if (equipmentUI.materials) {
+            const available = this.state.getEquipmentMaterialCount(item.materialKey);
+            const typeLabel = equipmentTypeLabels[item.type] ?? item.type.toUpperCase();
+            equipmentUI.materials.textContent = `재료 (${typeLabel} · ${item.grade} 등급): 필요 ${item.materialsPerLevel}개 / 보유 ${formatNumber(available)}개`;
         }
-        if (item.level >= item.maxLevel) {
+        if (item.isMaxLevel) {
             equipmentUI.button.textContent = '최대 강화';
             equipmentUI.button.disabled = true;
         } else {
-            equipmentUI.button.textContent = '강화';
-            equipmentUI.button.disabled = !item.canEnhance;
+            equipmentUI.button.textContent = `강화 (-${item.materialsPerLevel} 재료)`;
+            equipmentUI.button.disabled = !this.state.canEnhanceEquipment(item);
         }
     }
 
@@ -725,8 +776,7 @@ class GameUI {
             return;
         }
         this.addLog(`${result.item.name}이(가) +${result.item.level} 단계로 강화되었습니다!`, 'success');
-        this.updateEquipmentItem(result.item);
-        this.updateEquipmentSummary();
+        this.updateEquipment();
         this.updateStats();
         this.updateHeroes();
         saveGame(this.state);
