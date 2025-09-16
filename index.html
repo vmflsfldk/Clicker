@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tap Titans 스타일 클리커</title>
+    <title>블루 아카이브 전술 시뮬레이터</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
 <body>
     <div class="game">
         <header class="game__header">
-            <h1>영웅의 탭</h1>
+            <h1>샬레 전술 훈련</h1>
             <div class="game__stats">
                 <div class="stat">
                     <span class="stat__label">스테이지</span>
@@ -23,11 +23,11 @@
                     <span id="gold" class="stat__value">0</span>
                 </div>
                 <div class="stat">
-                    <span class="stat__label">클릭 대미지</span>
+                    <span class="stat__label">전술 공격력</span>
                     <span id="clickDamage" class="stat__value">1</span>
                 </div>
                 <div class="stat">
-                    <span class="stat__label">총 DPS</span>
+                    <span class="stat__label">총 지원 화력</span>
                     <span id="totalDps" class="stat__value">0</span>
                 </div>
             </div>
@@ -36,7 +36,7 @@
         <main class="game__main">
             <section class="game__enemy">
                 <div class="enemy__info">
-                    <div id="enemyName" class="enemy__name">고블린 정찰병</div>
+                    <div id="enemyName" class="enemy__name">훈련용 타깃</div>
                     <div class="enemy__health-bar">
                         <div id="enemyHealthBar" class="enemy__health-bar-fill"></div>
                     </div>
@@ -66,7 +66,7 @@
                         aria-controls="panel-heroes"
                         data-tab-target="heroes"
                     >
-                        영웅
+                        학생
                     </button>
                     <button
                         type="button"
@@ -90,7 +90,7 @@
                         data-tab-target="equipment"
                         tabindex="-1"
                     >
-                        장비
+                        전술 장비
                     </button>
                     <button
                         type="button"
@@ -116,7 +116,7 @@
                     >
                         <section class="panel panel--hero">
                             <header class="panel__header">
-                                <h2>영웅</h2>
+                                <h2>학생</h2>
                                 <button id="sortHeroes" class="btn btn-secondary">정렬 순서 변경</button>
                             </header>
                             <ul id="heroList" class="hero-list"></ul>
@@ -124,21 +124,21 @@
 
                         <section class="panel panel--upgrades">
                             <header class="panel__header">
-                                <h2>용사의 힘</h2>
+                                <h2>샬레 지원 센터</h2>
                             </header>
                             <div class="upgrade">
                                 <div>
-                                    <h3>검술 훈련</h3>
-                                    <p>클릭 대미지를 올립니다.</p>
+                                    <h3>전술 교육 프로그램</h3>
+                                    <p>학생의 기본 공격력을 강화합니다.</p>
                                 </div>
-                                <button id="upgradeClick" class="btn btn-upgrade">레벨 업 (10 골드)</button>
+                                <button id="upgradeClick" class="btn btn-upgrade">전술 교육 (10 골드)</button>
                             </div>
                             <div class="upgrade">
                                 <div>
-                                    <h3>자동 전투</h3>
-                                    <p>DPS를 일시적으로 2배로 증가시키는 스킬</p>
+                                    <h3>아로나의 전술 지원</h3>
+                                    <p>샬레의 지원 네트워크로 잠시 총 지원 화력을 2배로 높입니다.</p>
                                 </div>
-                                <button id="skillFrenzy" class="btn btn-skill">발동 (쿨타임 60초)</button>
+                                <button id="skillFrenzy" class="btn btn-skill">지원 요청 (쿨타임 60초)</button>
                                 <p id="skillCooldown" class="cooldown"></p>
                             </div>
                         </section>
@@ -193,22 +193,22 @@
                     >
                         <section class="panel panel--equipment">
                             <header class="panel__header">
-                                <h2>장비</h2>
+                                <h2>전술 장비</h2>
                             </header>
                             <p id="equipmentSummary" class="equipment__summary" aria-live="polite">
-                                탭 대미지 +0.0% · 용병 DPS +0.0% · 스킬 효율 +0.0%
+                                전술 공격력 +0.0% · 지원 화력 +0.0% · 전술 스킬 +0.0%
                             </p>
                             <div class="equipment__bonuses">
                                 <div class="equipment__bonus">
-                                    <span>탭 대미지</span>
+                                    <span>전술 공격력</span>
                                     <strong id="equipmentTapBonus">+0%</strong>
                                 </div>
                                 <div class="equipment__bonus">
-                                    <span>용병 DPS</span>
+                                    <span>지원 화력</span>
                                     <strong id="equipmentHeroBonus">+0%</strong>
                                 </div>
                                 <div class="equipment__bonus">
-                                    <span>스킬 효율</span>
+                                    <span>전술 스킬</span>
                                     <strong id="equipmentSkillBonus">+0%</strong>
                                 </div>
                             </div>
@@ -219,7 +219,7 @@
                             <div class="equipment__section">
                                 <h3 class="equipment__subheading">인벤토리</h3>
                                 <ul id="equipmentInventory" class="equipment-list"></ul>
-                                <p id="equipmentEmpty" class="equipment-empty">아직 획득한 장비가 없습니다.</p>
+                                <p id="equipmentEmpty" class="equipment-empty">아직 확보한 전술 장비가 없습니다.</p>
                             </div>
                         </section>
                     </div>
@@ -248,7 +248,7 @@
                 <button id="resetProgress" class="btn btn-secondary">초기화</button>
                 <button id="saveProgress" class="btn btn-secondary">즉시 저장</button>
             </div>
-            <p class="game__footer-text">Tap Titans에서 영감을 받은 브라우저용 클리커 게임 데모입니다.</p>
+            <p class="game__footer-text">비영리 블루 아카이브 팬게임을 위한 브라우저 전술 시뮬레이터 데모입니다.</p>
         </footer>
     </div>
 

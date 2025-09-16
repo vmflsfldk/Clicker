@@ -10,41 +10,41 @@ const formatNumber = (value) => {
 
 const defaultHeroes = [
     {
-        id: 'blade',
-        name: '칼날 수련생',
-        description: '초보지만 꾸준한 DPS를 제공하는 영웅.',
+        id: 'shiroko',
+        name: '시로코 - 아비도스 라이더',
+        description: '아비도스 대책위원회의 라이딩 에이스로 꾸준한 사격 지원을 제공합니다.',
         baseCost: 25,
         costMultiplier: 1.08,
         baseDamage: 5,
     },
     {
-        id: 'archer',
-        name: '달빛 궁수',
-        description: '빠른 속도로 화살을 쏘아 안정적인 피해를 입힙니다.',
+        id: 'hoshino',
+        name: '호시노 - 방과후 지휘',
+        description: '방과후 대책위원회의 부장. 여유로운 모습과 달리 안정적인 탄막을 유지합니다.',
         baseCost: 120,
         costMultiplier: 1.1,
         baseDamage: 18,
     },
     {
-        id: 'mage',
-        name: '마나 현자',
-        description: '강력한 원소 마법으로 적을 녹입니다.',
+        id: 'aru',
+        name: '아루 - 청룡당 리더',
+        description: '게헨나 청룡당의 리더로 폭발적인 화력을 자랑합니다.',
         baseCost: 450,
         costMultiplier: 1.12,
         baseDamage: 75,
     },
     {
-        id: 'assassin',
-        name: '그림자 암살자',
-        description: '중첩되는 출혈을 남기는 치명타 전문가.',
+        id: 'hibiki',
+        name: '히비키 - 밀레니엄 포격',
+        description: '밀레니엄 사이언스 스쿨의 폭격 지원 담당. 정밀 포격으로 광역 피해를 입힙니다.',
         baseCost: 1800,
         costMultiplier: 1.14,
         baseDamage: 220,
     },
     {
-        id: 'samurai',
-        name: '도깨비 사무라이',
-        description: '일격필살! 강력한 단일 공격으로 보스를 처치합니다.',
+        id: 'iroha',
+        name: '이로하 - 코사카 특무대',
+        description: '코사카 특무대의 전차 지휘관으로 강력한 포격으로 보스를 제압합니다.',
         baseCost: 5200,
         costMultiplier: 1.15,
         baseDamage: 620,
@@ -52,15 +52,15 @@ const defaultHeroes = [
 ];
 
 const EQUIPMENT_TYPES = [
-    { id: 'tap', label: '탭 대미지', description: '클릭 공격력을 증가시킵니다.' },
-    { id: 'hero', label: '용병 DPS', description: '자동 전투의 효율이 올라갑니다.' },
-    { id: 'skill', label: '스킬 효율', description: '광분 스킬의 지속 시간이 늘어나고 배율이 강화됩니다.' },
+    { id: 'tap', label: '전술 공격력', description: '학생의 기본 전투력을 강화합니다.' },
+    { id: 'hero', label: '지원 화력', description: '후방 지원 부대의 지속 화력을 끌어올립니다.' },
+    { id: 'skill', label: '전술 스킬', description: '샬레 전술 지원 호출의 효율을 강화합니다.' },
 ];
 
 const EQUIPMENT_BASE_NAMES = {
-    tap: ['격투 장갑', '폭풍의 검집', '강화 건틀릿', '전설의 단검'],
-    hero: ['용병 깃발', '전략의 서', '전투 북', '사령관의 망토'],
-    skill: ['마법 부적', '고대 주문서', '신비한 수정', '시간의 모래시계'],
+    tap: ['시로코의 라이딩 글러브', '네루의 전술 나이프', '미도리의 개조 키트', '유우카의 데이터 패드'],
+    hero: ['방과후 대책위원회 작전도', '밀레니엄 폭격 프로토콜', '청룡당 지휘 배지', '샬레 공용 무전기'],
+    skill: ['아로나의 전술 로그', '샬레 필드 매뉴얼', '코사카 특무대 작전지도', '하나에의 지원 드론 설계도'],
 };
 
 const EQUIPMENT_RARITIES = [
@@ -140,18 +140,18 @@ const BOSS_WARNING_THRESHOLD = 5000;
 const REBIRTH_STAGE_REQUIREMENT = 100;
 
 const REBIRTH_EFFECT_LABELS = {
-    tap: '탭 대미지',
-    hero: '용병 DPS',
-    skill: '스킬 효율',
-    gold: '골드 획득',
+    tap: '전술 공격력',
+    hero: '지원 화력',
+    skill: '전술 스킬',
+    gold: '작전 보상',
 };
 
 const REBIRTH_SKILLS = [
     {
         id: 'tapPower',
-        name: '환생의 일격',
-        description: '환생의 힘으로 손끝을 강화해 더 강한 일격을 날립니다.',
-        effectDescription: '레벨당 탭 대미지 +10%',
+        name: '아로나의 전술 분석',
+        description: '아로나가 전투 데이터를 실시간으로 분석해 학생들의 조준을 돕습니다.',
+        effectDescription: '레벨당 전술 공격력 +10%',
         effect: { tap: 0.1 },
         baseCost: 2,
         costGrowth: 2,
@@ -159,9 +159,9 @@ const REBIRTH_SKILLS = [
     },
     {
         id: 'heroCommand',
-        name: '전장의 지휘',
-        description: '환생의 기억으로 용병들의 전투력을 끌어올립니다.',
-        effectDescription: '레벨당 용병 DPS +8%',
+        name: '대책위원회 연계',
+        description: '방과후 대책위원회가 팀워크로 지원 화력을 조율합니다.',
+        effectDescription: '레벨당 지원 화력 +8%',
         effect: { hero: 0.08 },
         baseCost: 2,
         costGrowth: 3,
@@ -169,9 +169,9 @@ const REBIRTH_SKILLS = [
     },
     {
         id: 'manaOverflow',
-        name: '마력 홍수',
-        description: '끝없이 솟아나는 마력으로 광분 스킬을 강화합니다.',
-        effectDescription: '레벨당 스킬 효율 +6%',
+        name: '밀레니엄 전술 드론',
+        description: '밀레니엄의 전술 드론이 전장 데이터를 공유해 지원 호출을 강화합니다.',
+        effectDescription: '레벨당 전술 스킬 +6%',
         effect: { skill: 0.06 },
         baseCost: 3,
         costGrowth: 3,
@@ -179,9 +179,9 @@ const REBIRTH_SKILLS = [
     },
     {
         id: 'goldSense',
-        name: '황금 감각',
-        description: '적의 약점을 꿰뚫어 더 많은 전리품을 챙깁니다.',
-        effectDescription: '레벨당 골드 획득 +5%',
+        name: '게헨나 재무 감각',
+        description: '게헨나의 운영 노하우로 작전 보상 회수를 극대화합니다.',
+        effectDescription: '레벨당 작전 보상 +5%',
         effect: { gold: 0.05 },
         baseCost: 4,
         costGrowth: 4,
@@ -217,7 +217,7 @@ const chooseRarity = (isBoss) => {
 };
 
 const generateEquipmentName = (typeId) => {
-    const pool = EQUIPMENT_BASE_NAMES[typeId] ?? ['신비한 장비'];
+    const pool = EQUIPMENT_BASE_NAMES[typeId] ?? ['미식별 전술 장비'];
     return randomFromArray(pool);
 };
 
@@ -278,7 +278,7 @@ class Hero {
 class Enemy {
     constructor(stage = 1, savedState) {
         this.stage = stage;
-        this.baseNames = ['고블린 정찰병', '스켈레톤 창병', '늑대 인간', '오크 버서커', '암흑 기사'];
+        this.baseNames = ['훈련용 타깃', '전술 드론', '모의 전차', '연습용 자동포대', '합동 훈련 장비'];
         this.maxHp = savedState?.maxHp ?? this.calculateMaxHp(stage);
         this.hp = savedState?.hp ?? this.maxHp;
         this.defeated = savedState?.defeated ?? 0;
@@ -538,7 +538,7 @@ class GameState {
 
     buyHero(heroId) {
         const hero = this.heroes.find((h) => h.id === heroId);
-        if (!hero) return { success: false, message: '알 수 없는 영웅입니다.' };
+        if (!hero) return { success: false, message: '알 수 없는 학생입니다.' };
         const { success, cost, message } = hero.levelUp(this.gold);
         if (!success) return { success, message };
         this.gold -= cost;
@@ -708,7 +708,7 @@ class GameState {
     upgradeEquipment(itemId) {
         const index = this.inventory.findIndex((entry) => entry.id === itemId);
         if (index === -1) {
-            return { success: false, message: '장비를 찾을 수 없습니다.' };
+            return { success: false, message: '전술 장비를 찾을 수 없습니다.' };
         }
         const item = this.inventory[index];
         if (item.level >= item.maxLevel) {
@@ -721,7 +721,7 @@ class GameState {
             candidates.push({ entry, entryIndex });
         });
         if (candidates.length === 0) {
-            return { success: false, message: '강화에 사용할 동일한 장비가 부족합니다.' };
+            return { success: false, message: '강화에 사용할 동일한 전술 장비가 부족합니다.' };
         }
 
         const preferred = candidates.find(({ entry }) => this.equipped[item.type] !== entry.id);
@@ -781,7 +781,7 @@ class GameState {
     equipItem(itemId) {
         const item = this.inventory.find((entry) => entry.id === itemId);
         if (!item) {
-            return { success: false, message: '장비를 찾을 수 없습니다.' };
+            return { success: false, message: '전술 장비를 찾을 수 없습니다.' };
         }
         const previous = this.getEquippedItem(item.type);
         this.equipped[item.type] = item.id;
@@ -1056,13 +1056,13 @@ class GameUI {
                 })
                 .filter(Boolean)
                 .join(' · ');
-            UI.equipmentSummary.textContent = summaryText || '추가 보너스 없음';
+            UI.equipmentSummary.textContent = summaryText || '추가 지원 없음';
 
             const tooltipParts = summaryData.map(({ label, equipmentValue, rebirthValue }) => {
                 const breakdown = this.buildBonusBreakdown(equipmentValue, rebirthValue);
                 return `${label}: ${breakdown}`;
             });
-            UI.equipmentSummary.title = tooltipParts.length > 0 ? tooltipParts.join('\n') : '추가 보너스 없음';
+            UI.equipmentSummary.title = tooltipParts.length > 0 ? tooltipParts.join('\n') : '추가 지원 없음';
         }
     }
 
@@ -1075,9 +1075,9 @@ class GameUI {
 
     buildBonusBreakdown(equipmentValue = 0, rebirthValue = 0) {
         const parts = [];
-        if (equipmentValue > 0) parts.push(`장비 ${formatPercent(equipmentValue)}`);
-        if (rebirthValue > 0) parts.push(`환생 ${formatPercent(rebirthValue)}`);
-        if (parts.length === 0) return '추가 보너스 없음';
+        if (equipmentValue > 0) parts.push(`장비 지원 ${formatPercent(equipmentValue)}`);
+        if (rebirthValue > 0) parts.push(`환생 기억 ${formatPercent(rebirthValue)}`);
+        if (parts.length === 0) return '추가 지원 없음';
         return parts.join(' / ');
     }
 
@@ -1236,7 +1236,7 @@ class GameUI {
 
             const details = document.createElement('span');
             details.className = 'equipment-item__details';
-            const typeLabel = type?.label ?? '장비';
+            const typeLabel = type?.label ?? '전술 장비';
             details.textContent = `${typeLabel} +${formatPercent(item.value)} · Lv. ${item.level}/${item.maxLevel} · 스테이지 ${item.stage}`;
 
             info.append(name, details);
@@ -1260,9 +1260,9 @@ class GameUI {
                 upgradeButton.textContent = '강화';
                 upgradeButton.disabled = !upgradeAvailable;
                 if (!upgradeAvailable) {
-                    upgradeButton.title = '동일 타입·등급의 장비가 추가로 필요합니다.';
+                    upgradeButton.title = '동일 타입·등급의 전술 장비가 추가로 필요합니다.';
                 } else {
-                    upgradeButton.title = `강화에 동일 타입·등급 장비 1개가 소모됩니다. (보유 ${materials.length}개)`;
+                    upgradeButton.title = `강화에 동일 타입·등급 전술 장비 1개가 소모됩니다. (보유 ${materials.length}개)`;
                 }
             }
 
@@ -1291,7 +1291,7 @@ class GameUI {
             const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
             const type = EQUIPMENT_TYPE_MAP.get(result.item.type);
             const prefix = rarity ? `[${rarity.name}] ` : '';
-            const label = type?.label ?? '장비';
+            const label = type?.label ?? '전술 장비';
             const previousLevel = result.previousLevel;
             const previousValueText = formatPercent(result.previousValue);
             const newValueText = formatPercent(result.item.value);
@@ -1303,12 +1303,12 @@ class GameUI {
                 const consumedRarity = EQUIPMENT_RARITY_MAP.get(result.consumed.rarity);
                 const consumedPrefix = consumedRarity ? `[${consumedRarity.name}] ` : '';
                 this.addLog(
-                    `소모된 장비: ${consumedPrefix}${result.consumed.name} (Lv. ${result.consumed.level}/${result.consumed.maxLevel})`,
+                    `소모된 전술 장비: ${consumedPrefix}${result.consumed.name} (Lv. ${result.consumed.level}/${result.consumed.maxLevel})`,
                     'info',
                 );
             }
             if (result.consumedWasEquipped) {
-                this.addLog('강화 재료로 사용된 장착 장비가 해제되었습니다.', 'warning');
+                this.addLog('강화 재료로 사용된 전술 장비가 해제되었습니다.', 'warning');
             }
             this.renderEquipmentSlots();
             this.renderEquipmentInventory();
@@ -1327,13 +1327,13 @@ class GameUI {
         const type = EQUIPMENT_TYPE_MAP.get(result.item.type);
         const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
         const prefix = rarity ? `[${rarity.name}] ` : '';
-        const bonusText = `${type?.label ?? '장비'} +${formatPercent(result.item.value)} · Lv. ${result.item.level}/${result.item.maxLevel}`;
+        const bonusText = `${type?.label ?? '전술 장비'} +${formatPercent(result.item.value)} · Lv. ${result.item.level}/${result.item.maxLevel}`;
         this.addLog(`${prefix}${result.item.name}을 장착했습니다. ${bonusText}`, 'success');
         if (result.previous && result.previous.id !== result.item.id) {
             const previousRarity = EQUIPMENT_RARITY_MAP.get(result.previous.rarity);
             const previousPrefix = previousRarity ? `[${previousRarity.name}] ` : '';
             this.addLog(
-                `이전 장비 ${previousPrefix}${result.previous.name} (Lv. ${result.previous.level}/${result.previous.maxLevel})은 인벤토리에 보관됩니다.`,
+                `이전 전술 장비 ${previousPrefix}${result.previous.name} (Lv. ${result.previous.level}/${result.previous.maxLevel})은 인벤토리에 보관됩니다.`,
                 'info',
             );
         }
@@ -1382,7 +1382,7 @@ class GameUI {
         const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
         const type = EQUIPMENT_TYPE_MAP.get(item.type);
         const prefix = rarity ? `[${rarity.name}] ` : '';
-        const bonusText = `${type?.label ?? '장비'} +${formatPercent(item.value)}`;
+        const bonusText = `${type?.label ?? '전술 장비'} +${formatPercent(item.value)}`;
         const levelText = `Lv. ${item.level}/${item.maxLevel}`;
         const autoText = autoEquipped ? ' (자동 장착)' : '';
         this.addLog(`${prefix}${item.name}을 획득했습니다! ${bonusText} · ${levelText}${autoText}`, 'success');
@@ -1390,11 +1390,11 @@ class GameUI {
             const replacedRarity = EQUIPMENT_RARITY_MAP.get(replaced.rarity);
             const replacedPrefix = replacedRarity ? `[${replacedRarity.name}] ` : '';
             this.addLog(
-                `기존 ${type?.label ?? '장비'} ${replacedPrefix}${replaced.name} (Lv. ${replaced.level}/${replaced.maxLevel})이(가) 인벤토리로 이동했습니다.`,
+                `기존 ${type?.label ?? '전술 장비'} ${replacedPrefix}${replaced.name} (Lv. ${replaced.level}/${replaced.maxLevel})이(가) 인벤토리로 이동했습니다.`,
                 'info',
             );
         } else if (!autoEquipped) {
-            this.addLog(`${type?.label ?? '장비'} 장비가 기존보다 약해 자동 장착되지 않았습니다.`, 'info');
+            this.addLog(`${type?.label ?? '전술 장비'}가 기존보다 약해 자동 장착되지 않았습니다.`, 'info');
         }
         this.renderEquipmentInventory();
         this.renderEquipmentSlots();
@@ -1418,7 +1418,7 @@ class GameUI {
         UI.clickDamage.textContent = formatNumber(this.state.effectiveClickDamage);
         UI.totalDps.textContent = formatNumber(this.state.totalDps);
         const clickCost = Math.ceil(10 * Math.pow(1.2, this.state.clickLevel - 1));
-        UI.upgradeClick.textContent = `레벨 업 (${formatNumber(clickCost)} 골드)`;
+        UI.upgradeClick.textContent = `전술 교육 (${formatNumber(clickCost)} 골드)`;
         this.updateEquipmentSummary();
         this.updateRebirthUI();
     }
@@ -1428,14 +1428,14 @@ class GameUI {
         const remainingCooldown = Math.max(0, this.state.frenzyCooldown - now);
         if (this.state.isFrenzyActive) {
             const secondsLeft = ((this.state.frenzyActiveUntil - now) / 1000).toFixed(1);
-            UI.skillCooldown.textContent = `광분 지속: ${secondsLeft}s`;
+            UI.skillCooldown.textContent = `전술 지원 지속: ${secondsLeft}s`;
             UI.skillFrenzy.disabled = true;
         } else if (remainingCooldown > 0) {
             const seconds = Math.ceil(remainingCooldown / 1000);
-            UI.skillCooldown.textContent = `쿨타임: ${seconds}s`;
+            UI.skillCooldown.textContent = `재가동까지: ${seconds}s`;
             UI.skillFrenzy.disabled = true;
         } else {
-            UI.skillCooldown.textContent = '사용 가능';
+            UI.skillCooldown.textContent = '지원 가능';
             UI.skillFrenzy.disabled = false;
         }
     }
@@ -1527,7 +1527,7 @@ class GameUI {
             this.addLog(result.message, 'warning');
             return;
         }
-        this.addLog(`검술 훈련 레벨이 ${this.state.clickLevel}이 되었습니다!`);
+        this.addLog(`전술 교육 프로그램 레벨이 ${this.state.clickLevel}이 되었습니다!`);
         this.updateStats();
     }
 
@@ -1592,7 +1592,7 @@ class GameUI {
     useFrenzy() {
         const now = Date.now();
         if (this.state.frenzyCooldown > now || this.state.isFrenzyActive) {
-            this.addLog('아직 스킬을 사용할 수 없습니다.', 'warning');
+            this.addLog('아로나의 전술 지원은 아직 준비되지 않았습니다.', 'warning');
             return;
         }
         const baseDuration = 15000; // 15초 기본 지속
@@ -1602,7 +1602,7 @@ class GameUI {
         this.state.frenzyActiveUntil = now + duration;
         this.state.frenzyCooldown = now + cooldown;
         this.addLog(
-            `자동 전투 스킬 발동! ${(duration / 1000).toFixed(1)}초 동안 DPS가 ${multiplier.toFixed(1)}배입니다!`,
+            `아로나의 전술 지원 발동! ${(duration / 1000).toFixed(1)}초 동안 DPS가 ${multiplier.toFixed(1)}배입니다!`,
             'success',
         );
         this.updateFrenzyUI();
