@@ -840,6 +840,8 @@ const UI = {
     equipmentSlots: document.getElementById('equipmentSlots'),
     equipmentInventory: document.getElementById('equipmentInventory'),
     equipmentEmpty: document.getElementById('equipmentEmpty'),
+    panelTabButtons: document.querySelectorAll('[data-tab-target]'),
+    panelViews: document.querySelectorAll('[data-tab]'),
 };
 
 class GameUI {
@@ -849,6 +851,9 @@ class GameUI {
         this.heroElements = new Map();
         this.rebirthSkillElements = new Map();
         this.sortState = state.sortOrder;
+        this.tabButtons = [];
+        this.tabPanels = new Map();
+        this.setupTabs();
         this.setupEvents();
         this.renderHeroes();
         this.renderEquipmentUI();
@@ -856,6 +861,52 @@ class GameUI {
         this.updateSortButton();
         this.updateUI();
         this.startLoops();
+    }
+
+    setupTabs() {
+        this.tabButtons = Array.from(UI.panelTabButtons ?? []);
+        this.tabPanels = new Map(
+            Array.from(UI.panelViews ?? []).map((panel) => [panel.dataset.tab, panel]),
+        );
+        if (this.tabButtons.length === 0 || this.tabPanels.size === 0) {
+            return;
+        }
+        this.tabButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                const target = button.dataset.tabTarget;
+                if (target) {
+                    this.activateTab(target);
+                }
+            });
+        });
+        const initialButton = this.tabButtons.find((button) => button.classList.contains('is-active'));
+        const initialTab = initialButton?.dataset.tabTarget ?? this.tabButtons[0]?.dataset.tabTarget;
+        if (initialTab) {
+            this.activateTab(initialTab);
+        }
+    }
+
+    activateTab(tabId) {
+        if (!tabId || !this.tabPanels.has(tabId)) {
+            return;
+        }
+        this.tabButtons.forEach((button) => {
+            const isActive = button.dataset.tabTarget === tabId;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            button.setAttribute('tabindex', isActive ? '0' : '-1');
+        });
+        this.tabPanels.forEach((panel, id) => {
+            const isActive = id === tabId;
+            panel.classList.toggle('is-active', isActive);
+            panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+            if (isActive) {
+                panel.removeAttribute('hidden');
+            } else {
+                panel.setAttribute('hidden', '');
+            }
+        });
+        this.activeTab = tabId;
     }
 
     setupEvents() {
