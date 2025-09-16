@@ -84,6 +84,65 @@
                     </div>
                 </section>
 
+                <section class="panel panel--rebirth" id="rebirthPanel">
+                    <header class="panel__header">
+                        <h2>환생</h2>
+                    </header>
+                    <div class="rebirth__summary">
+                        <div class="rebirth__stat">
+                            <span class="rebirth__label">환생 횟수</span>
+                            <strong id="rebirthCount">0</strong>
+                        </div>
+                        <div class="rebirth__stat">
+                            <span class="rebirth__label">최고 도달 층</span>
+                            <strong id="rebirthHighestStage">0</strong>
+                        </div>
+                        <div class="rebirth__stat">
+                            <span class="rebirth__label">이번 획득 예상</span>
+                            <strong id="rebirthPotential">0</strong>
+                        </div>
+                        <div class="rebirth__stat">
+                            <span class="rebirth__label">보유 포인트</span>
+                            <strong id="rebirthPoints">0</strong>
+                        </div>
+                    </div>
+                    <button id="rebirthButton" class="btn btn-rebirth" disabled>환생하기</button>
+                    <p id="rebirthRequirement" class="rebirth__requirement">100층을 돌파하면 환생할 수 있습니다.</p>
+                    <div class="rebirth__skills">
+                        <h3 class="rebirth__subheading">환생 스킬</h3>
+                        <ul id="rebirthSkillList" class="rebirth-skill-list"></ul>
+                    </div>
+                </section>
+
+                <section class="panel panel--equipment">
+                    <header class="panel__header">
+                        <h2>장비</h2>
+                    </header>
+                    <div class="equipment__bonuses">
+                        <div class="equipment__bonus">
+                            <span>탭 대미지</span>
+                            <strong id="equipmentTapBonus">+0%</strong>
+                        </div>
+                        <div class="equipment__bonus">
+                            <span>용병 DPS</span>
+                            <strong id="equipmentHeroBonus">+0%</strong>
+                        </div>
+                        <div class="equipment__bonus">
+                            <span>스킬 효율</span>
+                            <strong id="equipmentSkillBonus">+0%</strong>
+                        </div>
+                    </div>
+                    <div class="equipment__section">
+                        <h3 class="equipment__subheading">장착 장비</h3>
+                        <ul id="equipmentSlots" class="equipment-slots"></ul>
+                    </div>
+                    <div class="equipment__section">
+                        <h3 class="equipment__subheading">인벤토리</h3>
+                        <ul id="equipmentInventory" class="equipment-list"></ul>
+                        <p id="equipmentEmpty" class="equipment-empty">아직 획득한 장비가 없습니다.</p>
+                    </div>
+                </section>
+
                 <section class="panel panel--log">
                     <header class="panel__header">
                         <h2>전투 로그</h2>

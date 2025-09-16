@@ -51,6 +51,132 @@ const defaultHeroes = [
     },
 ];
 
+const EQUIPMENT_TYPES = [
+    { id: 'tap', label: '탭 대미지', description: '클릭 공격력을 증가시킵니다.' },
+    { id: 'hero', label: '용병 DPS', description: '자동 전투의 효율이 올라갑니다.' },
+    { id: 'skill', label: '스킬 효율', description: '광분 스킬의 지속 시간이 늘어나고 배율이 강화됩니다.' },
+];
+
+const EQUIPMENT_BASE_NAMES = {
+    tap: ['격투 장갑', '폭풍의 검집', '강화 건틀릿', '전설의 단검'],
+    hero: ['용병 깃발', '전략의 서', '전투 북', '사령관의 망토'],
+    skill: ['마법 부적', '고대 주문서', '신비한 수정', '시간의 모래시계'],
+};
+
+const EQUIPMENT_RARITIES = [
+    { id: 'common', name: '커먼', color: '#94a3b8', baseWeight: 40, bossWeight: 25, valueRange: [0.02, 0.05], rank: 0 },
+    { id: 'uncommon', name: '언커먼', color: '#22d3ee', baseWeight: 25, bossWeight: 20, valueRange: [0.04, 0.07], rank: 1 },
+    { id: 'rare', name: '레어', color: '#a855f7', baseWeight: 20, bossWeight: 25, valueRange: [0.07, 0.12], rank: 2 },
+    { id: 'unique', name: '유니크', color: '#f97316', baseWeight: 10, bossWeight: 18, valueRange: [0.12, 0.18], rank: 3 },
+    { id: 'legendary', name: '레전더리', color: '#facc15', baseWeight: 5, bossWeight: 12, valueRange: [0.18, 0.26], rank: 4 },
+];
+
+const EQUIPMENT_DROP_CHANCE = 0.2;
+const EQUIPMENT_BOSS_DROP_CHANCE = 0.45;
+
+const EQUIPMENT_RARITY_MAP = new Map(EQUIPMENT_RARITIES.map((rarity) => [rarity.id, rarity]));
+const EQUIPMENT_TYPE_MAP = new Map(EQUIPMENT_TYPES.map((type) => [type.id, type]));
+
+const REBIRTH_STAGE_REQUIREMENT = 100;
+
+const REBIRTH_EFFECT_LABELS = {
+    tap: '탭 대미지',
+    hero: '용병 DPS',
+    skill: '스킬 효율',
+    gold: '골드 획득',
+};
+
+const REBIRTH_SKILLS = [
+    {
+        id: 'tapPower',
+        name: '환생의 일격',
+        description: '환생의 힘으로 손끝을 강화해 더 강한 일격을 날립니다.',
+        effectDescription: '레벨당 탭 대미지 +10%',
+        effect: { tap: 0.1 },
+        baseCost: 2,
+        costGrowth: 2,
+        maxLevel: 10,
+    },
+    {
+        id: 'heroCommand',
+        name: '전장의 지휘',
+        description: '환생의 기억으로 용병들의 전투력을 끌어올립니다.',
+        effectDescription: '레벨당 용병 DPS +8%',
+        effect: { hero: 0.08 },
+        baseCost: 2,
+        costGrowth: 3,
+        maxLevel: 10,
+    },
+    {
+        id: 'manaOverflow',
+        name: '마력 홍수',
+        description: '끝없이 솟아나는 마력으로 광분 스킬을 강화합니다.',
+        effectDescription: '레벨당 스킬 효율 +6%',
+        effect: { skill: 0.06 },
+        baseCost: 3,
+        costGrowth: 3,
+        maxLevel: 10,
+    },
+    {
+        id: 'goldSense',
+        name: '황금 감각',
+        description: '적의 약점을 꿰뚫어 더 많은 전리품을 챙깁니다.',
+        effectDescription: '레벨당 골드 획득 +5%',
+        effect: { gold: 0.05 },
+        baseCost: 4,
+        costGrowth: 4,
+        maxLevel: 10,
+    },
+];
+
+const REBIRTH_SKILL_MAP = new Map(REBIRTH_SKILLS.map((skill) => [skill.id, skill]));
+
+const formatPercent = (value) => `${(value * 100).toFixed(1)}%`;
+
+const randomFromArray = (array) => array[Math.floor(Math.random() * array.length)];
+
+const calculateRebirthPoints = (highestStage) => {
+    if (highestStage < REBIRTH_STAGE_REQUIREMENT) return 0;
+    return Math.max(1, Math.floor((highestStage - (REBIRTH_STAGE_REQUIREMENT - 5)) / 5));
+};
+
+const chooseRarity = (isBoss) => {
+    const totalWeight = EQUIPMENT_RARITIES.reduce(
+        (total, rarity) => total + (isBoss ? rarity.bossWeight : rarity.baseWeight),
+        0,
+    );
+    let roll = Math.random() * totalWeight;
+    for (const rarity of EQUIPMENT_RARITIES) {
+        const weight = isBoss ? rarity.bossWeight : rarity.baseWeight;
+        if (roll < weight) {
+            return rarity;
+        }
+        roll -= weight;
+    }
+    return EQUIPMENT_RARITIES[0];
+};
+
+const generateEquipmentName = (typeId) => {
+    const pool = EQUIPMENT_BASE_NAMES[typeId] ?? ['신비한 장비'];
+    return randomFromArray(pool);
+};
+
+const generateEquipmentItem = (stage, isBoss) => {
+    const rarity = chooseRarity(isBoss);
+    const type = randomFromArray(EQUIPMENT_TYPES);
+    const [min, max] = rarity.valueRange;
+    const stageBonus = 1 + Math.min(stage, 150) * 0.002;
+    const value = Math.min(0.6, Number(((min + Math.random() * (max - min)) * stageBonus).toFixed(3)));
+    return {
+        id: `eq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        type: type.id,
+        rarity: rarity.id,
+        value,
+        name: generateEquipmentName(type.id),
+        stage,
+    };
+};
+
 class Hero {
     constructor({ id, name, description, baseCost, baseDamage, costMultiplier }, savedState) {
         this.id = id;
@@ -144,20 +270,162 @@ class GameState {
         const heroStates = saved?.heroes ?? [];
         this.heroes = defaultHeroes.map((hero) => new Hero(hero, heroStates.find((h) => h.id === hero.id)));
         this.sortOrder = saved?.sortOrder ?? 'cost';
+        this.inventory = Array.isArray(saved?.inventory)
+            ? saved.inventory
+                  .map((item) => this.normalizeEquipmentItem(item))
+                  .filter(Boolean)
+            : [];
+        this.equipped = {};
+        EQUIPMENT_TYPES.forEach(({ id }) => {
+            const savedId = saved?.equipped?.[id];
+            this.equipped[id] = savedId ?? null;
+        });
+        const fallbackHighest = Math.max(0, this.enemy.stage - 1);
+        const loadedHighest = Number(saved?.highestStage ?? fallbackHighest);
+        this.highestStage = Number.isFinite(loadedHighest) ? Math.max(0, loadedHighest) : fallbackHighest;
+        const fallbackCurrent = Math.max(0, this.enemy.stage - 1);
+        const loadedCurrent = Number(saved?.currentRunHighestStage ?? fallbackCurrent);
+        this.currentRunHighestStage = Number.isFinite(loadedCurrent) ? Math.max(0, loadedCurrent) : fallbackCurrent;
+        const loadedPoints = Number(saved?.rebirthPoints ?? 0);
+        this.rebirthPoints = Number.isFinite(loadedPoints) ? Math.max(0, Math.floor(loadedPoints)) : 0;
+        const loadedRebirths = Number(saved?.totalRebirths ?? 0);
+        this.totalRebirths = Number.isFinite(loadedRebirths) ? Math.max(0, Math.floor(loadedRebirths)) : 0;
+        this.initializeRebirthSkills(saved?.rebirthSkills);
+        this.normalizeEquippedState();
     }
 
     get totalDps() {
         const heroDps = this.heroes.reduce((total, hero) => total + hero.damagePerSecond, 0);
-        const frenzyMultiplier = this.isFrenzyActive ? 2 : 1;
-        return heroDps * frenzyMultiplier;
+        const heroMultiplier = 1 + this.heroBonus;
+        const frenzyMultiplier = this.isFrenzyActive ? this.frenzyMultiplier : 1;
+        return heroDps * heroMultiplier * frenzyMultiplier;
     }
 
     get isFrenzyActive() {
         return Date.now() < this.frenzyActiveUntil;
     }
 
+    get frenzyMultiplier() {
+        return 2 * (1 + this.skillBonus);
+    }
+
+    get tapBonus() {
+        const equipment = this.getEquippedItem('tap')?.value ?? 0;
+        return equipment + this.getRebirthBonusValue('tap');
+    }
+
+    get heroBonus() {
+        const equipment = this.getEquippedItem('hero')?.value ?? 0;
+        return equipment + this.getRebirthBonusValue('hero');
+    }
+
+    get skillBonus() {
+        const equipment = this.getEquippedItem('skill')?.value ?? 0;
+        return equipment + this.getRebirthBonusValue('skill');
+    }
+
+    get goldBonus() {
+        return this.getRebirthBonusValue('gold');
+    }
+
+    get pendingRebirthPoints() {
+        return calculateRebirthPoints(this.currentRunHighestStage);
+    }
+
+    get canRebirth() {
+        return this.pendingRebirthPoints > 0;
+    }
+
+    getRebirthBonusValue(type) {
+        return REBIRTH_SKILLS.reduce((total, skill) => {
+            const level = this.rebirthSkills[skill.id] ?? 0;
+            if (level <= 0) return total;
+            const effect = skill.effect[type];
+            if (!effect) return total;
+            return total + effect * level;
+        }, 0);
+    }
+
+    getRebirthBonusSummary() {
+        return REBIRTH_SKILLS.reduce((acc, skill) => {
+            const level = this.rebirthSkills[skill.id] ?? 0;
+            if (level <= 0) return acc;
+            Object.entries(skill.effect).forEach(([key, value]) => {
+                acc[key] = (acc[key] ?? 0) + value * level;
+            });
+            return acc;
+        }, {});
+    }
+
+    getRebirthSkillLevel(skillId) {
+        return this.rebirthSkills[skillId] ?? 0;
+    }
+
+    getRebirthSkillCost(skillId) {
+        const skill = REBIRTH_SKILL_MAP.get(skillId);
+        if (!skill) return Infinity;
+        const level = this.getRebirthSkillLevel(skillId);
+        if (skill.maxLevel && level >= skill.maxLevel) return 0;
+        return Math.max(1, Math.ceil(skill.baseCost + level * skill.costGrowth));
+    }
+
+    upgradeRebirthSkill(skillId) {
+        const skill = REBIRTH_SKILL_MAP.get(skillId);
+        if (!skill) {
+            return { success: false, message: '알 수 없는 환생 스킬입니다.' };
+        }
+        const level = this.getRebirthSkillLevel(skillId);
+        if (skill.maxLevel && level >= skill.maxLevel) {
+            return { success: false, message: '이미 최대 레벨입니다.' };
+        }
+        const cost = this.getRebirthSkillCost(skillId);
+        if (this.rebirthPoints < cost) {
+            return { success: false, message: '환생 포인트가 부족합니다.' };
+        }
+        this.rebirthPoints -= cost;
+        this.rebirthSkills[skillId] = level + 1;
+        this.lastSave = Date.now();
+        return { success: true, level: level + 1, cost, skill };
+    }
+
+    performRebirth() {
+        const pointsEarned = this.pendingRebirthPoints;
+        if (pointsEarned <= 0) {
+            return {
+                success: false,
+                message: `${REBIRTH_STAGE_REQUIREMENT}층을 돌파해야 환생할 수 있습니다.`,
+            };
+        }
+        this.rebirthPoints += pointsEarned;
+        this.totalRebirths += 1;
+        const earnedFrom = this.currentRunHighestStage;
+        this.gold = 0;
+        this.clickLevel = 1;
+        this.clickDamage = 1;
+        this.lastSave = Date.now();
+        this.enemy.reset(1);
+        this.heroes.forEach((hero) => {
+            hero.level = 0;
+        });
+        this.frenzyCooldown = 0;
+        this.frenzyActiveUntil = 0;
+        this.currentRunHighestStage = 0;
+        this.normalizeEquippedState();
+        return {
+            success: true,
+            pointsEarned,
+            earnedFrom,
+            totalPoints: this.rebirthPoints,
+            rebirthCount: this.totalRebirths,
+        };
+    }
+
+    get effectiveClickDamage() {
+        return this.clickDamage * (1 + this.tapBonus);
+    }
+
     applyClick() {
-        const damage = this.clickDamage;
+        const damage = this.effectiveClickDamage;
         const defeated = this.enemy.applyDamage(damage);
         return { damage, defeated };
     }
@@ -168,7 +436,8 @@ class GameState {
 
     enemyReward() {
         const bossMultiplier = this.enemy.stage % 5 === 0 ? 5 : 1;
-        return Math.ceil((10 + this.enemy.stage * 2) * bossMultiplier);
+        const bonusMultiplier = 1 + this.goldBonus;
+        return Math.ceil((10 + this.enemy.stage * 2) * bossMultiplier * bonusMultiplier);
     }
 
     levelUpClick() {
@@ -192,10 +461,14 @@ class GameState {
     }
 
     goNextEnemy() {
+        const defeatedStage = this.enemy.stage;
         const reward = this.enemyReward();
         this.gold += reward;
+        const drop = this.tryDropEquipment(defeatedStage);
+        this.highestStage = Math.max(this.highestStage, defeatedStage);
+        this.currentRunHighestStage = Math.max(this.currentRunHighestStage, defeatedStage);
         this.enemy.advanceStage();
-        return reward;
+        return { reward, drop, defeatedStage };
     }
 
     reset() {
@@ -209,6 +482,16 @@ class GameState {
         });
         this.frenzyCooldown = 0;
         this.frenzyActiveUntil = 0;
+        this.inventory = [];
+        this.equipped = {};
+        EQUIPMENT_TYPES.forEach(({ id }) => {
+            this.equipped[id] = null;
+        });
+        this.highestStage = 0;
+        this.currentRunHighestStage = 0;
+        this.rebirthPoints = 0;
+        this.totalRebirths = 0;
+        this.initializeRebirthSkills({});
     }
 
     toJSON() {
@@ -222,6 +505,104 @@ class GameState {
             sortOrder: this.sortOrder,
             frenzyCooldown: this.frenzyCooldown,
             frenzyActiveUntil: this.frenzyActiveUntil,
+            inventory: this.inventory,
+            equipped: this.equipped,
+            highestStage: this.highestStage,
+            currentRunHighestStage: this.currentRunHighestStage,
+            rebirthPoints: this.rebirthPoints,
+            totalRebirths: this.totalRebirths,
+            rebirthSkills: this.rebirthSkills,
+        };
+    }
+
+    initializeRebirthSkills(savedSkills) {
+        this.rebirthSkills = {};
+        REBIRTH_SKILLS.forEach((skill) => {
+            const savedLevel = Number(savedSkills?.[skill.id] ?? 0);
+            this.rebirthSkills[skill.id] = Number.isFinite(savedLevel)
+                ? Math.max(0, Math.floor(savedLevel))
+                : 0;
+        });
+    }
+
+    normalizeEquipmentItem(item) {
+        if (!item) return null;
+        const type = EQUIPMENT_TYPE_MAP.has(item.type) ? item.type : null;
+        if (!type) return null;
+        const rarity = EQUIPMENT_RARITY_MAP.has(item.rarity) ? item.rarity : 'common';
+        const value = Number(item.value ?? 0) || 0;
+        return {
+            id: item.id ?? `eq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            type,
+            rarity,
+            value: Math.max(0, Number(value.toFixed(3))),
+            name: item.name ?? generateEquipmentName(type),
+            stage: Number(item.stage ?? 1) || 1,
+        };
+    }
+
+    normalizeEquippedState() {
+        EQUIPMENT_TYPES.forEach(({ id }) => {
+            const equippedId = this.equipped[id];
+            if (!equippedId) {
+                this.equipped[id] = null;
+                return;
+            }
+            const exists = this.inventory.some((item) => item.id === equippedId && item.type === id);
+            if (!exists) {
+                this.equipped[id] = null;
+            }
+        });
+    }
+
+    getEquippedItem(type) {
+        const equippedId = this.equipped[type];
+        if (!equippedId) return null;
+        return this.inventory.find((item) => item.id === equippedId) ?? null;
+    }
+
+    getEquipmentBonuses() {
+        return EQUIPMENT_TYPES.reduce((acc, { id }) => {
+            acc[id] = this.getEquippedItem(id)?.value ?? 0;
+            return acc;
+        }, {});
+    }
+
+    getHeroEffectiveDps(hero) {
+        return hero.damagePerSecond * (1 + this.heroBonus);
+    }
+
+    addEquipment(item) {
+        this.inventory.push(item);
+        const current = this.getEquippedItem(item.type);
+        if (!current || item.value > current.value) {
+            this.equipped[item.type] = item.id;
+            return { autoEquipped: true, replaced: current ?? null };
+        }
+        return { autoEquipped: false, replaced: current ?? null };
+    }
+
+    equipItem(itemId) {
+        const item = this.inventory.find((entry) => entry.id === itemId);
+        if (!item) {
+            return { success: false, message: '장비를 찾을 수 없습니다.' };
+        }
+        const previous = this.getEquippedItem(item.type);
+        this.equipped[item.type] = item.id;
+        return { success: true, item, previous };
+    }
+
+    tryDropEquipment(stage) {
+        const isBoss = stage % 5 === 0;
+        const dropChance = isBoss ? EQUIPMENT_BOSS_DROP_CHANCE : EQUIPMENT_DROP_CHANCE;
+        if (Math.random() > dropChance) return null;
+        const item = generateEquipmentItem(stage, isBoss);
+        const result = this.addEquipment(item);
+        return {
+            item,
+            autoEquipped: result.autoEquipped,
+            replaced: result.replaced,
+            isBoss,
         };
     }
 }
@@ -247,6 +628,20 @@ const UI = {
     skillCooldown: document.getElementById('skillCooldown'),
     saveProgress: document.getElementById('saveProgress'),
     resetProgress: document.getElementById('resetProgress'),
+    rebirthPanel: document.getElementById('rebirthPanel'),
+    rebirthButton: document.getElementById('rebirthButton'),
+    rebirthRequirement: document.getElementById('rebirthRequirement'),
+    rebirthSkillList: document.getElementById('rebirthSkillList'),
+    rebirthPoints: document.getElementById('rebirthPoints'),
+    rebirthPotential: document.getElementById('rebirthPotential'),
+    rebirthHighestStage: document.getElementById('rebirthHighestStage'),
+    rebirthCount: document.getElementById('rebirthCount'),
+    equipmentTapBonus: document.getElementById('equipmentTapBonus'),
+    equipmentHeroBonus: document.getElementById('equipmentHeroBonus'),
+    equipmentSkillBonus: document.getElementById('equipmentSkillBonus'),
+    equipmentSlots: document.getElementById('equipmentSlots'),
+    equipmentInventory: document.getElementById('equipmentInventory'),
+    equipmentEmpty: document.getElementById('equipmentEmpty'),
 };
 
 class GameUI {
@@ -254,9 +649,12 @@ class GameUI {
         this.state = state;
         this.heroTemplate = document.getElementById('heroTemplate');
         this.heroElements = new Map();
+        this.rebirthSkillElements = new Map();
         this.sortState = state.sortOrder;
         this.setupEvents();
         this.renderHeroes();
+        this.renderEquipmentUI();
+        this.renderRebirthUI();
         this.updateSortButton();
         this.updateUI();
         this.startLoops();
@@ -270,6 +668,15 @@ class GameUI {
         UI.skillFrenzy.addEventListener('click', () => this.useFrenzy());
         UI.saveProgress.addEventListener('click', () => this.manualSave());
         UI.resetProgress.addEventListener('click', () => this.resetGame());
+        if (UI.rebirthButton) {
+            UI.rebirthButton.addEventListener('click', () => this.handleRebirth());
+        }
+        if (UI.rebirthSkillList) {
+            UI.rebirthSkillList.addEventListener('click', (event) => this.handleRebirthSkillClick(event));
+        }
+        if (UI.equipmentInventory) {
+            UI.equipmentInventory.addEventListener('click', (event) => this.handleEquipmentInventoryClick(event));
+        }
     }
 
     renderHeroes() {
@@ -279,7 +686,7 @@ class GameUI {
         if (this.sortState === 'cost') {
             sorted.sort((a, b) => a.nextCost - b.nextCost);
         } else {
-            sorted.sort((a, b) => b.damagePerSecond - a.damagePerSecond);
+            sorted.sort((a, b) => this.state.getHeroEffectiveDps(b) - this.state.getHeroEffectiveDps(a));
         }
         sorted.forEach((hero) => this.addHero(hero));
     }
@@ -296,7 +703,7 @@ class GameUI {
         name.textContent = hero.name;
         desc.textContent = hero.description;
         level.textContent = `Lv. ${hero.level}`;
-        dps.textContent = `DPS: ${formatNumber(hero.damagePerSecond)}`;
+        dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
         const costText = formatNumber(hero.nextCost);
         button.textContent = hero.level === 0 ? `${costText} 골드로 채용` : `레벨 업 (${costText} 골드)`;
         button.disabled = hero.nextCost > this.state.gold;
@@ -310,7 +717,7 @@ class GameUI {
         const heroUI = this.heroElements.get(hero.id);
         if (!heroUI) return;
         heroUI.level.textContent = `Lv. ${hero.level}`;
-        heroUI.dps.textContent = `DPS: ${formatNumber(hero.damagePerSecond)}`;
+        heroUI.dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
         const costText = formatNumber(hero.nextCost);
         heroUI.button.textContent = hero.level === 0 ? `${costText} 골드로 채용` : `레벨 업 (${costText} 골드)`;
         heroUI.button.disabled = hero.nextCost > this.state.gold;
@@ -318,6 +725,330 @@ class GameUI {
 
     updateHeroes() {
         this.state.heroes.forEach((hero) => this.updateHero(hero));
+    }
+
+    renderEquipmentUI() {
+        this.renderEquipmentSlots();
+        this.renderEquipmentInventory();
+        this.updateEquipmentSummary();
+    }
+
+    renderRebirthUI() {
+        if (!UI.rebirthSkillList) return;
+        UI.rebirthSkillList.innerHTML = '';
+        this.rebirthSkillElements.clear();
+        REBIRTH_SKILLS.forEach((skill) => {
+            const entry = document.createElement('li');
+            entry.className = 'rebirth-skill';
+            entry.dataset.skillId = skill.id;
+
+            const header = document.createElement('div');
+            header.className = 'rebirth-skill__header';
+
+            const name = document.createElement('span');
+            name.className = 'rebirth-skill__name';
+            name.textContent = skill.name;
+
+            const level = document.createElement('span');
+            level.className = 'rebirth-skill__level';
+
+            header.append(name, level);
+
+            const desc = document.createElement('p');
+            desc.className = 'rebirth-skill__desc';
+            desc.textContent = skill.description;
+
+            const bonus = document.createElement('span');
+            bonus.className = 'rebirth-skill__bonus';
+            bonus.textContent = skill.effectDescription;
+
+            const actions = document.createElement('div');
+            actions.className = 'rebirth-skill__actions';
+
+            const total = document.createElement('span');
+            total.className = 'rebirth-skill__total';
+
+            const button = document.createElement('button');
+            button.className = 'btn btn-secondary rebirth-skill__button';
+            button.dataset.skillId = skill.id;
+            button.type = 'button';
+
+            actions.append(total, button);
+
+            entry.append(header, desc, bonus, actions);
+            UI.rebirthSkillList.appendChild(entry);
+
+            this.rebirthSkillElements.set(skill.id, { level, total, button });
+        });
+        this.updateRebirthUI();
+    }
+
+    updateEquipmentSummary() {
+        if (!UI.equipmentTapBonus) return;
+        const equipmentBonuses = this.state.getEquipmentBonuses();
+        const rebirthBonuses = this.state.getRebirthBonusSummary();
+        this.setBonusDisplay(UI.equipmentTapBonus, equipmentBonuses.tap ?? 0, rebirthBonuses.tap ?? 0);
+        this.setBonusDisplay(UI.equipmentHeroBonus, equipmentBonuses.hero ?? 0, rebirthBonuses.hero ?? 0);
+        this.setBonusDisplay(UI.equipmentSkillBonus, equipmentBonuses.skill ?? 0, rebirthBonuses.skill ?? 0);
+    }
+
+    setBonusDisplay(element, equipmentValue = 0, rebirthValue = 0) {
+        if (!element) return;
+        const total = (equipmentValue ?? 0) + (rebirthValue ?? 0);
+        element.textContent = `+${formatPercent(total)}`;
+        element.title = this.buildBonusBreakdown(equipmentValue, rebirthValue);
+    }
+
+    buildBonusBreakdown(equipmentValue = 0, rebirthValue = 0) {
+        const parts = [];
+        if (equipmentValue > 0) parts.push(`장비 ${formatPercent(equipmentValue)}`);
+        if (rebirthValue > 0) parts.push(`환생 ${formatPercent(rebirthValue)}`);
+        if (parts.length === 0) return '추가 보너스 없음';
+        return parts.join(' / ');
+    }
+
+    updateRebirthUI() {
+        if (!UI.rebirthPanel) return;
+        if (UI.rebirthCount) {
+            UI.rebirthCount.textContent = formatNumber(this.state.totalRebirths);
+        }
+        if (UI.rebirthHighestStage) {
+            UI.rebirthHighestStage.textContent = formatNumber(this.state.highestStage);
+        }
+        if (UI.rebirthPotential) {
+            UI.rebirthPotential.textContent = formatNumber(this.state.pendingRebirthPoints);
+        }
+        if (UI.rebirthPoints) {
+            UI.rebirthPoints.textContent = formatNumber(this.state.rebirthPoints);
+        }
+        if (UI.rebirthButton) {
+            UI.rebirthButton.disabled = !this.state.canRebirth;
+        }
+        if (UI.rebirthRequirement) {
+            if (this.state.canRebirth) {
+                UI.rebirthRequirement.textContent = '환생이 가능합니다! 포인트를 받고 새롭게 시작하세요.';
+                UI.rebirthRequirement.dataset.state = 'ready';
+            } else {
+                const current = this.state.currentRunHighestStage;
+                if (current <= 0) {
+                    UI.rebirthRequirement.textContent = `${REBIRTH_STAGE_REQUIREMENT}층을 돌파하면 환생할 수 있습니다.`;
+                } else {
+                    const remaining = Math.max(0, REBIRTH_STAGE_REQUIREMENT - current);
+                    UI.rebirthRequirement.textContent =
+                        remaining > 0
+                            ? `환생까지 ${remaining}층 더 돌파하세요.`
+                            : '보스를 처치해 환생 포인트를 모으세요.';
+                }
+                UI.rebirthRequirement.dataset.state = 'locked';
+            }
+        }
+        if (UI.rebirthPanel) {
+            UI.rebirthPanel.dataset.unlocked = this.state.highestStage >= REBIRTH_STAGE_REQUIREMENT ? 'true' : 'false';
+        }
+        this.updateRebirthSkills();
+    }
+
+    updateRebirthSkills() {
+        if (this.rebirthSkillElements.size === 0) return;
+        const availablePoints = this.state.rebirthPoints;
+        REBIRTH_SKILLS.forEach((skill) => {
+            const elements = this.rebirthSkillElements.get(skill.id);
+            if (!elements) return;
+            const level = this.state.getRebirthSkillLevel(skill.id);
+            elements.level.textContent = `Lv. ${level}/${skill.maxLevel}`;
+            elements.total.textContent = this.formatRebirthTotal(skill, level);
+            const cost = this.state.getRebirthSkillCost(skill.id);
+            if (skill.maxLevel && level >= skill.maxLevel) {
+                elements.button.textContent = '최대 레벨';
+                elements.button.disabled = true;
+            } else {
+                elements.button.textContent = `강화 (${cost}P)`;
+                elements.button.disabled = cost > availablePoints;
+            }
+        });
+    }
+
+    formatRebirthTotal(skill, level) {
+        if (level <= 0) return '총 효과: 없음';
+        const parts = Object.entries(skill.effect).map(([type, value]) => {
+            const label = REBIRTH_EFFECT_LABELS[type] ?? type;
+            return `${label} +${formatPercent(value * level)}`;
+        });
+        return `총 효과: ${parts.join(' · ')}`;
+    }
+
+    renderEquipmentSlots() {
+        if (!UI.equipmentSlots) return;
+        UI.equipmentSlots.innerHTML = '';
+        EQUIPMENT_TYPES.forEach((type) => {
+            const item = this.state.getEquippedItem(type.id);
+            const slot = document.createElement('li');
+            slot.className = 'equipment-slot';
+            slot.dataset.rarity = item?.rarity ?? 'none';
+            slot.dataset.equipped = item ? 'true' : 'false';
+
+            const label = document.createElement('div');
+            label.className = 'equipment-slot__label';
+            label.textContent = type.label;
+
+            const content = document.createElement('div');
+            content.className = 'equipment-slot__content';
+
+            if (item) {
+                const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
+                const name = document.createElement('span');
+                name.className = 'equipment-slot__name';
+                const rarityTag = rarity ? `[${rarity.name}] ` : '';
+                name.textContent = `${rarityTag}${item.name}`;
+                const value = document.createElement('span');
+                value.className = 'equipment-slot__value';
+                value.textContent = `+${formatPercent(item.value)}`;
+                content.append(name, value);
+            } else {
+                const empty = document.createElement('span');
+                empty.className = 'equipment-slot__empty';
+                empty.textContent = '미장착';
+                content.appendChild(empty);
+            }
+
+            slot.append(label, content);
+            UI.equipmentSlots.appendChild(slot);
+        });
+    }
+
+    renderEquipmentInventory() {
+        if (!UI.equipmentInventory) return;
+        UI.equipmentInventory.innerHTML = '';
+        const items = [...this.state.inventory];
+        items.sort((a, b) => {
+            const rarityA = EQUIPMENT_RARITY_MAP.get(a.rarity)?.rank ?? 0;
+            const rarityB = EQUIPMENT_RARITY_MAP.get(b.rarity)?.rank ?? 0;
+            if (rarityA !== rarityB) return rarityB - rarityA;
+            if (a.value !== b.value) return b.value - a.value;
+            return a.name.localeCompare(b.name, 'ko');
+        });
+
+        if (UI.equipmentEmpty) {
+            UI.equipmentEmpty.style.display = items.length === 0 ? 'block' : 'none';
+        }
+
+        items.forEach((item) => {
+            const type = EQUIPMENT_TYPE_MAP.get(item.type);
+            const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
+            const equipped = this.state.equipped[item.type] === item.id;
+
+            const entry = document.createElement('li');
+            entry.className = 'equipment-item';
+            entry.dataset.rarity = item.rarity;
+            entry.dataset.equipped = equipped ? 'true' : 'false';
+
+            const info = document.createElement('div');
+            info.className = 'equipment-item__info';
+
+            const name = document.createElement('span');
+            name.className = 'equipment-item__name';
+            const rarityLabel = rarity ? `[${rarity.name}] ` : '';
+            name.textContent = `${rarityLabel}${item.name}`;
+
+            const details = document.createElement('span');
+            details.className = 'equipment-item__details';
+            const typeLabel = type?.label ?? '장비';
+            details.textContent = `${typeLabel} +${formatPercent(item.value)} · 스테이지 ${item.stage}`;
+
+            info.append(name, details);
+
+            const button = document.createElement('button');
+            button.className = 'btn btn-secondary equipment-item__equip';
+            button.textContent = equipped ? '장착 중' : '장착';
+            button.disabled = equipped;
+            button.dataset.equipId = item.id;
+
+            entry.append(info, button);
+            UI.equipmentInventory.appendChild(entry);
+        });
+    }
+
+    handleEquipmentInventoryClick(event) {
+        const button = event.target.closest('[data-equip-id]');
+        if (!button) return;
+        const itemId = button.dataset.equipId;
+        const result = this.state.equipItem(itemId);
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const type = EQUIPMENT_TYPE_MAP.get(result.item.type);
+        const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
+        const prefix = rarity ? `[${rarity.name}] ` : '';
+        const bonusText = `${type?.label ?? '장비'} +${formatPercent(result.item.value)}`;
+        this.addLog(`${prefix}${result.item.name}을 장착했습니다. ${bonusText}`, 'success');
+        if (result.previous && result.previous.id !== result.item.id) {
+            const previousRarity = EQUIPMENT_RARITY_MAP.get(result.previous.rarity);
+            const previousPrefix = previousRarity ? `[${previousRarity.name}] ` : '';
+            this.addLog(`이전 장비 ${previousPrefix}${result.previous.name}은 인벤토리에 보관됩니다.`, 'info');
+        }
+        this.renderEquipmentSlots();
+        this.renderEquipmentInventory();
+        this.updateStats();
+        this.updateHeroes();
+    }
+
+    handleRebirthSkillClick(event) {
+        const button = event.target.closest('[data-skill-id]');
+        if (!button) return;
+        const skillId = button.dataset.skillId;
+        const result = this.state.upgradeRebirthSkill(skillId);
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const totalText = this.formatRebirthTotal(result.skill, result.level);
+        this.addLog(`${result.skill.name} 레벨이 ${result.level}이 되었습니다! ${totalText}`, 'success');
+        this.updateStats();
+        saveGame(this.state);
+    }
+
+    handleRebirth() {
+        const result = this.state.performRebirth();
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const stageText = formatNumber(result.earnedFrom);
+        const pointsText = formatNumber(result.pointsEarned);
+        const totalPointsText = formatNumber(result.totalPoints);
+        const rebirthCountText = formatNumber(result.rebirthCount);
+        this.addLog(
+            `${stageText}층까지 돌파하여 환생 포인트 ${pointsText}점을 획득했습니다! (보유 ${totalPointsText}P, 총 ${rebirthCountText}회)`,
+            'success',
+        );
+        this.renderHeroes();
+        this.updateUI();
+        saveGame(this.state);
+    }
+
+    handleEquipmentDrop(drop) {
+        const { item, autoEquipped, replaced } = drop;
+        const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
+        const type = EQUIPMENT_TYPE_MAP.get(item.type);
+        const prefix = rarity ? `[${rarity.name}] ` : '';
+        const bonusText = `${type?.label ?? '장비'} +${formatPercent(item.value)}`;
+        const autoText = autoEquipped ? ' (자동 장착)' : '';
+        this.addLog(`${prefix}${item.name}을 획득했습니다! ${bonusText}${autoText}`, 'success');
+        if (autoEquipped && replaced) {
+            const replacedRarity = EQUIPMENT_RARITY_MAP.get(replaced.rarity);
+            const replacedPrefix = replacedRarity ? `[${replacedRarity.name}] ` : '';
+            this.addLog(
+                `기존 ${type?.label ?? '장비'} ${replacedPrefix}${replaced.name}이(가) 인벤토리로 이동했습니다.`,
+                'info',
+            );
+        } else if (!autoEquipped) {
+            this.addLog(`${type?.label ?? '장비'} 장비가 기존보다 약해 자동 장착되지 않았습니다.`, 'info');
+        }
+        this.renderEquipmentInventory();
+        this.renderEquipmentSlots();
+        this.updateStats();
+        this.updateHeroes();
     }
 
     updateEnemy() {
@@ -333,10 +1064,12 @@ class GameUI {
     updateStats() {
         UI.stage.textContent = this.state.enemy.stage;
         UI.gold.textContent = formatNumber(this.state.gold);
-        UI.clickDamage.textContent = formatNumber(this.state.clickDamage);
+        UI.clickDamage.textContent = formatNumber(this.state.effectiveClickDamage);
         UI.totalDps.textContent = formatNumber(this.state.totalDps);
         const clickCost = Math.ceil(10 * Math.pow(1.2, this.state.clickLevel - 1));
         UI.upgradeClick.textContent = `레벨 업 (${formatNumber(clickCost)} 골드)`;
+        this.updateEquipmentSummary();
+        this.updateRebirthUI();
     }
 
     updateFrenzyUI() {
@@ -384,8 +1117,15 @@ class GameUI {
     }
 
     handleEnemyDefeat() {
-        const reward = this.state.goNextEnemy();
-        this.addLog(`스테이지 ${this.state.enemy.stage - 1}의 적을 처치하고 ${formatNumber(reward)} 골드를 획득했습니다!`);
+        const previousBest = this.state.currentRunHighestStage;
+        const { reward, drop, defeatedStage } = this.state.goNextEnemy();
+        this.addLog(`스테이지 ${defeatedStage}의 적을 처치하고 ${formatNumber(reward)} 골드를 획득했습니다!`);
+        if (drop) {
+            this.handleEquipmentDrop(drop);
+        }
+        if (previousBest < REBIRTH_STAGE_REQUIREMENT && defeatedStage >= REBIRTH_STAGE_REQUIREMENT) {
+            this.addLog('환생의 기운이 깨어났습니다! 환생 메뉴에서 포인트를 획득하세요.', 'success');
+        }
     }
 
     handleHeroLevelUp(heroId) {
@@ -457,12 +1197,18 @@ class GameUI {
             this.addLog('아직 스킬을 사용할 수 없습니다.', 'warning');
             return;
         }
-        const duration = 15000; // 15초 동안 지속
+        const baseDuration = 15000; // 15초 기본 지속
         const cooldown = 60000; // 60초 쿨타임
+        const duration = Math.floor(baseDuration * (1 + this.state.skillBonus));
+        const multiplier = this.state.frenzyMultiplier;
         this.state.frenzyActiveUntil = now + duration;
         this.state.frenzyCooldown = now + cooldown;
-        this.addLog('자동 전투 스킬 발동! 15초 동안 DPS가 2배입니다!', 'success');
+        this.addLog(
+            `자동 전투 스킬 발동! ${(duration / 1000).toFixed(1)}초 동안 DPS가 ${multiplier.toFixed(1)}배입니다!`,
+            'success',
+        );
         this.updateFrenzyUI();
+        this.updateStats();
     }
 
     autoSave() {
@@ -478,6 +1224,8 @@ class GameUI {
         if (!confirm('정말로 진행 상황을 초기화할까요?')) return;
         this.state.reset();
         this.renderHeroes();
+        this.renderEquipmentUI();
+        this.renderRebirthUI();
         this.updateUI();
         saveGame(this.state);
         this.addLog('게임이 초기화되었습니다.', 'warning');
@@ -519,7 +1267,7 @@ const init = () => {
     if (saved?.lastSave) {
         const elapsed = Math.floor((Date.now() - saved.lastSave) / 1000);
         if (elapsed > 5) {
-            const offlineGold = Math.floor(state.totalDps * elapsed * 0.25);
+            const offlineGold = Math.floor(state.totalDps * elapsed * 0.25 * (1 + state.goldBonus));
             if (offlineGold > 0) {
                 state.gold += offlineGold;
                 ui.addLog(`오프라인 동안 ${elapsed}초가 지났습니다. ${formatNumber(offlineGold)} 골드를 획득했습니다!`);
