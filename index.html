@@ -63,6 +63,17 @@
                     <ul id="heroList" class="hero-list"></ul>
                 </section>
 
+                <section class="panel panel--equipment">
+                    <header class="panel__header">
+                        <h2>장비</h2>
+                    </header>
+                    <div id="equipmentSummary" class="equipment-summary">
+                        <span>클릭 피해 +0%</span>
+                        <span>총 DPS +0%</span>
+                    </div>
+                    <ul id="equipmentList" class="equipment-list"></ul>
+                </section>
+
                 <section class="panel panel--upgrades">
                     <header class="panel__header">
                         <h2>용사의 힘</h2>
@@ -113,6 +124,22 @@
                 </div>
             </div>
             <button class="btn btn-hero"></button>
+        </li>
+    </template>
+
+    <template id="equipmentTemplate">
+        <li class="equipment">
+            <div class="equipment__info">
+                <h3 class="equipment__name"></h3>
+                <p class="equipment__desc"></p>
+                <div class="equipment__meta">
+                    <span class="equipment__grade"></span>
+                    <span class="equipment__level"></span>
+                </div>
+                <div class="equipment__bonus"></div>
+                <div class="equipment__duplicates"></div>
+            </div>
+            <button class="btn btn-equipment">강화</button>
         </li>
     </template>
 

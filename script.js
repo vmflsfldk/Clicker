@@ -8,6 +8,138 @@ const formatNumber = (value) => {
     return '0';
 };
 
+const formatPercent = (value, fractionDigits = 1) => {
+    if (value === 0) return '0%';
+    return `${(value * 100).toFixed(fractionDigits)}%`;
+};
+
+const equipmentCatalog = [
+    {
+        id: 'training-blade',
+        name: '훈련용 검',
+        description: '초보자 전사에게 지급되는 기본 검. 클릭 피해를 올려줍니다.',
+        type: 'weapon',
+        grade: 'C',
+        stat: 'clickDamage',
+        baseBonus: 0.15,
+        bonusPerLevel: 0.08,
+        maxLevel: 5,
+        initialDuplicates: 2,
+    },
+    {
+        id: 'scout-armor',
+        name: '정찰병의 경갑',
+        description: '얇지만 가벼운 갑옷으로 영웅들의 공격 속도가 빨라집니다.',
+        type: 'armor',
+        grade: 'B',
+        stat: 'dps',
+        baseBonus: 0.12,
+        bonusPerLevel: 0.07,
+        maxLevel: 6,
+        initialDuplicates: 1,
+    },
+    {
+        id: 'hunter-charm',
+        name: '사냥꾼의 부적',
+        description: '정밀한 타격을 도와주는 부적. 클릭 피해와 DPS를 모두 향상시킵니다.',
+        type: 'trinket',
+        grade: 'A',
+        stat: 'allDamage',
+        baseBonus: 0.1,
+        bonusPerLevel: 0.05,
+        maxLevel: 7,
+        initialDuplicates: 1,
+    },
+];
+
+const equipmentTypeLabels = {
+    weapon: '무기',
+    armor: '방어구',
+    trinket: '장신구',
+};
+
+class EquipmentItem {
+    constructor(definition, savedState) {
+        this.id = definition.id;
+        this.name = definition.name;
+        this.description = definition.description;
+        this.type = definition.type;
+        this.grade = definition.grade;
+        this.stat = definition.stat;
+        this.baseBonus = definition.baseBonus;
+        this.bonusPerLevel = definition.bonusPerLevel;
+        this.maxLevel = definition.maxLevel;
+        this.level = savedState?.level ?? 0;
+        const savedDuplicates = savedState?.duplicates ?? definition.initialDuplicates ?? 0;
+        this.duplicates = Math.max(0, savedDuplicates);
+    }
+
+    get totalBonus() {
+        return this.baseBonus + this.level * this.bonusPerLevel;
+    }
+
+    get canEnhance() {
+        return this.level < this.maxLevel && this.availableDuplicates > 0;
+    }
+
+    get availableDuplicates() {
+        return this.duplicates;
+    }
+
+    consumeDuplicate(count = 1) {
+        if (this.availableDuplicates < count) return false;
+        this.duplicates -= count;
+        return true;
+    }
+
+    enhance() {
+        if (!this.canEnhance) return false;
+        if (!this.consumeDuplicate(1)) return false;
+        this.level += 1;
+        return true;
+    }
+
+    toJSON() {
+        return {
+            id: this.id,
+            level: this.level,
+            duplicates: this.duplicates,
+        };
+    }
+}
+
+const createEquipmentInventory = (savedInventory) => {
+    const saved = savedInventory ?? [];
+    return equipmentCatalog.map((definition) => {
+        const state = saved.find((item) => item.id === definition.id);
+        return new EquipmentItem(definition, state);
+    });
+};
+
+const getEquipmentBonuses = (equipmentList) => {
+    return equipmentList.reduce(
+        (bonuses, item) => {
+            const value = item.totalBonus;
+            switch (item.stat) {
+                case 'clickDamage':
+                    bonuses.clickDamage += value;
+                    break;
+                case 'dps':
+                    bonuses.dps += value;
+                    break;
+                case 'allDamage':
+                    bonuses.clickDamage += value;
+                    bonuses.dps += value;
+                    break;
+                default:
+                    break;
+            }
+            return bonuses;
+        },
+        { clickDamage: 0, dps: 0 }
+    );
+};
+
 const defaultHeroes = [
     {
         id: 'blade',
@@ -144,20 +276,31 @@ class GameState {
         const heroStates = saved?.heroes ?? [];
         this.heroes = defaultHeroes.map((hero) => new Hero(hero, heroStates.find((h) => h.id === hero.id)));
         this.sortOrder = saved?.sortOrder ?? 'cost';
+        this.equipment = createEquipmentInventory(saved?.equipment);
     }
 
     get totalDps() {
         const heroDps = this.heroes.reduce((total, hero) => total + hero.damagePerSecond, 0);
         const frenzyMultiplier = this.isFrenzyActive ? 2 : 1;
-        return heroDps * frenzyMultiplier;
+        const dpsBonus = 1 + this.equipmentBonuses.dps;
+        return heroDps * frenzyMultiplier * dpsBonus;
     }
 
     get isFrenzyActive() {
         return Date.now() < this.frenzyActiveUntil;
     }
 
+    get equipmentBonuses() {
+        return getEquipmentBonuses(this.equipment);
+    }
+
+    get effectiveClickDamage() {
+        const bonusMultiplier = 1 + this.equipmentBonuses.clickDamage;
+        return Math.ceil(this.clickDamage * bonusMultiplier);
+    }
+
     applyClick() {
-        const damage = this.clickDamage;
+        const damage = this.effectiveClickDamage;
         const defeated = this.enemy.applyDamage(damage);
         return { damage, defeated };
     }
@@ -209,6 +352,7 @@ class GameState {
         });
         this.frenzyCooldown = 0;
         this.frenzyActiveUntil = 0;
+        this.equipment = createEquipmentInventory();
     }
 
     toJSON() {
@@ -222,7 +366,28 @@ class GameState {
             sortOrder: this.sortOrder,
             frenzyCooldown: this.frenzyCooldown,
             frenzyActiveUntil: this.frenzyActiveUntil,
+            equipment: this.equipment.map((item) => item.toJSON()),
         };
+    }
+
+    enhanceEquipment(equipmentId) {
+        const item = this.equipment.find((equipmentItem) => equipmentItem.id === equipmentId);
+        if (!item) {
+            return { success: false, message: '장비를 찾을 수 없습니다.' };
+        }
+        if (item.level >= item.maxLevel) {
+            return { success: false, message: '이미 최대 강화 단계입니다.' };
+        }
+        if (!item.canEnhance) {
+            return { success: false, message: '강화에 필요한 동일 장비가 부족합니다.' };
+        }
+
+        const enhanced = item.enhance();
+        if (!enhanced) {
+            return { success: false, message: '강화에 실패했습니다.' };
+        }
+
+        return { success: true, item };
     }
 }
 
@@ -247,16 +412,21 @@ const UI = {
     skillCooldown: document.getElementById('skillCooldown'),
     saveProgress: document.getElementById('saveProgress'),
     resetProgress: document.getElementById('resetProgress'),
+    equipmentList: document.getElementById('equipmentList'),
+    equipmentSummary: document.getElementById('equipmentSummary'),
 };
 
 class GameUI {
     constructor(state) {
         this.state = state;
         this.heroTemplate = document.getElementById('heroTemplate');
+        this.equipmentTemplate = document.getElementById('equipmentTemplate');
         this.heroElements = new Map();
+        this.equipmentElements = new Map();
         this.sortState = state.sortOrder;
         this.setupEvents();
         this.renderHeroes();
+        this.renderEquipment();
         this.updateSortButton();
         this.updateUI();
         this.startLoops();
@@ -304,20 +474,102 @@ class GameUI {
 
         UI.heroList.appendChild(node);
         this.heroElements.set(hero.id, { node, level, dps, button });
+        this.updateHero(hero);
     }
 
-    updateHero(hero) {
+    updateHero(hero, dpsMultiplier = 1 + this.state.equipmentBonuses.dps) {
         const heroUI = this.heroElements.get(hero.id);
         if (!heroUI) return;
         heroUI.level.textContent = `Lv. ${hero.level}`;
-        heroUI.dps.textContent = `DPS: ${formatNumber(hero.damagePerSecond)}`;
+        heroUI.dps.textContent = `DPS: ${formatNumber(hero.damagePerSecond * dpsMultiplier)}`;
         const costText = formatNumber(hero.nextCost);
         heroUI.button.textContent = hero.level === 0 ? `${costText} 골드로 채용` : `레벨 업 (${costText} 골드)`;
         heroUI.button.disabled = hero.nextCost > this.state.gold;
     }
 
     updateHeroes() {
-        this.state.heroes.forEach((hero) => this.updateHero(hero));
+        const dpsMultiplier = 1 + this.state.equipmentBonuses.dps;
+        this.state.heroes.forEach((hero) => this.updateHero(hero, dpsMultiplier));
+    }
+
+    renderEquipment() {
+        if (!UI.equipmentList || !this.equipmentTemplate) return;
+        UI.equipmentList.innerHTML = '';
+        this.equipmentElements.clear();
+        this.state.equipment.forEach((item) => this.addEquipment(item));
+        this.updateEquipmentSummary();
+    }
+
+    addEquipment(item) {
+        const node = this.equipmentTemplate.content.firstElementChild.cloneNode(true);
+        node.dataset.equipmentId = item.id;
+        const name = node.querySelector('.equipment__name');
+        const desc = node.querySelector('.equipment__desc');
+        const grade = node.querySelector('.equipment__grade');
+        const level = node.querySelector('.equipment__level');
+        const bonus = node.querySelector('.equipment__bonus');
+        const duplicates = node.querySelector('.equipment__duplicates');
+        const button = node.querySelector('.btn');
+
+        if (name) name.textContent = item.name;
+        if (desc) desc.textContent = item.description;
+        if (grade) {
+            const typeLabel = equipmentTypeLabels[item.type] ?? item.type.toUpperCase();
+            grade.textContent = `${typeLabel} · ${item.grade} 등급`;
+            grade.dataset.grade = item.grade;
+        }
+
+        button.addEventListener('click', () => this.handleEquipmentEnhance(item.id));
+
+        UI.equipmentList.appendChild(node);
+        this.equipmentElements.set(item.id, { node, level, bonus, duplicates, button });
+        this.updateEquipmentItem(item);
+    }
+
+    updateEquipmentItem(item) {
+        const equipmentUI = this.equipmentElements.get(item.id);
+        if (!equipmentUI) return;
+        if (equipmentUI.level) {
+            equipmentUI.level.textContent = `강화 단계: +${item.level} / +${item.maxLevel}`;
+        }
+        if (equipmentUI.bonus) {
+            equipmentUI.bonus.textContent = `효과: ${this.getEquipmentBonusText(item)}`;
+        }
+        if (equipmentUI.duplicates) {
+            equipmentUI.duplicates.textContent = `보유 중인 동일 장비: ${formatNumber(item.availableDuplicates)}개`;
+        }
+        if (item.level >= item.maxLevel) {
+            equipmentUI.button.textContent = '최대 강화';
+            equipmentUI.button.disabled = true;
+        } else {
+            equipmentUI.button.textContent = '강화';
+            equipmentUI.button.disabled = !item.canEnhance;
+        }
+    }
+
+    getEquipmentBonusText(item) {
+        const bonus = item.totalBonus;
+        if (item.stat === 'clickDamage') {
+            return `클릭 피해 +${formatPercent(bonus)}`;
+        }
+        if (item.stat === 'dps') {
+            return `총 DPS +${formatPercent(bonus)}`;
+        }
+        if (item.stat === 'allDamage') {
+            return `클릭 피해 및 총 DPS +${formatPercent(bonus)}`;
+        }
+        return `보너스 +${formatPercent(bonus)}`;
+    }
+
+    updateEquipmentSummary() {
+        if (!UI.equipmentSummary) return;
+        const bonuses = this.state.equipmentBonuses;
+        UI.equipmentSummary.innerHTML = `<span>클릭 피해 +${formatPercent(bonuses.clickDamage)}</span><span>총 DPS +${formatPercent(bonuses.dps)}</span>`;
+    }
+
+    updateEquipment() {
+        this.state.equipment.forEach((item) => this.updateEquipmentItem(item));
+        this.updateEquipmentSummary();
     }
 
     updateEnemy() {
@@ -333,7 +585,7 @@ class GameUI {
     updateStats() {
         UI.stage.textContent = this.state.enemy.stage;
         UI.gold.textContent = formatNumber(this.state.gold);
-        UI.clickDamage.textContent = formatNumber(this.state.clickDamage);
+        UI.clickDamage.textContent = formatNumber(this.state.effectiveClickDamage);
         UI.totalDps.textContent = formatNumber(this.state.totalDps);
         const clickCost = Math.ceil(10 * Math.pow(1.2, this.state.clickLevel - 1));
         UI.upgradeClick.textContent = `레벨 업 (${formatNumber(clickCost)} 골드)`;
@@ -361,6 +613,7 @@ class GameUI {
         this.updateHeroes();
         this.updateEnemy();
         this.updateFrenzyUI();
+        this.updateEquipment();
     }
 
     handleTap() {
@@ -463,6 +716,20 @@ class GameUI {
         this.state.frenzyCooldown = now + cooldown;
         this.addLog('자동 전투 스킬 발동! 15초 동안 DPS가 2배입니다!', 'success');
         this.updateFrenzyUI();
+    }
+
+    handleEquipmentEnhance(equipmentId) {
+        const result = this.state.enhanceEquipment(equipmentId);
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        this.addLog(`${result.item.name}이(가) +${result.item.level} 단계로 강화되었습니다!`, 'success');
+        this.updateEquipmentItem(result.item);
+        this.updateEquipmentSummary();
+        this.updateStats();
+        this.updateHeroes();
+        saveGame(this.state);
     }
 
     autoSave() {
