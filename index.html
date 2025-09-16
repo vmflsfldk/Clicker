@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tap Titans 스타일 클리커</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <div class="game">
+        <header class="game__header">
+            <h1>영웅의 탭</h1>
+            <div class="game__stats">
+                <div class="stat">
+                    <span class="stat__label">스테이지</span>
+                    <span id="stage" class="stat__value">1</span>
+                </div>
+                <div class="stat">
+                    <span class="stat__label">골드</span>
+                    <span id="gold" class="stat__value">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat__label">클릭 대미지</span>
+                    <span id="clickDamage" class="stat__value">1</span>
+                </div>
+                <div class="stat">
+                    <span class="stat__label">총 DPS</span>
+                    <span id="totalDps" class="stat__value">0</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="game__main">
+            <section class="game__enemy">
+                <div class="enemy__info">
+                    <div id="enemyName" class="enemy__name">고블린 정찰병</div>
+                    <div class="enemy__health-bar">
+                        <div id="enemyHealthBar" class="enemy__health-bar-fill"></div>
+                    </div>
+                    <div class="enemy__health">
+                        <span id="enemyCurrentHp">10</span> / <span id="enemyMaxHp">10</span>
+                    </div>
+                </div>
+                <div id="enemy" class="enemy">
+                    <div class="enemy__sprite"></div>
+                    <div id="damageIndicator" class="damage-indicator"></div>
+                </div>
+                <button id="tapButton" class="btn btn-primary">공격!</button>
+                <div class="game__progress">
+                    <div class="progress-track" id="stageProgressTrack"></div>
+                </div>
+            </section>
+
+            <aside class="game__panel">
+                <section class="panel panel--hero">
+                    <header class="panel__header">
+                        <h2>영웅</h2>
+                        <button id="sortHeroes" class="btn btn-secondary">정렬 순서 변경</button>
+                    </header>
+                    <ul id="heroList" class="hero-list"></ul>
+                </section>
+
+                <section class="panel panel--upgrades">
+                    <header class="panel__header">
+                        <h2>용사의 힘</h2>
+                    </header>
+                    <div class="upgrade">
+                        <div>
+                            <h3>검술 훈련</h3>
+                            <p>클릭 대미지를 올립니다.</p>
+                        </div>
+                        <button id="upgradeClick" class="btn btn-upgrade">레벨 업 (10 골드)</button>
+                    </div>
+                    <div class="upgrade">
+                        <div>
+                            <h3>자동 전투</h3>
+                            <p>DPS를 일시적으로 2배로 증가시키는 스킬</p>
+                        </div>
+                        <button id="skillFrenzy" class="btn btn-skill">발동 (쿨타임 60초)</button>
+                        <p id="skillCooldown" class="cooldown"></p>
+                    </div>
+                </section>
+
+                <section class="panel panel--log">
+                    <header class="panel__header">
+                        <h2>전투 로그</h2>
+                    </header>
+                    <ul id="log" class="log"></ul>
+                </section>
+            </aside>
+        </main>
+
+        <footer class="game__footer">
+            <div>
+                <button id="resetProgress" class="btn btn-secondary">초기화</button>
+                <button id="saveProgress" class="btn btn-secondary">즉시 저장</button>
+            </div>
+            <p class="game__footer-text">Tap Titans에서 영감을 받은 브라우저용 클리커 게임 데모입니다.</p>
+        </footer>
+    </div>
+
+    <template id="heroTemplate">
+        <li class="hero">
+            <div class="hero__info">
+                <h3 class="hero__name"></h3>
+                <p class="hero__desc"></p>
+                <div class="hero__meta">
+                    <span class="hero__level"></span>
+                    <span class="hero__dps"></span>
+                </div>
+            </div>
+            <button class="btn btn-hero"></button>
+        </li>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>
