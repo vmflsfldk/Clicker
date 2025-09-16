@@ -130,6 +130,24 @@ h1,
     color: var(--subtext-color);
 }
 
+.boss-timer {
+    margin-top: 0.75rem;
+    font-size: 1rem;
+    color: var(--gold-color);
+    text-shadow: 0 0 10px rgba(251, 191, 36, 0.45);
+    display: none;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.boss-timer--visible {
+    display: block;
+}
+
+.boss-timer--warning {
+    color: var(--danger-color);
+    text-shadow: 0 0 12px rgba(248, 113, 113, 0.6);
+}
+
 .enemy {
     width: 260px;
     height: 260px;
