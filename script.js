@@ -64,12 +64,67 @@ const EQUIPMENT_BASE_NAMES = {
 };
 
 const EQUIPMENT_RARITIES = [
-    { id: 'common', name: '커먼', color: '#94a3b8', baseWeight: 40, bossWeight: 25, valueRange: [0.02, 0.05], rank: 0 },
-    { id: 'uncommon', name: '언커먼', color: '#22d3ee', baseWeight: 25, bossWeight: 20, valueRange: [0.04, 0.07], rank: 1 },
-    { id: 'rare', name: '레어', color: '#a855f7', baseWeight: 20, bossWeight: 25, valueRange: [0.07, 0.12], rank: 2 },
-    { id: 'unique', name: '유니크', color: '#f97316', baseWeight: 10, bossWeight: 18, valueRange: [0.12, 0.18], rank: 3 },
-    { id: 'legendary', name: '레전더리', color: '#facc15', baseWeight: 5, bossWeight: 12, valueRange: [0.18, 0.26], rank: 4 },
+    {
+        id: 'common',
+        name: '커먼',
+        color: '#94a3b8',
+        baseWeight: 40,
+        bossWeight: 25,
+        valueRange: [0.02, 0.05],
+        rank: 0,
+        maxLevel: 3,
+    },
+    {
+        id: 'uncommon',
+        name: '언커먼',
+        color: '#22d3ee',
+        baseWeight: 25,
+        bossWeight: 20,
+        valueRange: [0.04, 0.07],
+        rank: 1,
+        maxLevel: 4,
+    },
+    {
+        id: 'rare',
+        name: '레어',
+        color: '#a855f7',
+        baseWeight: 20,
+        bossWeight: 25,
+        valueRange: [0.07, 0.12],
+        rank: 2,
+        maxLevel: 5,
+    },
+    {
+        id: 'unique',
+        name: '유니크',
+        color: '#f97316',
+        baseWeight: 10,
+        bossWeight: 18,
+        valueRange: [0.12, 0.18],
+        rank: 3,
+        maxLevel: 6,
+    },
+    {
+        id: 'legendary',
+        name: '레전더리',
+        color: '#facc15',
+        baseWeight: 5,
+        bossWeight: 12,
+        valueRange: [0.18, 0.26],
+        rank: 4,
+        maxLevel: 7,
+    },
 ];
+
+const EQUIPMENT_MAX_VALUE = 0.6;
+const EQUIPMENT_UPGRADE_RATE = 0.2;
+
+const clampEquipmentValue = (value) => Math.min(EQUIPMENT_MAX_VALUE, Number(value.toFixed(3)));
+const calculateEquipmentValue = (baseValue, level = 1) => {
+    const normalizedLevel = Math.max(1, Math.floor(level));
+    const multiplier = 1 + EQUIPMENT_UPGRADE_RATE * (normalizedLevel - 1);
+    return clampEquipmentValue(baseValue * multiplier);
+};
 
 const EQUIPMENT_DROP_CHANCE = 0.2;
 const EQUIPMENT_BOSS_DROP_CHANCE = 0.45;
@@ -166,12 +221,16 @@ const generateEquipmentItem = (stage, isBoss) => {
     const type = randomFromArray(EQUIPMENT_TYPES);
     const [min, max] = rarity.valueRange;
     const stageBonus = 1 + Math.min(stage, 150) * 0.002;
-    const value = Math.min(0.6, Number(((min + Math.random() * (max - min)) * stageBonus).toFixed(3)));
+    const baseValue = clampEquipmentValue((min + Math.random() * (max - min)) * stageBonus);
+    const value = calculateEquipmentValue(baseValue, 1);
     return {
         id: `eq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         type: type.id,
         rarity: rarity.id,
+        baseValue,
         value,
+        level: 1,
+        maxLevel: rarity.maxLevel,
         name: generateEquipmentName(type.id),
         stage,
     };
@@ -530,12 +589,22 @@ class GameState {
         const type = EQUIPMENT_TYPE_MAP.has(item.type) ? item.type : null;
         if (!type) return null;
         const rarity = EQUIPMENT_RARITY_MAP.has(item.rarity) ? item.rarity : 'common';
-        const value = Number(item.value ?? 0) || 0;
+        const rarityData = EQUIPMENT_RARITY_MAP.get(rarity);
+        const rawBaseValue = Number(item.baseValue ?? item.value ?? 0);
+        const baseValue = clampEquipmentValue(Math.max(0, Number.isFinite(rawBaseValue) ? rawBaseValue : 0));
+        const rawMaxLevel = Number(item.maxLevel ?? rarityData?.maxLevel ?? 3);
+        const maxLevel = Math.max(1, Math.floor(Number.isFinite(rawMaxLevel) ? rawMaxLevel : 1));
+        const rawLevel = Number(item.level ?? 1);
+        const level = Math.min(maxLevel, Math.max(1, Math.floor(Number.isFinite(rawLevel) ? rawLevel : 1)));
+        const value = calculateEquipmentValue(baseValue, level);
         return {
             id: item.id ?? `eq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             type,
             rarity,
-            value: Math.max(0, Number(value.toFixed(3))),
+            baseValue,
+            value,
+            level,
+            maxLevel,
             name: item.name ?? generateEquipmentName(type),
             stage: Number(item.stage ?? 1) || 1,
         };
@@ -559,6 +628,66 @@ class GameState {
         const equippedId = this.equipped[type];
         if (!equippedId) return null;
         return this.inventory.find((item) => item.id === equippedId) ?? null;
+    }
+
+    canUpgradeEquipment(item) {
+        if (!item) return false;
+        if (item.level >= item.maxLevel) return false;
+        return this.inventory.some(
+            (entry) => entry.id !== item.id && entry.type === item.type && entry.rarity === item.rarity,
+        );
+    }
+
+    upgradeEquipment(itemId) {
+        const index = this.inventory.findIndex((entry) => entry.id === itemId);
+        if (index === -1) {
+            return { success: false, message: '장비를 찾을 수 없습니다.' };
+        }
+        const item = this.inventory[index];
+        if (item.level >= item.maxLevel) {
+            return { success: false, message: '이미 최대 강화 단계입니다.' };
+        }
+        const candidates = [];
+        this.inventory.forEach((entry, entryIndex) => {
+            if (entry.id === item.id) return;
+            if (entry.type !== item.type || entry.rarity !== item.rarity) return;
+            candidates.push({ entry, entryIndex });
+        });
+        if (candidates.length === 0) {
+            return { success: false, message: '강화에 사용할 동일한 장비가 부족합니다.' };
+        }
+
+        const preferred = candidates.find(({ entry }) => this.equipped[item.type] !== entry.id);
+        const chosen = preferred ?? candidates[0];
+        const { entry: consumed, entryIndex } = chosen;
+        const wasEquipped = this.equipped[item.type] === consumed.id;
+        this.inventory.splice(entryIndex, 1);
+        if (wasEquipped) {
+            this.equipped[item.type] = null;
+        }
+
+        const previousLevel = item.level;
+        const previousValue = item.value;
+        if (!Number.isFinite(item.baseValue) || item.baseValue <= 0) {
+            item.baseValue = previousValue;
+        }
+        item.level = Math.min(item.maxLevel, item.level + 1);
+        item.value = calculateEquipmentValue(item.baseValue, item.level);
+
+        this.normalizeEquippedState();
+        const currentlyEquipped = this.getEquippedItem(item.type);
+        if (!currentlyEquipped || currentlyEquipped.id === item.id || item.value > currentlyEquipped.value) {
+            this.equipped[item.type] = item.id;
+        }
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            item,
+            consumed,
+            consumedWasEquipped: wasEquipped,
+            previousLevel,
+            previousValue,
+        };
     }
 
     getEquipmentBonuses() {
@@ -922,14 +1051,24 @@ class GameUI {
 
             if (item) {
                 const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
+                const header = document.createElement('div');
+                header.className = 'equipment-slot__header';
+
                 const name = document.createElement('span');
                 name.className = 'equipment-slot__name';
                 const rarityTag = rarity ? `[${rarity.name}] ` : '';
                 name.textContent = `${rarityTag}${item.name}`;
+
+                const level = document.createElement('span');
+                level.className = 'equipment-slot__level';
+                level.textContent = `Lv. ${item.level}/${item.maxLevel}`;
+
+                header.append(name, level);
+
                 const value = document.createElement('span');
                 value.className = 'equipment-slot__value';
                 value.textContent = `+${formatPercent(item.value)}`;
-                content.append(name, value);
+                content.append(header, value);
             } else {
                 const empty = document.createElement('span');
                 empty.className = 'equipment-slot__empty';
@@ -979,22 +1118,85 @@ class GameUI {
             const details = document.createElement('span');
             details.className = 'equipment-item__details';
             const typeLabel = type?.label ?? '장비';
-            details.textContent = `${typeLabel} +${formatPercent(item.value)} · 스테이지 ${item.stage}`;
+            details.textContent = `${typeLabel} +${formatPercent(item.value)} · Lv. ${item.level}/${item.maxLevel} · 스테이지 ${item.stage}`;
 
             info.append(name, details);
 
-            const button = document.createElement('button');
-            button.className = 'btn btn-secondary equipment-item__equip';
-            button.textContent = equipped ? '장착 중' : '장착';
-            button.disabled = equipped;
-            button.dataset.equipId = item.id;
+            const actions = document.createElement('div');
+            actions.className = 'equipment-item__actions';
 
-            entry.append(info, button);
+            const materials = this.state.inventory.filter(
+                (other) => other.id !== item.id && other.type === item.type && other.rarity === item.rarity,
+            );
+            const upgradeAvailable = item.level < item.maxLevel && materials.length > 0;
+
+            const upgradeButton = document.createElement('button');
+            upgradeButton.className = 'btn btn-upgrade equipment-item__upgrade';
+            upgradeButton.dataset.upgradeId = item.id;
+            if (item.level >= item.maxLevel) {
+                upgradeButton.textContent = '최대 강화';
+                upgradeButton.disabled = true;
+                upgradeButton.title = '이미 최대 강화 단계입니다.';
+            } else {
+                upgradeButton.textContent = '강화';
+                upgradeButton.disabled = !upgradeAvailable;
+                if (!upgradeAvailable) {
+                    upgradeButton.title = '동일 타입·등급의 장비가 추가로 필요합니다.';
+                } else {
+                    upgradeButton.title = `강화에 동일 타입·등급 장비 1개가 소모됩니다. (보유 ${materials.length}개)`;
+                }
+            }
+
+            const equipButton = document.createElement('button');
+            equipButton.className = 'btn btn-secondary equipment-item__equip';
+            equipButton.textContent = equipped ? '장착 중' : '장착';
+            equipButton.disabled = equipped;
+            equipButton.dataset.equipId = item.id;
+
+            actions.append(upgradeButton, equipButton);
+
+            entry.append(info, actions);
             UI.equipmentInventory.appendChild(entry);
         });
     }
 
     handleEquipmentInventoryClick(event) {
+        const upgradeButton = event.target.closest('[data-upgrade-id]');
+        if (upgradeButton) {
+            const itemId = upgradeButton.dataset.upgradeId;
+            const result = this.state.upgradeEquipment(itemId);
+            if (!result.success) {
+                this.addLog(result.message, 'warning');
+                return;
+            }
+            const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
+            const type = EQUIPMENT_TYPE_MAP.get(result.item.type);
+            const prefix = rarity ? `[${rarity.name}] ` : '';
+            const label = type?.label ?? '장비';
+            const previousLevel = result.previousLevel;
+            const previousValueText = formatPercent(result.previousValue);
+            const newValueText = formatPercent(result.item.value);
+            this.addLog(
+                `${prefix}${result.item.name} 강화 성공! Lv. ${previousLevel} → ${result.item.level}, ${label} ${previousValueText} → ${newValueText}`,
+                'success',
+            );
+            if (result.consumed) {
+                const consumedRarity = EQUIPMENT_RARITY_MAP.get(result.consumed.rarity);
+                const consumedPrefix = consumedRarity ? `[${consumedRarity.name}] ` : '';
+                this.addLog(
+                    `소모된 장비: ${consumedPrefix}${result.consumed.name} (Lv. ${result.consumed.level}/${result.consumed.maxLevel})`,
+                    'info',
+                );
+            }
+            if (result.consumedWasEquipped) {
+                this.addLog('강화 재료로 사용된 장착 장비가 해제되었습니다.', 'warning');
+            }
+            this.renderEquipmentSlots();
+            this.renderEquipmentInventory();
+            this.updateStats();
+            this.updateHeroes();
+            return;
+        }
         const button = event.target.closest('[data-equip-id]');
         if (!button) return;
         const itemId = button.dataset.equipId;
@@ -1006,12 +1208,15 @@ class GameUI {
         const type = EQUIPMENT_TYPE_MAP.get(result.item.type);
         const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
         const prefix = rarity ? `[${rarity.name}] ` : '';
-        const bonusText = `${type?.label ?? '장비'} +${formatPercent(result.item.value)}`;
+        const bonusText = `${type?.label ?? '장비'} +${formatPercent(result.item.value)} · Lv. ${result.item.level}/${result.item.maxLevel}`;
         this.addLog(`${prefix}${result.item.name}을 장착했습니다. ${bonusText}`, 'success');
         if (result.previous && result.previous.id !== result.item.id) {
             const previousRarity = EQUIPMENT_RARITY_MAP.get(result.previous.rarity);
             const previousPrefix = previousRarity ? `[${previousRarity.name}] ` : '';
-            this.addLog(`이전 장비 ${previousPrefix}${result.previous.name}은 인벤토리에 보관됩니다.`, 'info');
+            this.addLog(
+                `이전 장비 ${previousPrefix}${result.previous.name} (Lv. ${result.previous.level}/${result.previous.maxLevel})은 인벤토리에 보관됩니다.`,
+                'info',
+            );
         }
         this.renderEquipmentSlots();
         this.renderEquipmentInventory();
@@ -1059,13 +1264,14 @@ class GameUI {
         const type = EQUIPMENT_TYPE_MAP.get(item.type);
         const prefix = rarity ? `[${rarity.name}] ` : '';
         const bonusText = `${type?.label ?? '장비'} +${formatPercent(item.value)}`;
+        const levelText = `Lv. ${item.level}/${item.maxLevel}`;
         const autoText = autoEquipped ? ' (자동 장착)' : '';
-        this.addLog(`${prefix}${item.name}을 획득했습니다! ${bonusText}${autoText}`, 'success');
+        this.addLog(`${prefix}${item.name}을 획득했습니다! ${bonusText} · ${levelText}${autoText}`, 'success');
         if (autoEquipped && replaced) {
             const replacedRarity = EQUIPMENT_RARITY_MAP.get(replaced.rarity);
             const replacedPrefix = replacedRarity ? `[${replacedRarity.name}] ` : '';
             this.addLog(
-                `기존 ${type?.label ?? '장비'} ${replacedPrefix}${replaced.name}이(가) 인벤토리로 이동했습니다.`,
+                `기존 ${type?.label ?? '장비'} ${replacedPrefix}${replaced.name} (Lv. ${replaced.level}/${replaced.maxLevel})이(가) 인벤토리로 이동했습니다.`,
                 'info',
             );
         } else if (!autoEquipped) {

@@ -487,8 +487,20 @@ h1,
     text-align: right;
 }
 
+.equipment-slot__header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    justify-content: space-between;
+}
+
 .equipment-slot__name {
     font-size: 1rem;
+}
+
+.equipment-slot__level {
+    font-size: 0.85rem;
+    color: var(--subtext-color);
 }
 
 .equipment-slot__value {
@@ -513,7 +525,7 @@ h1,
 
 .equipment-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
     background: rgba(30, 41, 59, 0.9);
@@ -542,8 +554,16 @@ h1,
     color: var(--subtext-color);
 }
 
-.equipment-item__equip.btn {
-    min-width: 100px;
+.equipment-item__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.equipment-item__equip.btn,
+.equipment-item__upgrade.btn {
+    min-width: 115px;
     padding: 0.6rem 1.2rem;
 }
 
