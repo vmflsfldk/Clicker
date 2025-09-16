@@ -230,7 +230,78 @@ h1,
     gap: 1.5rem;
 }
 
-.panel { 
+.panel-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 0.75rem;
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+}
+
+.panel-tab {
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: transparent;
+    color: var(--subtext-color);
+    padding: 0.65rem 0.9rem;
+    border-radius: 14px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.panel-tab:hover {
+    color: #e2e8f0;
+    border-color: rgba(148, 163, 184, 0.45);
+}
+
+.panel-tab:focus-visible {
+    outline: 2px solid rgba(148, 163, 184, 0.65);
+    outline-offset: 2px;
+}
+
+.panel-tab.is-active {
+    background: linear-gradient(120deg, rgba(56, 189, 248, 0.92), rgba(14, 165, 233, 0.9));
+    color: #0f172a;
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 14px 30px rgba(56, 189, 248, 0.35);
+    transform: translateY(-1px);
+}
+
+.panel-tab.is-active:focus-visible {
+    outline-color: rgba(14, 116, 144, 0.9);
+}
+
+.panel-views {
+    position: relative;
+}
+
+.panel-view {
+    display: none;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.panel-view.is-active {
+    display: flex;
+    animation: panelFadeIn 0.25s ease;
+}
+
+@keyframes panelFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.panel {
     background: var(--panel-color);
     border-radius: 24px;
     padding: 1.75rem;
@@ -784,6 +855,17 @@ h1,
 
     .btn-primary {
         width: 180px;
+    }
+
+    .panel-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .panel-tab {
+        font-size: 0.95rem;
+        padding: 0.5rem 0.75rem;
     }
 }
 

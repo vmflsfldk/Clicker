@@ -56,103 +56,190 @@
             </section>
 
             <aside class="game__panel">
-                <section class="panel panel--hero">
-                    <header class="panel__header">
-                        <h2>영웅</h2>
-                        <button id="sortHeroes" class="btn btn-secondary">정렬 순서 변경</button>
-                    </header>
-                    <ul id="heroList" class="hero-list"></ul>
-                </section>
+                <nav class="panel-tabs" role="tablist" aria-label="보조 패널">
+                    <button
+                        type="button"
+                        class="panel-tab is-active"
+                        id="tab-heroes"
+                        role="tab"
+                        aria-selected="true"
+                        aria-controls="panel-heroes"
+                        data-tab-target="heroes"
+                    >
+                        영웅
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
+                        id="tab-rebirth"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-rebirth"
+                        data-tab-target="rebirth"
+                        tabindex="-1"
+                    >
+                        환생
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
+                        id="tab-equipment"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-equipment"
+                        data-tab-target="equipment"
+                        tabindex="-1"
+                    >
+                        장비
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
+                        id="tab-log"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-log"
+                        data-tab-target="log"
+                        tabindex="-1"
+                    >
+                        전투 로그
+                    </button>
+                </nav>
 
-                <section class="panel panel--upgrades">
-                    <header class="panel__header">
-                        <h2>용사의 힘</h2>
-                    </header>
-                    <div class="upgrade">
-                        <div>
-                            <h3>검술 훈련</h3>
-                            <p>클릭 대미지를 올립니다.</p>
-                        </div>
-                        <button id="upgradeClick" class="btn btn-upgrade">레벨 업 (10 골드)</button>
-                    </div>
-                    <div class="upgrade">
-                        <div>
-                            <h3>자동 전투</h3>
-                            <p>DPS를 일시적으로 2배로 증가시키는 스킬</p>
-                        </div>
-                        <button id="skillFrenzy" class="btn btn-skill">발동 (쿨타임 60초)</button>
-                        <p id="skillCooldown" class="cooldown"></p>
-                    </div>
-                </section>
+                <div class="panel-views">
+                    <div
+                        class="panel-view is-active"
+                        id="panel-heroes"
+                        role="tabpanel"
+                        aria-labelledby="tab-heroes"
+                        data-tab="heroes"
+                    >
+                        <section class="panel panel--hero">
+                            <header class="panel__header">
+                                <h2>영웅</h2>
+                                <button id="sortHeroes" class="btn btn-secondary">정렬 순서 변경</button>
+                            </header>
+                            <ul id="heroList" class="hero-list"></ul>
+                        </section>
 
-                <section class="panel panel--rebirth" id="rebirthPanel">
-                    <header class="panel__header">
-                        <h2>환생</h2>
-                    </header>
-                    <div class="rebirth__summary">
-                        <div class="rebirth__stat">
-                            <span class="rebirth__label">환생 횟수</span>
-                            <strong id="rebirthCount">0</strong>
-                        </div>
-                        <div class="rebirth__stat">
-                            <span class="rebirth__label">최고 도달 층</span>
-                            <strong id="rebirthHighestStage">0</strong>
-                        </div>
-                        <div class="rebirth__stat">
-                            <span class="rebirth__label">이번 획득 예상</span>
-                            <strong id="rebirthPotential">0</strong>
-                        </div>
-                        <div class="rebirth__stat">
-                            <span class="rebirth__label">보유 포인트</span>
-                            <strong id="rebirthPoints">0</strong>
-                        </div>
+                        <section class="panel panel--upgrades">
+                            <header class="panel__header">
+                                <h2>용사의 힘</h2>
+                            </header>
+                            <div class="upgrade">
+                                <div>
+                                    <h3>검술 훈련</h3>
+                                    <p>클릭 대미지를 올립니다.</p>
+                                </div>
+                                <button id="upgradeClick" class="btn btn-upgrade">레벨 업 (10 골드)</button>
+                            </div>
+                            <div class="upgrade">
+                                <div>
+                                    <h3>자동 전투</h3>
+                                    <p>DPS를 일시적으로 2배로 증가시키는 스킬</p>
+                                </div>
+                                <button id="skillFrenzy" class="btn btn-skill">발동 (쿨타임 60초)</button>
+                                <p id="skillCooldown" class="cooldown"></p>
+                            </div>
+                        </section>
                     </div>
-                    <button id="rebirthButton" class="btn btn-rebirth" disabled>환생하기</button>
-                    <p id="rebirthRequirement" class="rebirth__requirement">100층을 돌파하면 환생할 수 있습니다.</p>
-                    <div class="rebirth__skills">
-                        <h3 class="rebirth__subheading">환생 스킬</h3>
-                        <ul id="rebirthSkillList" class="rebirth-skill-list"></ul>
-                    </div>
-                </section>
 
-                <section class="panel panel--equipment">
-                    <header class="panel__header">
-                        <h2>장비</h2>
-                    </header>
-                    <p id="equipmentSummary" class="equipment__summary" aria-live="polite">
-                        탭 대미지 +0.0% · 용병 DPS +0.0% · 스킬 효율 +0.0%
-                    </p>
-                    <div class="equipment__bonuses">
-                        <div class="equipment__bonus">
-                            <span>탭 대미지</span>
-                            <strong id="equipmentTapBonus">+0%</strong>
-                        </div>
-                        <div class="equipment__bonus">
-                            <span>용병 DPS</span>
-                            <strong id="equipmentHeroBonus">+0%</strong>
-                        </div>
-                        <div class="equipment__bonus">
-                            <span>스킬 효율</span>
-                            <strong id="equipmentSkillBonus">+0%</strong>
-                        </div>
+                    <div
+                        class="panel-view"
+                        id="panel-rebirth"
+                        role="tabpanel"
+                        aria-labelledby="tab-rebirth"
+                        data-tab="rebirth"
+                        hidden
+                    >
+                        <section class="panel panel--rebirth" id="rebirthPanel">
+                            <header class="panel__header">
+                                <h2>환생</h2>
+                            </header>
+                            <div class="rebirth__summary">
+                                <div class="rebirth__stat">
+                                    <span class="rebirth__label">환생 횟수</span>
+                                    <strong id="rebirthCount">0</strong>
+                                </div>
+                                <div class="rebirth__stat">
+                                    <span class="rebirth__label">최고 도달 층</span>
+                                    <strong id="rebirthHighestStage">0</strong>
+                                </div>
+                                <div class="rebirth__stat">
+                                    <span class="rebirth__label">이번 획득 예상</span>
+                                    <strong id="rebirthPotential">0</strong>
+                                </div>
+                                <div class="rebirth__stat">
+                                    <span class="rebirth__label">보유 포인트</span>
+                                    <strong id="rebirthPoints">0</strong>
+                                </div>
+                            </div>
+                            <button id="rebirthButton" class="btn btn-rebirth" disabled>환생하기</button>
+                            <p id="rebirthRequirement" class="rebirth__requirement">100층을 돌파하면 환생할 수 있습니다.</p>
+                            <div class="rebirth__skills">
+                                <h3 class="rebirth__subheading">환생 스킬</h3>
+                                <ul id="rebirthSkillList" class="rebirth-skill-list"></ul>
+                            </div>
+                        </section>
                     </div>
-                    <div class="equipment__section">
-                        <h3 class="equipment__subheading">장착 장비</h3>
-                        <ul id="equipmentSlots" class="equipment-slots"></ul>
-                    </div>
-                    <div class="equipment__section">
-                        <h3 class="equipment__subheading">인벤토리</h3>
-                        <ul id="equipmentInventory" class="equipment-list"></ul>
-                        <p id="equipmentEmpty" class="equipment-empty">아직 획득한 장비가 없습니다.</p>
-                    </div>
-                </section>
 
-                <section class="panel panel--log">
-                    <header class="panel__header">
-                        <h2>전투 로그</h2>
-                    </header>
-                    <ul id="log" class="log"></ul>
-                </section>
+                    <div
+                        class="panel-view"
+                        id="panel-equipment"
+                        role="tabpanel"
+                        aria-labelledby="tab-equipment"
+                        data-tab="equipment"
+                        hidden
+                    >
+                        <section class="panel panel--equipment">
+                            <header class="panel__header">
+                                <h2>장비</h2>
+                            </header>
+                            <p id="equipmentSummary" class="equipment__summary" aria-live="polite">
+                                탭 대미지 +0.0% · 용병 DPS +0.0% · 스킬 효율 +0.0%
+                            </p>
+                            <div class="equipment__bonuses">
+                                <div class="equipment__bonus">
+                                    <span>탭 대미지</span>
+                                    <strong id="equipmentTapBonus">+0%</strong>
+                                </div>
+                                <div class="equipment__bonus">
+                                    <span>용병 DPS</span>
+                                    <strong id="equipmentHeroBonus">+0%</strong>
+                                </div>
+                                <div class="equipment__bonus">
+                                    <span>스킬 효율</span>
+                                    <strong id="equipmentSkillBonus">+0%</strong>
+                                </div>
+                            </div>
+                            <div class="equipment__section">
+                                <h3 class="equipment__subheading">장착 장비</h3>
+                                <ul id="equipmentSlots" class="equipment-slots"></ul>
+                            </div>
+                            <div class="equipment__section">
+                                <h3 class="equipment__subheading">인벤토리</h3>
+                                <ul id="equipmentInventory" class="equipment-list"></ul>
+                                <p id="equipmentEmpty" class="equipment-empty">아직 획득한 장비가 없습니다.</p>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div
+                        class="panel-view"
+                        id="panel-log"
+                        role="tabpanel"
+                        aria-labelledby="tab-log"
+                        data-tab="log"
+                        hidden
+                    >
+                        <section class="panel panel--log">
+                            <header class="panel__header">
+                                <h2>전투 로그</h2>
+                            </header>
+                            <ul id="log" class="log"></ul>
+                        </section>
+                    </div>
+                </div>
             </aside>
         </main>
 
