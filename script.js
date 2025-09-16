@@ -132,6 +132,11 @@ const EQUIPMENT_BOSS_DROP_CHANCE = 0.45;
 const EQUIPMENT_RARITY_MAP = new Map(EQUIPMENT_RARITIES.map((rarity) => [rarity.id, rarity]));
 const EQUIPMENT_TYPE_MAP = new Map(EQUIPMENT_TYPES.map((type) => [type.id, type]));
 
+const BOSS_STAGE_INTERVAL = 5;
+const BOSS_TIME_LIMIT = 30000;
+const BOSS_TIME_LIMIT_SECONDS = Math.floor(BOSS_TIME_LIMIT / 1000);
+const BOSS_WARNING_THRESHOLD = 5000;
+
 const REBIRTH_STAGE_REQUIREMENT = 100;
 
 const REBIRTH_EFFECT_LABELS = {
@@ -287,7 +292,7 @@ class Enemy {
 
     get name() {
         const index = Math.floor((this.stage - 1) % this.baseNames.length);
-        const suffix = this.stage % 5 === 0 ? ' (보스)' : '';
+        const suffix = this.stage % BOSS_STAGE_INTERVAL === 0 ? ' (보스)' : '';
         return `${this.baseNames[index]}${suffix}`;
     }
 
@@ -300,6 +305,17 @@ class Enemy {
 
     advanceStage() {
         this.stage += 1;
+        this.maxHp = this.calculateMaxHp(this.stage);
+        this.hp = this.maxHp;
+        this.defeated = 0;
+    }
+
+    retreatStage() {
+        if (this.stage <= 1) {
+            this.reset(1);
+            return;
+        }
+        this.stage -= 1;
         this.maxHp = this.calculateMaxHp(this.stage);
         this.hp = this.maxHp;
         this.defeated = 0;
@@ -351,6 +367,15 @@ class GameState {
         this.totalRebirths = Number.isFinite(loadedRebirths) ? Math.max(0, Math.floor(loadedRebirths)) : 0;
         this.initializeRebirthSkills(saved?.rebirthSkills);
         this.normalizeEquippedState();
+        const savedBossDeadline = Number(saved?.bossDeadline ?? 0);
+        this.bossDeadline = Number.isFinite(savedBossDeadline)
+            ? Math.max(0, Math.floor(savedBossDeadline))
+            : 0;
+        if (!this.isBossStage()) {
+            this.clearBossTimer();
+        } else if (this.bossDeadline === 0) {
+            this.startBossTimer();
+        }
     }
 
     get totalDps() {
@@ -463,6 +488,7 @@ class GameState {
         this.clickDamage = 1;
         this.lastSave = Date.now();
         this.enemy.reset(1);
+        this.clearBossTimer();
         this.heroes.forEach((hero) => {
             hero.level = 0;
         });
@@ -494,7 +520,7 @@ class GameState {
     }
 
     enemyReward() {
-        const bossMultiplier = this.enemy.stage % 5 === 0 ? 5 : 1;
+        const bossMultiplier = this.isBossStage() ? 5 : 1;
         const bonusMultiplier = 1 + this.goldBonus;
         return Math.ceil((10 + this.enemy.stage * 2) * bossMultiplier * bonusMultiplier);
     }
@@ -519,6 +545,40 @@ class GameState {
         return { success: true, hero };
     }
 
+    isBossStage(stage = this.enemy.stage) {
+        if (!Number.isFinite(stage) || stage <= 0) return false;
+        return stage % BOSS_STAGE_INTERVAL === 0;
+    }
+
+    startBossTimer() {
+        this.bossDeadline = Date.now() + BOSS_TIME_LIMIT;
+    }
+
+    clearBossTimer() {
+        this.bossDeadline = 0;
+    }
+
+    checkBossTimeout() {
+        if (!this.isBossStage()) {
+            if (this.bossDeadline !== 0) {
+                this.clearBossTimer();
+            }
+            return null;
+        }
+        if (!this.bossDeadline) {
+            this.startBossTimer();
+            return null;
+        }
+        if (Date.now() < this.bossDeadline) {
+            return null;
+        }
+        const failedStage = this.enemy.stage;
+        this.enemy.retreatStage();
+        const revertedStage = this.enemy.stage;
+        this.clearBossTimer();
+        return { failedStage, revertedStage };
+    }
+
     goNextEnemy() {
         const defeatedStage = this.enemy.stage;
         const reward = this.enemyReward();
@@ -527,6 +587,11 @@ class GameState {
         this.highestStage = Math.max(this.highestStage, defeatedStage);
         this.currentRunHighestStage = Math.max(this.currentRunHighestStage, defeatedStage);
         this.enemy.advanceStage();
+        if (this.isBossStage()) {
+            this.startBossTimer();
+        } else {
+            this.clearBossTimer();
+        }
         return { reward, drop, defeatedStage };
     }
 
@@ -536,6 +601,7 @@ class GameState {
         this.clickDamage = 1;
         this.lastSave = Date.now();
         this.enemy.reset(1);
+        this.clearBossTimer();
         this.heroes.forEach((hero) => {
             hero.level = 0;
         });
@@ -568,6 +634,7 @@ class GameState {
             equipped: this.equipped,
             highestStage: this.highestStage,
             currentRunHighestStage: this.currentRunHighestStage,
+            bossDeadline: this.bossDeadline,
             rebirthPoints: this.rebirthPoints,
             totalRebirths: this.totalRebirths,
             rebirthSkills: this.rebirthSkills,
@@ -722,7 +789,7 @@ class GameState {
     }
 
     tryDropEquipment(stage) {
-        const isBoss = stage % 5 === 0;
+        const isBoss = stage % BOSS_STAGE_INTERVAL === 0;
         const dropChance = isBoss ? EQUIPMENT_BOSS_DROP_CHANCE : EQUIPMENT_DROP_CHANCE;
         if (Math.random() > dropChance) return null;
         const item = generateEquipmentItem(stage, isBoss);
@@ -745,6 +812,7 @@ const UI = {
     enemyCurrentHp: document.getElementById('enemyCurrentHp'),
     enemyMaxHp: document.getElementById('enemyMaxHp'),
     enemyHealthBar: document.getElementById('enemyHealthBar'),
+    bossTimer: document.getElementById('bossTimer'),
     tapButton: document.getElementById('tapButton'),
     enemy: document.getElementById('enemy'),
     heroList: document.getElementById('heroList'),
@@ -1321,11 +1389,36 @@ class GameUI {
         }
     }
 
+    updateBossTimerUI() {
+        if (!UI.bossTimer) return;
+        if (!this.state.isBossStage()) {
+            UI.bossTimer.textContent = '';
+            UI.bossTimer.classList.remove('boss-timer--visible', 'boss-timer--warning');
+            return;
+        }
+        UI.bossTimer.classList.add('boss-timer--visible');
+        const deadline = this.state.bossDeadline;
+        if (!deadline) {
+            UI.bossTimer.textContent = '보스 제한시간 준비 중...';
+            UI.bossTimer.classList.remove('boss-timer--warning');
+            return;
+        }
+        const remaining = Math.max(0, deadline - Date.now());
+        const seconds = (remaining / 1000).toFixed(1);
+        UI.bossTimer.textContent = `보스 제한시간: ${seconds}s`;
+        if (remaining <= BOSS_WARNING_THRESHOLD) {
+            UI.bossTimer.classList.add('boss-timer--warning');
+        } else {
+            UI.bossTimer.classList.remove('boss-timer--warning');
+        }
+    }
+
     updateUI() {
         this.updateStats();
         this.updateHeroes();
         this.updateEnemy();
         this.updateFrenzyUI();
+        this.updateBossTimerUI();
     }
 
     handleTap() {
@@ -1354,6 +1447,12 @@ class GameUI {
         this.addLog(`스테이지 ${defeatedStage}의 적을 처치하고 ${formatNumber(reward)} 골드를 획득했습니다!`);
         if (drop) {
             this.handleEquipmentDrop(drop);
+        }
+        if (this.state.isBossStage()) {
+            this.addLog(
+                `${this.state.enemy.stage}층 보스 등장! ${BOSS_TIME_LIMIT_SECONDS}초 안에 처치하세요!`,
+                'warning',
+            );
         }
         if (previousBest < REBIRTH_STAGE_REQUIREMENT && defeatedStage >= REBIRTH_STAGE_REQUIREMENT) {
             this.addLog('환생의 기운이 깨어났습니다! 환생 메뉴에서 포인트를 획득하세요.', 'success');
@@ -1404,10 +1503,25 @@ class GameUI {
         }
     }
 
+    handleBossTimerTick() {
+        const result = this.state.checkBossTimeout();
+        if (result) {
+            this.addLog(
+                `${result.failedStage}층 보스를 ${BOSS_TIME_LIMIT_SECONDS}초 안에 처치하지 못했습니다. ${result.revertedStage}층으로 후퇴합니다.`,
+                'warning',
+            );
+            this.updateUI();
+            return;
+        }
+        this.updateBossTimerUI();
+    }
+
     startLoops() {
         this.damageLoop = setInterval(() => this.applyDps(), 250);
         this.saveLoop = setInterval(() => this.autoSave(), 10000);
         this.frenzyLoop = setInterval(() => this.updateFrenzyUI(), 200);
+        this.bossTimerLoop = setInterval(() => this.handleBossTimerTick(), 100);
+        this.handleBossTimerTick();
     }
 
     applyDps() {
@@ -1421,6 +1535,7 @@ class GameUI {
         this.updateEnemy();
         this.updateStats();
         this.updateHeroes();
+        this.updateBossTimerUI();
     }
 
     useFrenzy() {
