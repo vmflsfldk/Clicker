@@ -412,6 +412,13 @@ h1,
     color: rgba(226, 232, 240, 0.9);
 }
 
+.equipment__summary {
+    font-size: 0.95rem;
+    color: var(--subtext-color);
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
 .equipment__bonuses {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
