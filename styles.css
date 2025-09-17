@@ -24,11 +24,20 @@
     padding: 0;
 }
 
+html {
+    height: 100%;
+}
+
 body {
     font-family: var(--font-sans);
     background: radial-gradient(circle at top, #1e293b, var(--bg-color) 50%);
     color: var(--text-color);
     min-height: 100vh;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    overflow: hidden;
 }
 
 h1,
@@ -38,12 +47,14 @@ h1,
 }
 
 .game {
-    max-width: 1200px;
+    width: min(1200px, 100%);
     margin: 0 auto;
-    padding: 2rem 1.5rem 3rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+    padding: 1.25rem 1.75rem 1.75rem;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 1.25rem;
+    height: 100vh;
+    height: 100dvh;
 }
 
 .game__header {
@@ -51,12 +62,12 @@ h1,
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1rem;
+    gap: 0.75rem;
     text-align: center;
 }
 
 .game__header h1 {
-    font-size: 3rem;
+    font-size: clamp(2.2rem, 3.5vw, 3rem);
     letter-spacing: 2px;
     text-transform: uppercase;
     text-shadow: 0 8px 15px rgba(14, 165, 233, 0.45);
@@ -64,14 +75,15 @@ h1,
 
 .game__stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
     width: 100%;
     justify-items: center;
 }
 
 .game__enemy-stats {
     width: 100%;
+    padding-top: 0.25rem;
 }
 
 .game__enemy-stats .game__stats {
@@ -81,38 +93,58 @@ h1,
 
 .stat {
     background: linear-gradient(160deg, rgba(59, 130, 246, 0.2), rgba(236, 72, 153, 0.12));
-    padding: 1rem 1.5rem;
+    padding: 0.85rem 1.1rem;
     border-radius: 16px;
     box-shadow: var(--shadow);
 }
 
 .stat__label {
     display: block;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     color: var(--subtext-color);
     margin-bottom: 0.4rem;
     letter-spacing: 1px;
 }
 
 .stat__value {
-    font-size: 1.6rem;
+    font-size: 1.35rem;
 }
 
 .game__main {
     display: grid;
-    grid-template-columns: 3fr 2fr;
-    gap: 2rem;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 1.5rem;
+    min-height: 0;
+    align-items: stretch;
 }
 
 .game__enemy {
     background: var(--panel-color);
     border-radius: 24px;
-    padding: 2rem;
+    padding: 1.5rem 1.25rem;
     box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
     align-items: center;
-    gap: 1rem;
+    gap: 0.9rem;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable both-edges;
+}
+
+.game__enemy > *:not(.enemy) {
+    width: 100%;
+}
+
+#enemy {
+    justify-self: center;
+}
+
+#tapButton {
+    width: 100%;
+    max-width: 280px;
+    justify-self: center;
 }
 
 .enemy__info {
@@ -121,9 +153,9 @@ h1,
 }
 
 .enemy__name {
-    font-size: 1.5rem;
+    font-size: 1.45rem;
     letter-spacing: 1px;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 .enemy__health-bar {
@@ -173,7 +205,6 @@ h1,
     flex-wrap: wrap;
     opacity: 0;
     transition: opacity 0.2s ease;
-    margin-top: 0.5rem;
 }
 
 .boss-controls--visible {
@@ -196,8 +227,8 @@ h1,
 }
 
 .enemy {
-    width: 260px;
-    height: 260px;
+    width: clamp(200px, 22vw, 260px);
+    height: clamp(200px, 22vw, 260px);
     border-radius: 50%;
     background: linear-gradient(160deg, rgba(14, 165, 233, 0.45), rgba(76, 29, 149, 0.4));
     display: grid;
@@ -205,6 +236,7 @@ h1,
     position: relative;
     cursor: pointer;
     user-select: none;
+    margin: 0 auto;
 }
 
 .enemy__sprite {
@@ -280,18 +312,29 @@ h1,
 .game__panel {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.25rem;
+    background: var(--panel-color);
+    border-radius: 24px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    height: 100%;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
 }
 
 .panel-tabs {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 0.75rem;
-    background: rgba(15, 23, 42, 0.6);
+    background: rgba(15, 23, 42, 0.7);
     padding: 0.75rem;
     border-radius: 18px;
     box-shadow: var(--shadow);
     backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .panel-tab {
@@ -330,6 +373,13 @@ h1,
 
 .panel-views {
     position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    padding-bottom: 0.5rem;
+    margin-right: -0.5rem;
+    scrollbar-gutter: stable both-edges;
 }
 
 .panel-overlay__close {
@@ -1918,31 +1968,92 @@ body.modal-open {
 
 .game__footer {
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    flex-direction: row;
+    justify-content: space-between;
     align-items: center;
+    gap: 1rem;
     color: var(--subtext-color);
+}
+
+.game__footer > div {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .game__footer-text {
     font-size: 0.9rem;
+    text-align: right;
 }
 
 @media (max-width: 1024px) {
+    body {
+        display: block;
+        overflow: auto;
+    }
+
+    .game {
+        height: auto;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        padding: 1.5rem 1.25rem 2.5rem;
+    }
+
     .game__main {
         grid-template-columns: 1fr;
+        gap: 1.75rem;
     }
 
     .game__panel {
         order: -1;
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+        height: auto;
+        min-height: auto;
+    }
+
+    .panel-tabs {
+        position: static;
+    }
+
+    .panel-views {
+        flex: initial;
+        min-height: auto;
+        overflow: visible;
+        padding-right: 0;
+        margin-right: 0;
+        scrollbar-gutter: auto;
     }
 
     .game__enemy {
         order: 1;
+        overflow: visible;
+        scrollbar-gutter: auto;
+    }
+
+    #tapButton {
+        max-width: none;
     }
 
     .game__stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .game__footer {
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .game__footer > div {
+        justify-content: center;
+    }
+
+    .game__footer-text {
+        text-align: center;
     }
 }
 
@@ -1965,8 +2076,8 @@ body.modal-open {
     }
 
     .enemy {
-        width: min(60vw, 260px);
-        height: min(60vw, 260px);
+        width: clamp(180px, 52vw, 240px);
+        height: clamp(180px, 52vw, 240px);
     }
 
     .game__stats {
@@ -2023,8 +2134,8 @@ body.modal-open {
 
     .enemy {
         order: 3;
-        width: min(72vw, 240px);
-        height: min(72vw, 240px);
+        width: clamp(160px, 70vw, 220px);
+        height: clamp(160px, 70vw, 220px);
         margin: 0 auto 1rem;
     }
 
