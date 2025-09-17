@@ -280,6 +280,7 @@ const generateEquipmentItem = (stage, isBoss) => {
         maxLevel: rarity.maxLevel,
         name: generateEquipmentName(type.id),
         stage,
+        locked: false,
     };
 };
 
@@ -400,6 +401,8 @@ class GameState {
             const savedId = saved?.equipped?.[id];
             this.equipped[id] = savedId ?? null;
         });
+        const rawMaterials = Number(saved?.upgradeMaterials ?? 0);
+        this.upgradeMaterials = Number.isFinite(rawMaterials) ? Math.max(0, Math.floor(rawMaterials)) : 0;
         const fallbackHighest = Math.max(0, this.enemy.stage - 1);
         const loadedHighest = Number(saved?.highestStage ?? fallbackHighest);
         this.highestStage = Number.isFinite(loadedHighest) ? Math.max(0, loadedHighest) : fallbackHighest;
@@ -684,6 +687,7 @@ class GameState {
         this.frenzyActiveUntil = 0;
         this.inventory = [];
         this.equipped = {};
+        this.upgradeMaterials = 0;
         EQUIPMENT_TYPES.forEach(({ id }) => {
             this.equipped[id] = null;
         });
@@ -708,6 +712,7 @@ class GameState {
             frenzyActiveUntil: this.frenzyActiveUntil,
             inventory: this.inventory,
             equipped: this.equipped,
+            upgradeMaterials: this.upgradeMaterials,
             highestStage: this.highestStage,
             currentRunHighestStage: this.currentRunHighestStage,
             bossDeadline: this.bossDeadline,
@@ -854,6 +859,7 @@ class GameState {
             maxLevel,
             name: item.name ?? generateEquipmentName(type),
             stage: Number(item.stage ?? 1) || 1,
+            locked: Boolean(item.locked),
         };
     }
 
@@ -881,7 +887,11 @@ class GameState {
         if (!item) return false;
         if (item.level >= item.maxLevel) return false;
         return this.inventory.some(
-            (entry) => entry.id !== item.id && entry.type === item.type && entry.rarity === item.rarity,
+            (entry) =>
+                entry.id !== item.id &&
+                entry.type === item.type &&
+                entry.rarity === item.rarity &&
+                !entry.locked,
         );
     }
 
@@ -898,6 +908,7 @@ class GameState {
         this.inventory.forEach((entry, entryIndex) => {
             if (entry.id === item.id) return;
             if (entry.type !== item.type || entry.rarity !== item.rarity) return;
+            if (entry.locked) return;
             candidates.push({ entry, entryIndex });
         });
         if (candidates.length === 0) {
@@ -937,6 +948,90 @@ class GameState {
         };
     }
 
+    canSalvageItem(item) {
+        if (!item) return false;
+        if (item.locked) return false;
+        return this.equipped[item.type] !== item.id;
+    }
+
+    toggleEquipmentLock(itemId) {
+        const item = this.inventory.find((entry) => entry.id === itemId);
+        if (!item) {
+            return { success: false, message: '전술 장비를 찾을 수 없습니다.' };
+        }
+        item.locked = !item.locked;
+        this.lastSave = Date.now();
+        return { success: true, item, locked: item.locked };
+    }
+
+    calculateSalvageReward(item) {
+        if (!item) {
+            return { gold: 0, materials: 0 };
+        }
+        const rarityData = EQUIPMENT_RARITY_MAP.get(item.rarity);
+        const rarityRank = rarityData?.rank ?? 0;
+        const baseMaterials = 1 + rarityRank;
+        const levelBonus = Math.max(0, item.level - 1);
+        const materials = Math.max(1, Math.round(baseMaterials + levelBonus));
+        const stage = Math.max(1, Number.isFinite(item.stage) ? Math.floor(item.stage) : 1);
+        const baseGold = 20 + stage * 6;
+        const valueFactor = Math.max(1, (item.baseValue ?? item.value ?? 0) * 10 + 1);
+        const rarityMultiplier = 1 + rarityRank * 0.6;
+        const gold = Math.max(15, Math.round(baseGold * rarityMultiplier * valueFactor));
+        return { gold, materials };
+    }
+
+    salvageEquipment(itemIds) {
+        const ids = Array.isArray(itemIds) ? itemIds.filter(Boolean) : [itemIds];
+        const uniqueIds = Array.from(new Set(ids));
+        if (uniqueIds.length === 0) {
+            return { success: false, message: '분해할 전술 장비를 선택하세요.' };
+        }
+        const items = [];
+        for (const id of uniqueIds) {
+            const item = this.inventory.find((entry) => entry.id === id);
+            if (!item) {
+                return { success: false, message: '전술 장비를 찾을 수 없습니다.' };
+            }
+            if (item.locked) {
+                return { success: false, message: `${item.name}은(는) 잠겨 있어 분해할 수 없습니다.` };
+            }
+            if (this.equipped[item.type] === item.id) {
+                return { success: false, message: '장착 중인 전술 장비는 분해할 수 없습니다.' };
+            }
+            items.push(item);
+        }
+
+        if (items.length === 0) {
+            return { success: false, message: '분해할 전술 장비를 선택하세요.' };
+        }
+
+        const totals = items.reduce(
+            (acc, item) => {
+                const reward = this.calculateSalvageReward(item);
+                acc.gold += reward.gold;
+                acc.materials += reward.materials;
+                return acc;
+            },
+            { gold: 0, materials: 0 },
+        );
+
+        const removalSet = new Set(uniqueIds);
+        this.inventory = this.inventory.filter((entry) => !removalSet.has(entry.id));
+
+        this.gold += totals.gold;
+        this.upgradeMaterials += totals.materials;
+        this.lastSave = Date.now();
+
+        return {
+            success: true,
+            items,
+            count: items.length,
+            gold: totals.gold,
+            materials: totals.materials,
+        };
+    }
+
     getEquipmentBonuses() {
         return EQUIPMENT_TYPES.reduce((acc, { id }) => {
             acc[id] = this.getEquippedItem(id)?.value ?? 0;
@@ -949,6 +1044,7 @@ class GameState {
     }
 
     addEquipment(item) {
+        item.locked = Boolean(item.locked);
         this.inventory.push(item);
         const current = this.getEquippedItem(item.type);
         if (!current || item.value > current.value) {
@@ -994,6 +1090,7 @@ class GameState {
 const UI = {
     stage: document.getElementById('stage'),
     gold: document.getElementById('gold'),
+    upgradeMaterials: document.getElementById('upgradeMaterials'),
     gachaTokensHeader: document.getElementById('gachaTokensHeader'),
     clickDamage: document.getElementById('clickDamage'),
     totalDps: document.getElementById('totalDps'),
@@ -1034,9 +1131,21 @@ const UI = {
     equipmentSlots: document.getElementById('equipmentSlots'),
     equipmentInventory: document.getElementById('equipmentInventory'),
     equipmentEmpty: document.getElementById('equipmentEmpty'),
+    equipmentFilterSalvageable: document.getElementById('equipmentFilterSalvageable'),
+    equipmentSelectSalvageable: document.getElementById('equipmentSelectSalvageable'),
+    equipmentSalvageSelected: document.getElementById('equipmentSalvageSelected'),
+    equipmentSalvageHint: document.getElementById('equipmentSalvageHint'),
+    equipmentSelectionCount: document.getElementById('equipmentSelectionCount'),
     missionSummary: document.getElementById('missionSummary'),
     missionList: document.getElementById('missionList'),
     missionEmpty: document.getElementById('missionEmpty'),
+    salvageModal: document.getElementById('salvageModal'),
+    salvageModalOverlay: document.getElementById('salvageModalOverlay'),
+    salvageModalList: document.getElementById('salvageModalList'),
+    salvageModalCount: document.getElementById('salvageModalCount'),
+    salvageModalRewards: document.getElementById('salvageModalRewards'),
+    salvageModalConfirm: document.getElementById('salvageModalConfirm'),
+    salvageModalCancel: document.getElementById('salvageModalCancel'),
     panelTabButtons: document.querySelectorAll('[data-tab-target]'),
     panelViews: document.querySelectorAll('[data-tab]'),
 };
@@ -1048,6 +1157,9 @@ class GameUI {
         this.heroElements = new Map();
         this.rebirthSkillElements = new Map();
         this.missionElements = new Map();
+        this.selectedEquipmentIds = new Set();
+        this.filterSalvageable = false;
+        this.pendingSalvageIds = [];
         this.sortState = state.sortOrder === 'dps' ? 'dps' : 'level';
         this.tabButtons = [];
         this.tabPanels = new Map();
@@ -1131,7 +1243,33 @@ class GameUI {
         }
         if (UI.equipmentInventory) {
             UI.equipmentInventory.addEventListener('click', (event) => this.handleEquipmentInventoryClick(event));
+            UI.equipmentInventory.addEventListener('change', (event) => this.handleEquipmentInventoryChange(event));
         }
+        if (UI.equipmentFilterSalvageable) {
+            UI.equipmentFilterSalvageable.addEventListener('change', (event) =>
+                this.handleEquipmentFilterChange(event),
+            );
+        }
+        if (UI.equipmentSelectSalvageable) {
+            UI.equipmentSelectSalvageable.addEventListener('click', () => this.selectAllSalvageable());
+        }
+        if (UI.equipmentSalvageSelected) {
+            UI.equipmentSalvageSelected.addEventListener('click', () => this.requestSalvageSelected());
+        }
+        if (UI.salvageModalCancel) {
+            UI.salvageModalCancel.addEventListener('click', () => this.closeSalvageModal());
+        }
+        if (UI.salvageModalConfirm) {
+            UI.salvageModalConfirm.addEventListener('click', () => this.confirmSalvage());
+        }
+        if (UI.salvageModalOverlay) {
+            UI.salvageModalOverlay.addEventListener('click', (event) => {
+                if (event.target === UI.salvageModalOverlay) {
+                    this.closeSalvageModal();
+                }
+            });
+        }
+        document.addEventListener('keydown', (event) => this.handleKeyDown(event));
         if (UI.missionList) {
             UI.missionList.addEventListener('click', (event) => this.handleMissionListClick(event));
         }
@@ -1418,9 +1556,10 @@ class GameUI {
 
     renderEquipmentInventory() {
         if (!UI.equipmentInventory) return;
+        this.sanitizeSelectedEquipment();
         UI.equipmentInventory.innerHTML = '';
-        const items = [...this.state.inventory];
-        items.sort((a, b) => {
+        const sorted = [...this.state.inventory];
+        sorted.sort((a, b) => {
             const rarityA = EQUIPMENT_RARITY_MAP.get(a.rarity)?.rank ?? 0;
             const rarityB = EQUIPMENT_RARITY_MAP.get(b.rarity)?.rank ?? 0;
             if (rarityA !== rarityB) return rarityB - rarityA;
@@ -1428,19 +1567,57 @@ class GameUI {
             return a.name.localeCompare(b.name, 'ko');
         });
 
+        const visibleItems = this.filterSalvageable
+            ? sorted.filter((item) => this.state.canSalvageItem(item))
+            : sorted;
+
         if (UI.equipmentEmpty) {
-            UI.equipmentEmpty.style.display = items.length === 0 ? 'block' : 'none';
+            if (sorted.length === 0) {
+                UI.equipmentEmpty.textContent = '아직 확보한 전술 장비가 없습니다.';
+                UI.equipmentEmpty.style.display = 'block';
+            } else if (visibleItems.length === 0) {
+                UI.equipmentEmpty.textContent =
+                    '조건을 만족하는 전술 장비가 없습니다. 잠금 또는 장착 상태를 확인하세요.';
+                UI.equipmentEmpty.style.display = 'block';
+            } else {
+                UI.equipmentEmpty.style.display = 'none';
+            }
         }
 
-        items.forEach((item) => {
+        visibleItems.forEach((item) => {
             const type = EQUIPMENT_TYPE_MAP.get(item.type);
             const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
             const equipped = this.state.equipped[item.type] === item.id;
+            const salvageable = this.state.canSalvageItem(item);
 
             const entry = document.createElement('li');
             entry.className = 'equipment-item';
             entry.dataset.rarity = item.rarity;
             entry.dataset.equipped = equipped ? 'true' : 'false';
+            entry.dataset.salvageable = salvageable ? 'true' : 'false';
+
+            const selectWrapper = document.createElement('label');
+            selectWrapper.className = 'equipment-item__select';
+            const selectTooltip = salvageable
+                ? '선택하여 여러 장비를 한 번에 분해할 수 있습니다.'
+                : item.locked
+                ? '잠금 중인 전술 장비는 선택할 수 없습니다.'
+                : equipped
+                ? '장착 중인 전술 장비는 선택할 수 없습니다.'
+                : '선택할 수 없는 전술 장비입니다.';
+            selectWrapper.title = selectTooltip;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.dataset.selectId = item.id;
+            checkbox.checked = this.selectedEquipmentIds.has(item.id);
+            checkbox.disabled = !salvageable;
+
+            const checkboxLabel = document.createElement('span');
+            checkboxLabel.className = 'equipment-item__select-label';
+            checkboxLabel.textContent = '선택';
+
+            selectWrapper.append(checkbox, checkboxLabel);
 
             const info = document.createElement('div');
             info.className = 'equipment-item__info';
@@ -1455,17 +1632,47 @@ class GameUI {
             const typeLabel = type?.label ?? '전술 장비';
             details.textContent = `${typeLabel} +${formatPercent(item.value)} · Lv. ${item.level}/${item.maxLevel} · 스테이지 ${item.stage}`;
 
-            info.append(name, details);
+            const status = document.createElement('span');
+            status.className = 'equipment-item__status';
+            if (item.locked) {
+                status.textContent = '🔒 잠금 상태';
+                status.dataset.state = 'locked';
+            } else if (equipped) {
+                status.textContent = '장착 중';
+                status.dataset.state = 'equipped';
+            } else if (salvageable) {
+                status.textContent = '분해 가능';
+                status.dataset.state = 'available';
+            } else {
+                status.textContent = '보관 중';
+                status.dataset.state = 'stored';
+            }
+
+            info.append(name, details, status);
 
             const actions = document.createElement('div');
             actions.className = 'equipment-item__actions';
 
+            const lockButton = document.createElement('button');
+            lockButton.type = 'button';
+            lockButton.className = 'btn btn-ghost equipment-item__lock';
+            lockButton.dataset.lockId = item.id;
+            lockButton.textContent = item.locked ? '잠금 해제' : '잠금';
+            lockButton.title = item.locked
+                ? '잠금을 해제하여 강화 재료로 사용하거나 분해할 수 있습니다.'
+                : '잠금하면 분해 및 강화 재료로 사용되지 않습니다.';
+
             const materials = this.state.inventory.filter(
-                (other) => other.id !== item.id && other.type === item.type && other.rarity === item.rarity,
+                (other) =>
+                    other.id !== item.id &&
+                    other.type === item.type &&
+                    other.rarity === item.rarity &&
+                    !other.locked,
             );
             const upgradeAvailable = item.level < item.maxLevel && materials.length > 0;
 
             const upgradeButton = document.createElement('button');
+            upgradeButton.type = 'button';
             upgradeButton.className = 'btn btn-upgrade equipment-item__upgrade';
             upgradeButton.dataset.upgradeId = item.id;
             if (item.level >= item.maxLevel) {
@@ -1478,23 +1685,222 @@ class GameUI {
                 if (!upgradeAvailable) {
                     upgradeButton.title = '동일 타입·등급의 전술 장비가 추가로 필요합니다.';
                 } else {
-                    upgradeButton.title = `강화에 동일 타입·등급 전술 장비 1개가 소모됩니다. (보유 ${materials.length}개)`;
+                    upgradeButton.title = `강화에 동일 타입·등급 전술 장비 1개가 소모됩니다. (사용 가능 ${materials.length}개)`;
                 }
             }
 
             const equipButton = document.createElement('button');
+            equipButton.type = 'button';
             equipButton.className = 'btn btn-secondary equipment-item__equip';
             equipButton.textContent = equipped ? '장착 중' : '장착';
             equipButton.disabled = equipped;
             equipButton.dataset.equipId = item.id;
+            equipButton.title = equipped ? '이미 장착 중입니다.' : '선택한 전술 장비를 장착합니다.';
 
-            actions.append(upgradeButton, equipButton);
+            const salvageButton = document.createElement('button');
+            salvageButton.type = 'button';
+            salvageButton.className = 'btn btn-danger equipment-item__salvage';
+            salvageButton.dataset.salvageId = item.id;
+            salvageButton.textContent = '분해';
+            salvageButton.disabled = !salvageable;
+            if (item.locked) {
+                salvageButton.title = '잠긴 전술 장비는 분해할 수 없습니다.';
+            } else if (equipped) {
+                salvageButton.title = '장착 중인 전술 장비는 분해할 수 없습니다.';
+            } else {
+                salvageButton.title = '전술 장비를 분해하여 강화 재료와 골드를 획득합니다.';
+            }
 
-            entry.append(info, actions);
+            actions.append(lockButton, upgradeButton, equipButton, salvageButton);
+
+            entry.append(selectWrapper, info, actions);
             UI.equipmentInventory.appendChild(entry);
         });
+
+        this.updateEquipmentControls();
     }
 
+
+    sanitizeSelectedEquipment() {
+        if (!this.selectedEquipmentIds || this.selectedEquipmentIds.size === 0) {
+            return;
+        }
+        const valid = new Set();
+        this.state.inventory.forEach((item) => {
+            if (this.state.canSalvageItem(item) && this.selectedEquipmentIds.has(item.id)) {
+                valid.add(item.id);
+            }
+        });
+        this.selectedEquipmentIds = valid;
+    }
+
+    updateEquipmentControls() {
+        const salvageableItems = this.state.inventory.filter((item) => this.state.canSalvageItem(item));
+        const totalSalvageable = salvageableItems.length;
+        const selectedCount = this.selectedEquipmentIds.size;
+
+        if (UI.equipmentFilterSalvageable) {
+            UI.equipmentFilterSalvageable.checked = this.filterSalvageable;
+        }
+        if (UI.equipmentSelectSalvageable) {
+            UI.equipmentSelectSalvageable.disabled = totalSalvageable === 0;
+            UI.equipmentSelectSalvageable.title =
+                totalSalvageable === 0
+                    ? '분해 가능한 전술 장비가 없습니다.'
+                    : `분해 가능한 전술 장비 ${formatNumber(totalSalvageable)}개를 한 번에 선택합니다.`;
+        }
+        if (UI.equipmentSalvageSelected) {
+            UI.equipmentSalvageSelected.disabled = selectedCount === 0;
+            UI.equipmentSalvageSelected.textContent =
+                selectedCount > 0 ? `선택 분해 (${formatNumber(selectedCount)}개)` : '선택 분해';
+            UI.equipmentSalvageSelected.title = selectedCount > 0
+                ? '선택한 전술 장비를 분해합니다.'
+                : '분해할 전술 장비를 먼저 선택하세요.';
+        }
+        if (UI.equipmentSelectionCount) {
+            UI.equipmentSelectionCount.textContent =
+                selectedCount > 0 ? `현재 선택: ${formatNumber(selectedCount)}개` : '현재 선택: 없음';
+        }
+    }
+
+    handleEquipmentInventoryChange(event) {
+        const checkbox = event.target.closest('input[data-select-id]');
+        if (!checkbox) return;
+        const itemId = checkbox.dataset.selectId;
+        if (!itemId) return;
+        if (checkbox.checked) {
+            this.selectedEquipmentIds.add(itemId);
+        } else {
+            this.selectedEquipmentIds.delete(itemId);
+        }
+        this.updateEquipmentControls();
+    }
+
+    handleEquipmentFilterChange(event) {
+        const target = event?.target;
+        const checked = target ? Boolean(target.checked) : false;
+        this.filterSalvageable = checked;
+        this.renderEquipmentInventory();
+    }
+
+    selectAllSalvageable() {
+        const salvageable = this.state.inventory.filter((item) => this.state.canSalvageItem(item));
+        if (salvageable.length === 0) {
+            this.addLog('분해 가능한 전술 장비가 없습니다.', 'info');
+            return;
+        }
+        salvageable.forEach((item) => this.selectedEquipmentIds.add(item.id));
+        this.renderEquipmentInventory();
+    }
+
+    requestSalvageSelected() {
+        if (!this.selectedEquipmentIds || this.selectedEquipmentIds.size === 0) {
+            this.addLog('분해할 전술 장비를 먼저 선택하세요.', 'warning');
+            return;
+        }
+        this.openSalvageModal(Array.from(this.selectedEquipmentIds));
+    }
+
+    openSalvageModal(itemIds) {
+        const uniqueIds = Array.from(new Set(Array.isArray(itemIds) ? itemIds : [itemIds])).filter(Boolean);
+        if (uniqueIds.length === 0) {
+            this.addLog('분해할 전술 장비가 없습니다.', 'warning');
+            return;
+        }
+        const items = uniqueIds
+            .map((id) => this.state.inventory.find((item) => item.id === id))
+            .filter((item) => item && this.state.canSalvageItem(item));
+        if (items.length === 0) {
+            this.addLog('선택한 전술 장비를 분해할 수 없습니다.', 'warning');
+            return;
+        }
+        this.pendingSalvageIds = items.map((item) => item.id);
+        this.renderSalvageModal(items);
+        if (UI.salvageModal) {
+            UI.salvageModal.classList.add('is-open');
+            UI.salvageModal.removeAttribute('hidden');
+        }
+        document.body.classList.add('modal-open');
+    }
+
+    renderSalvageModal(items) {
+        const totals = items.reduce(
+            (acc, item) => {
+                const reward = this.state.calculateSalvageReward(item);
+                acc.gold += reward.gold;
+                acc.materials += reward.materials;
+                return acc;
+            },
+            { gold: 0, materials: 0 },
+        );
+        if (UI.salvageModalList) {
+            UI.salvageModalList.innerHTML = '';
+            items.forEach((item) => {
+                const entry = document.createElement('li');
+                entry.className = 'modal__list-item';
+                const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
+                const type = EQUIPMENT_TYPE_MAP.get(item.type);
+                const reward = this.state.calculateSalvageReward(item);
+                const rarityLabel = rarity ? `[${rarity.name}] ` : '';
+                entry.textContent = `${rarityLabel}${item.name} · ${type?.label ?? '전술 장비'} +${formatPercent(item.value)} (재료 ${formatNumber(reward.materials)}개 / 골드 ${formatNumber(reward.gold)})`;
+                UI.salvageModalList.appendChild(entry);
+            });
+        }
+        if (UI.salvageModalCount) {
+            UI.salvageModalCount.textContent = `선택된 장비 ${formatNumber(items.length)}개`;
+        }
+        if (UI.salvageModalRewards) {
+            UI.salvageModalRewards.textContent = `강화 재료 ${formatNumber(totals.materials)}개 · 골드 ${formatNumber(totals.gold)}`;
+        }
+    }
+
+    closeSalvageModal() {
+        this.pendingSalvageIds = [];
+        if (UI.salvageModal) {
+            UI.salvageModal.classList.remove('is-open');
+            UI.salvageModal.setAttribute('hidden', '');
+        }
+        document.body.classList.remove('modal-open');
+    }
+
+    isSalvageModalOpen() {
+        return Boolean(UI.salvageModal?.classList.contains('is-open'));
+    }
+
+    confirmSalvage() {
+        if (!this.pendingSalvageIds || this.pendingSalvageIds.length === 0) {
+            this.closeSalvageModal();
+            return;
+        }
+        const result = this.state.salvageEquipment(this.pendingSalvageIds);
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            this.closeSalvageModal();
+            this.renderEquipmentInventory();
+            return;
+        }
+        const countText = formatNumber(result.count);
+        const materialsText = formatNumber(result.materials);
+        const goldText = formatNumber(result.gold);
+        this.addLog(
+            `전술 장비 ${countText}개를 분해하여 강화 재료 ${materialsText}개와 골드 ${goldText}을(를) 획득했습니다.`,
+            'success',
+        );
+        result.items.forEach((item) => {
+            this.selectedEquipmentIds.delete(item.id);
+        });
+        this.closeSalvageModal();
+        this.renderEquipmentInventory();
+        this.updateStats();
+        saveGame(this.state);
+    }
+
+    handleKeyDown(event) {
+        if (event.key === 'Escape' && this.isSalvageModalOpen()) {
+            event.preventDefault();
+            this.closeSalvageModal();
+        }
+    }
 
     renderMissionUI() {
         if (!UI.missionList) return;
@@ -1628,6 +2034,35 @@ class GameUI {
     }
 
     handleEquipmentInventoryClick(event) {
+        const lockButton = event.target.closest('[data-lock-id]');
+        if (lockButton) {
+            const itemId = lockButton.dataset.lockId;
+            if (!itemId) return;
+            const result = this.state.toggleEquipmentLock(itemId);
+            if (!result.success) {
+                this.addLog(result.message, 'warning');
+                return;
+            }
+            if (result.locked) {
+                this.selectedEquipmentIds.delete(result.item.id);
+            }
+            const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
+            const prefix = rarity ? `[${rarity.name}] ` : '';
+            const actionText = result.locked ? '잠금되었습니다.' : '잠금이 해제되었습니다.';
+            this.addLog(`${prefix}${result.item.name}이(가) ${actionText}`, result.locked ? 'info' : 'success');
+            this.renderEquipmentInventory();
+            saveGame(this.state);
+            return;
+        }
+
+        const salvageButton = event.target.closest('[data-salvage-id]');
+        if (salvageButton) {
+            const itemId = salvageButton.dataset.salvageId;
+            if (!itemId) return;
+            this.openSalvageModal([itemId]);
+            return;
+        }
+
         const upgradeButton = event.target.closest('[data-upgrade-id]');
         if (upgradeButton) {
             const itemId = upgradeButton.dataset.upgradeId;
@@ -1648,6 +2083,7 @@ class GameUI {
                 'success',
             );
             if (result.consumed) {
+                this.selectedEquipmentIds.delete(result.consumed.id);
                 const consumedRarity = EQUIPMENT_RARITY_MAP.get(result.consumed.rarity);
                 const consumedPrefix = consumedRarity ? `[${consumedRarity.name}] ` : '';
                 this.addLog(
@@ -1796,6 +2232,9 @@ class GameUI {
     updateStats() {
         UI.stage.textContent = this.state.enemy.stage;
         UI.gold.textContent = formatNumber(this.state.gold);
+        if (UI.upgradeMaterials) {
+            UI.upgradeMaterials.textContent = formatNumber(this.state.upgradeMaterials);
+        }
         UI.clickDamage.textContent = formatNumber(this.state.effectiveClickDamage);
         UI.totalDps.textContent = formatNumber(this.state.totalDps);
         if (UI.upgradeClick) {
