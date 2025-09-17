@@ -1444,6 +1444,12 @@ export class GameState {
         this.gold = 0;
         this.clickLevel = 1;
         this.clickDamage = 1;
+        this.clickCritChanceLevel = 0;
+        this.clickCritDamageLevel = 0;
+        this.heroDpsLevel = 0;
+        this.heroCritChanceLevel = 0;
+        this.heroCritDamageLevel = 0;
+        this.goldGainLevel = 0;
         this.lastSave = Date.now();
         this.enemy.reset(1);
         this.clearBossTimer();
@@ -1464,9 +1470,6 @@ export class GameState {
         this.currentRunHighestStage = 0;
         this.rebirthPoints = 0;
         this.totalRebirths = 0;
-        this.goldGainLevel = 0;
-        this.heroCritChanceLevel = 0;
-        this.heroCritDamageLevel = 0;
         this.initializeRebirthSkills({});
         this.initializeMissions({});
     }
