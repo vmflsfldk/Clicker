@@ -99,6 +99,18 @@
                     <button
                         type="button"
                         class="panel-tab"
+                        id="tab-missions"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-missions"
+                        data-tab-target="missions"
+                        tabindex="-1"
+                    >
+                        임무
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
                         id="tab-log"
                         role="tab"
                         aria-selected="false"
@@ -249,6 +261,26 @@
                                 <ul id="equipmentInventory" class="equipment-list"></ul>
                                 <p id="equipmentEmpty" class="equipment-empty">아직 확보한 전술 장비가 없습니다.</p>
                             </div>
+                        </section>
+                    </div>
+
+                    <div
+                        class="panel-view"
+                        id="panel-missions"
+                        role="tabpanel"
+                        aria-labelledby="tab-missions"
+                        data-tab="missions"
+                        hidden
+                    >
+                        <section class="panel panel--missions">
+                            <header class="panel__header">
+                                <h2>임무</h2>
+                            </header>
+                            <p id="missionSummary" class="mission__summary">
+                                샬레의 지시를 수행해 보상을 획득하세요.
+                            </p>
+                            <ul id="missionList" class="mission-list"></ul>
+                            <p id="missionEmpty" class="mission-empty">모든 임무를 완료했습니다!</p>
                         </section>
                     </div>
 
