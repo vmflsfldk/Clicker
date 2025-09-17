@@ -197,10 +197,16 @@ export class GameUI {
         this.tabButtons.forEach((button) => {
             button.addEventListener('click', () => {
                 const target = button.dataset.tabTarget;
-                if (target) {
-                    this.activateTab(target);
-                    this.openPanelOverlay();
+                if (!target) {
+                    return;
                 }
+                if (this.activeTab === target && this.isPanelOverlayOpen()) {
+                    this.clearActiveTab();
+                    this.closePanelOverlay();
+                    return;
+                }
+                this.activateTab(target);
+                this.openPanelOverlay();
             });
         });
         const initialButton = this.tabButtons.find((button) => button.classList.contains('is-active'));
@@ -231,6 +237,21 @@ export class GameUI {
             }
         });
         this.activeTab = tabId;
+        this.updateOverlayAriaState();
+    }
+
+    clearActiveTab() {
+        this.tabButtons.forEach((button) => {
+            button.classList.remove('is-active');
+            button.setAttribute('aria-selected', 'false');
+            button.setAttribute('tabindex', '0');
+        });
+        this.tabPanels.forEach((panel) => {
+            panel.classList.remove('is-active');
+            panel.setAttribute('aria-hidden', 'true');
+            panel.setAttribute('hidden', '');
+        });
+        this.activeTab = null;
         this.updateOverlayAriaState();
     }
 
@@ -353,10 +374,16 @@ export class GameUI {
             UI.missionList.addEventListener('click', (event) => this.handleMissionListClick(event));
         }
         if (this.panelOverlayClose) {
-            this.panelOverlayClose.addEventListener('click', () => this.closePanelOverlay());
+            this.panelOverlayClose.addEventListener('click', () => {
+                this.clearActiveTab();
+                this.closePanelOverlay();
+            });
         }
         if (this.panelOverlayBackdrop) {
-            this.panelOverlayBackdrop.addEventListener('click', () => this.closePanelOverlay());
+            this.panelOverlayBackdrop.addEventListener('click', () => {
+                this.clearActiveTab();
+                this.closePanelOverlay();
+            });
         }
     }
 
@@ -1635,6 +1662,7 @@ export class GameUI {
         }
         if (this.isPanelOverlayOpen()) {
             event.preventDefault();
+            this.clearActiveTab();
             this.closePanelOverlay();
         }
     }
