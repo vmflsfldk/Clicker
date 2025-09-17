@@ -1785,6 +1785,12 @@ body.modal-open {
         font-size: 2.4rem;
     }
 
+    .game__panel {
+        flex-direction: row;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
     .stat__value {
         font-size: 1.4rem;
     }
@@ -1804,14 +1810,24 @@ body.modal-open {
     }
 
     .panel-tabs {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        flex: 0 0 130px;
+        display: flex;
+        flex-direction: column;
         gap: 0.5rem;
-        padding: 0.5rem;
+        padding: 0.75rem 0.5rem;
+        max-height: 65vh;
+        overflow-y: auto;
     }
 
     .panel-tab {
         font-size: 0.95rem;
-        padding: 0.5rem 0.75rem;
+        padding: 0.6rem 0.75rem;
+        text-align: left;
+    }
+
+    .panel-views {
+        flex: 1;
+        min-width: 0;
     }
 }
 
