@@ -126,6 +126,8 @@ const calculateEquipmentValue = (baseValue, level = 1) => {
     return clampEquipmentValue(baseValue * multiplier);
 };
 
+const clampProbability = (value) => Math.min(1, Math.max(0, value));
+
 const EQUIPMENT_DROP_CHANCE = 0.2;
 const EQUIPMENT_BOSS_DROP_CHANCE = 0.45;
 
@@ -186,6 +188,8 @@ const REBIRTH_EFFECT_LABELS = {
     hero: '지원 화력',
     skill: '전술 스킬',
     gold: '작전 보상',
+    equipmentDrop: '전술 장비 드롭',
+    gachaDrop: '모집권 드롭',
 };
 
 const REBIRTH_SKILLS = [
@@ -227,6 +231,26 @@ const REBIRTH_SKILLS = [
         effect: { gold: 0.05 },
         baseCost: 4,
         costGrowth: 4,
+        maxLevel: 10,
+    },
+    {
+        id: 'salvageNetwork',
+        name: '샬레 전리품 네트워크',
+        description: '샬레 보급 관리국이 전장 보급망을 확충해 장비 회수를 체계화합니다.',
+        effectDescription: '레벨당 전술 장비 드롭 확률 +10%',
+        effect: { equipmentDrop: 0.1 },
+        baseCost: 3,
+        costGrowth: 4,
+        maxLevel: 10,
+    },
+    {
+        id: 'strategicRecruitment',
+        name: '전략적 모집 네트워크',
+        description: '각 학원의 협력 체계를 통해 보스 토벌 시 추가 모집권을 확보합니다.',
+        effectDescription: '레벨당 모집권 드롭 확률 +4%',
+        effect: { gachaDrop: 0.04 },
+        baseCost: 4,
+        costGrowth: 5,
         maxLevel: 10,
     },
 ];
@@ -459,6 +483,14 @@ class GameState {
 
     get goldBonus() {
         return this.getRebirthBonusValue('gold');
+    }
+
+    get equipmentDropBonus() {
+        return this.getRebirthBonusValue('equipmentDrop');
+    }
+
+    get gachaDropBonus() {
+        return this.getRebirthBonusValue('gachaDrop');
     }
 
     get pendingRebirthPoints() {
@@ -1066,16 +1098,21 @@ class GameState {
 
     tryDropGachaToken(stage) {
         if (!this.isBossStage(stage)) return null;
-        if (Math.random() > GACHA_TOKEN_DROP_CHANCE) return null;
+        const baseChance = GACHA_TOKEN_DROP_CHANCE;
+        const bonus = this.gachaDropBonus;
+        const finalChance = clampProbability(baseChance + bonus);
+        if (Math.random() > finalChance) return null;
         this.gachaTokens += 1;
         this.lastSave = Date.now();
-        return { amount: 1 };
+        return { amount: 1, baseChance, chance: finalChance };
     }
 
     tryDropEquipment(stage) {
         const isBoss = stage % BOSS_STAGE_INTERVAL === 0;
-        const dropChance = isBoss ? EQUIPMENT_BOSS_DROP_CHANCE : EQUIPMENT_DROP_CHANCE;
-        if (Math.random() > dropChance) return null;
+        const baseChance = isBoss ? EQUIPMENT_BOSS_DROP_CHANCE : EQUIPMENT_DROP_CHANCE;
+        const bonusMultiplier = 1 + this.equipmentDropBonus;
+        const finalChance = clampProbability(baseChance * bonusMultiplier);
+        if (Math.random() > finalChance) return null;
         const item = generateEquipmentItem(stage, isBoss);
         const result = this.addEquipment(item);
         return {
@@ -1083,6 +1120,8 @@ class GameState {
             autoEquipped: result.autoEquipped,
             replaced: result.replaced,
             isBoss,
+            baseChance,
+            chance: finalChance,
         };
     }
 }
@@ -1416,6 +1455,13 @@ class GameUI {
                 const breakdown = this.buildBonusBreakdown(equipmentValue, rebirthValue);
                 return `${label}: ${breakdown}`;
             });
+            const dropBonus = this.state.equipmentDropBonus ?? 0;
+            const normalChance = clampProbability(EQUIPMENT_DROP_CHANCE * (1 + dropBonus));
+            const bossChance = clampProbability(EQUIPMENT_BOSS_DROP_CHANCE * (1 + dropBonus));
+            const normalDetail = this.buildChanceDetail('일반 드롭 확률', EQUIPMENT_DROP_CHANCE, normalChance);
+            const bossDetail = this.buildChanceDetail('보스 드롭 확률', EQUIPMENT_BOSS_DROP_CHANCE, bossChance);
+            if (normalDetail) tooltipParts.push(normalDetail);
+            if (bossDetail) tooltipParts.push(bossDetail);
             UI.equipmentSummary.title = tooltipParts.length > 0 ? tooltipParts.join('\n') : '추가 지원 없음';
         }
     }
@@ -1433,6 +1479,16 @@ class GameUI {
         if (rebirthValue > 0) parts.push(`환생 기억 ${formatPercent(rebirthValue)}`);
         if (parts.length === 0) return '추가 지원 없음';
         return parts.join(' / ');
+    }
+
+    buildChanceDetail(label, baseChance, finalChance) {
+        if (!Number.isFinite(baseChance) || !Number.isFinite(finalChance)) return '';
+        const baseText = formatPercent(baseChance);
+        const finalText = formatPercent(finalChance);
+        if (Math.abs(finalChance - baseChance) < 0.0005) {
+            return `${label} ${finalText}`;
+        }
+        return `${label} ${baseText} → ${finalText}`;
     }
 
     updateRebirthUI() {
@@ -2195,14 +2251,16 @@ class GameUI {
     }
 
     handleEquipmentDrop(drop) {
-        const { item, autoEquipped, replaced } = drop;
+        const { item, autoEquipped, replaced, baseChance, chance } = drop;
         const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
         const type = EQUIPMENT_TYPE_MAP.get(item.type);
         const prefix = rarity ? `[${rarity.name}] ` : '';
         const bonusText = `${type?.label ?? '전술 장비'} +${formatPercent(item.value)}`;
         const levelText = `Lv. ${item.level}/${item.maxLevel}`;
         const autoText = autoEquipped ? ' (자동 장착)' : '';
-        this.addLog(`${prefix}${item.name}을 획득했습니다! ${bonusText} · ${levelText}${autoText}`, 'success');
+        const chanceDetail = this.buildChanceDetail('드롭 확률', baseChance, chance);
+        const chanceText = chanceDetail ? ` (${chanceDetail})` : '';
+        this.addLog(`${prefix}${item.name}을 획득했습니다! ${bonusText} · ${levelText}${autoText}${chanceText}`, 'success');
         if (autoEquipped && replaced) {
             const replacedRarity = EQUIPMENT_RARITY_MAP.get(replaced.rarity);
             const replacedPrefix = replacedRarity ? `[${replacedRarity.name}] ` : '';
@@ -2324,8 +2382,10 @@ class GameUI {
             this.handleEquipmentDrop(drop);
         }
         if (gacha) {
+            const chanceDetail = this.buildChanceDetail('드롭 확률', gacha.baseChance, gacha.chance);
+            const chanceText = chanceDetail ? ` (${chanceDetail})` : '';
             this.addLog(
-                `보스 제압 보상으로 모집권 ${gacha.amount.toLocaleString('ko-KR')}개를 확보했습니다!`,
+                `보스 제압 보상으로 모집권 ${gacha.amount.toLocaleString('ko-KR')}개를 확보했습니다!${chanceText}`,
                 'success',
             );
             this.updateGachaUI();
@@ -2421,6 +2481,14 @@ class GameUI {
         }
         if (UI.gachaTokensHeader) {
             UI.gachaTokensHeader.textContent = tokenText;
+        }
+        const finalChance = clampProbability(GACHA_TOKEN_DROP_CHANCE + (this.state.gachaDropBonus ?? 0));
+        const chanceDetail = this.buildChanceDetail('보스 모집권 드롭 확률', GACHA_TOKEN_DROP_CHANCE, finalChance);
+        if (UI.gachaTokens) {
+            UI.gachaTokens.title = chanceDetail;
+        }
+        if (UI.gachaTokensHeader) {
+            UI.gachaTokensHeader.title = chanceDetail;
         }
         if (UI.gachaSingle) {
             UI.gachaSingle.disabled = this.state.gachaTokens < GACHA_SINGLE_COST;
