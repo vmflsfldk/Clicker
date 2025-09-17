@@ -155,6 +155,14 @@
                                     <button id="gachaTen" class="btn btn-gacha" type="button">10회 모집 (9)</button>
                                 </div>
                                 <p class="gacha-panel__notice">10회 모집 시 1회는 무료로 진행됩니다.</p>
+                                <div class="gacha-panel__rates">
+                                    <h4 class="gacha-panel__rates-title">희귀도별 출현 확률</h4>
+                                    <ul id="gachaRateList" class="gacha-rate-list" aria-label="희귀도별 가챠 확률"></ul>
+                                </div>
+                                <div class="gacha-panel__pool">
+                                    <h4 class="gacha-panel__pool-title">학생별 출현 정보</h4>
+                                    <ul id="gachaPoolList" class="gacha-pool-list" aria-label="학생별 가챠 정보"></ul>
+                                </div>
                                 <ul
                                     id="gachaResults"
                                     class="gacha-results"
@@ -369,9 +377,12 @@
     </div>
 
     <template id="heroTemplate">
-        <li class="hero" data-recruited="false">
+        <li class="hero" data-recruited="false" data-rarity="common">
             <div class="hero__info">
-                <h3 class="hero__name"></h3>
+                <div class="hero__header">
+                    <span class="hero__rarity"></span>
+                    <h3 class="hero__name"></h3>
+                </div>
                 <p class="hero__desc"></p>
                 <div class="hero__meta">
                     <span class="hero__level"></span>
