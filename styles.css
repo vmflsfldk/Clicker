@@ -361,6 +361,12 @@ h1,
     gap: 1.25rem;
 }
 
+.panel--recruit {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
 .panel--rebirth {
     display: flex;
     flex-direction: column;
