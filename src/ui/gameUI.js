@@ -29,6 +29,8 @@ const UI = {
     gachaTokensHeader: document.getElementById('gachaTokensHeader'),
     clickDamage: document.getElementById('clickDamage'),
     totalDps: document.getElementById('totalDps'),
+    heroCritChance: document.getElementById('heroCritChance'),
+    heroCritMultiplier: document.getElementById('heroCritMultiplier'),
     critChance: document.getElementById('critChance'),
     critMultiplier: document.getElementById('critMultiplier'),
     enemyName: document.getElementById('enemyName'),
@@ -57,6 +59,10 @@ const UI = {
     upgradeCritChanceInfo: document.getElementById('critChanceUpgradeInfo'),
     upgradeCritDamage: document.getElementById('upgradeCritDamage'),
     upgradeCritDamageInfo: document.getElementById('critDamageUpgradeInfo'),
+    upgradeHeroCritChance: document.getElementById('upgradeHeroCritChance'),
+    upgradeHeroCritChanceInfo: document.getElementById('heroCritChanceUpgradeInfo'),
+    upgradeHeroCritDamage: document.getElementById('upgradeHeroCritDamage'),
+    upgradeHeroCritDamageInfo: document.getElementById('heroCritDamageUpgradeInfo'),
     upgradeHeroDps: document.getElementById('upgradeHeroDps'),
     upgradeHeroDpsInfo: document.getElementById('heroDpsUpgradeInfo'),
     upgradeGoldGain: document.getElementById('upgradeGoldGain'),
@@ -276,6 +282,12 @@ export class GameUI {
         }
         if (UI.upgradeCritDamage) {
             UI.upgradeCritDamage.addEventListener('click', () => this.handleClickCritDamageUpgrade());
+        }
+        if (UI.upgradeHeroCritChance) {
+            UI.upgradeHeroCritChance.addEventListener('click', () => this.handleHeroCritChanceUpgrade());
+        }
+        if (UI.upgradeHeroCritDamage) {
+            UI.upgradeHeroCritDamage.addEventListener('click', () => this.handleHeroCritDamageUpgrade());
         }
         if (UI.upgradeHeroDps) {
             UI.upgradeHeroDps.addEventListener('click', () => this.handleHeroDpsUpgrade());
@@ -1976,6 +1988,12 @@ export class GameUI {
             UI.clickDamage.textContent = formatNumber(this.state.expectedClickDamage);
         }
         UI.totalDps.textContent = formatNumber(this.state.totalDps);
+        if (UI.heroCritChance) {
+            UI.heroCritChance.textContent = formatPercent(this.state.heroCritChance);
+        }
+        if (UI.heroCritMultiplier) {
+            UI.heroCritMultiplier.textContent = `${this.state.heroCritMultiplier.toFixed(2)}배`;
+        }
         if (UI.critChance) {
             UI.critChance.textContent = formatPercent(this.state.clickCritChance);
         }
@@ -2050,6 +2068,56 @@ export class GameUI {
                     infoParts.push('이미 최대 강화');
                 }
                 UI.upgradeCritDamageInfo.textContent = infoParts.join(' · ');
+            }
+        }
+        if (UI.upgradeHeroCritChance) {
+            const context = this.state.getHeroCritChanceUpgradeContext();
+            if (context.canUpgrade) {
+                UI.upgradeHeroCritChance.textContent = `학생 치명타 교정 (${formatNumber(context.cost)} 골드)`;
+                UI.upgradeHeroCritChance.disabled = false;
+            } else {
+                UI.upgradeHeroCritChance.textContent = '학생 치명타 교정 (최대)';
+                UI.upgradeHeroCritChance.disabled = true;
+            }
+            if (UI.upgradeHeroCritChanceInfo) {
+                const infoParts = [];
+                infoParts.push(
+                    `치명타 확률 ${formatPercent(context.currentChance)} → ${formatPercent(context.nextChance)}`,
+                );
+                infoParts.push(
+                    `평균 배율 ${context.currentAverageMultiplier.toFixed(2)}배 → ${context.nextAverageMultiplier.toFixed(2)}배`,
+                );
+                if (context.canUpgrade) {
+                    infoParts.push(`증가량 +${formatPercent(context.gain)}`);
+                } else {
+                    infoParts.push('이미 최대 강화');
+                }
+                UI.upgradeHeroCritChanceInfo.textContent = infoParts.join(' · ');
+            }
+        }
+        if (UI.upgradeHeroCritDamage) {
+            const context = this.state.getHeroCritDamageUpgradeContext();
+            if (context.canUpgrade) {
+                UI.upgradeHeroCritDamage.textContent = `학생 탄두 개량 (${formatNumber(context.cost)} 골드)`;
+                UI.upgradeHeroCritDamage.disabled = false;
+            } else {
+                UI.upgradeHeroCritDamage.textContent = '학생 탄두 개량 (최대)';
+                UI.upgradeHeroCritDamage.disabled = true;
+            }
+            if (UI.upgradeHeroCritDamageInfo) {
+                const infoParts = [];
+                infoParts.push(
+                    `치명타 배율 ${context.currentMultiplier.toFixed(2)}배 → ${context.nextMultiplier.toFixed(2)}배`,
+                );
+                infoParts.push(
+                    `평균 배율 ${context.currentAverageMultiplier.toFixed(2)}배 → ${context.nextAverageMultiplier.toFixed(2)}배`,
+                );
+                if (context.canUpgrade) {
+                    infoParts.push(`증가량 +${context.gain.toFixed(2)}배`);
+                } else {
+                    infoParts.push('이미 최대 강화');
+                }
+                UI.upgradeHeroCritDamageInfo.textContent = infoParts.join(' · ');
             }
         }
         if (UI.upgradeHeroDps) {
@@ -2292,6 +2360,40 @@ export class GameUI {
         const newText = `${this.state.clickCritMultiplier.toFixed(2)}배`;
         this.addLog(
             `특수 탄두 연구 레벨이 ${this.state.clickCritDamageLevel}이 되었습니다! (치명타 배율 ${previousText} → ${newText})`,
+            'success',
+        );
+        this.updateStats();
+    }
+
+    handleHeroCritChanceUpgrade() {
+        const result = this.state.levelUpHeroCritChance();
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const previousChanceText = formatPercent(result.previousChance);
+        const newChanceText = formatPercent(this.state.heroCritChance);
+        const previousAverageText = `${result.previousAverageMultiplier.toFixed(2)}배`;
+        const newAverageText = `${result.newAverageMultiplier.toFixed(2)}배`;
+        this.addLog(
+            `학생 정밀 사격 훈련 레벨이 ${this.state.heroCritChanceLevel}이 되었습니다! (치명타 확률 ${previousChanceText} → ${newChanceText} · 평균 배율 ${previousAverageText} → ${newAverageText})`,
+            'success',
+        );
+        this.updateStats();
+    }
+
+    handleHeroCritDamageUpgrade() {
+        const result = this.state.levelUpHeroCritDamage();
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const previousMultiplierText = `${result.previousMultiplier.toFixed(2)}배`;
+        const newMultiplierText = `${this.state.heroCritMultiplier.toFixed(2)}배`;
+        const previousAverageText = `${result.previousAverageMultiplier.toFixed(2)}배`;
+        const newAverageText = `${result.newAverageMultiplier.toFixed(2)}배`;
+        this.addLog(
+            `학생 탄두 개량 연구 레벨이 ${this.state.heroCritDamageLevel}이 되었습니다! (치명타 배율 ${previousMultiplierText} → ${newMultiplierText} · 평균 배율 ${previousAverageText} → ${newAverageText})`,
             'success',
         );
         this.updateStats();
