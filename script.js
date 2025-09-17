@@ -816,6 +816,43 @@ class GameState {
         return { failedStage, revertedStage };
     }
 
+    canRetreatFromBoss() {
+        if (!this.isBossStage()) return false;
+        if (this.enemy.stage <= 1) return false;
+        return true;
+    }
+
+    retreatFromBoss() {
+        if (!this.canRetreatFromBoss()) {
+            return { success: false, message: '현재 보스 전투 중이 아닙니다.' };
+        }
+        const bossStage = this.enemy.stage;
+        this.enemy.retreatStage();
+        const fallbackStage = this.enemy.stage;
+        this.clearBossTimer();
+        this.lastSave = Date.now();
+        return { success: true, bossStage, fallbackStage };
+    }
+
+    canAdvanceToNextBossStage() {
+        if (this.isBossStage()) return false;
+        const stage = this.enemy.stage;
+        if (!Number.isFinite(stage) || stage <= 0) return false;
+        return stage % BOSS_STAGE_INTERVAL === BOSS_STAGE_INTERVAL - 1;
+    }
+
+    advanceToNextBossStage() {
+        if (!this.canAdvanceToNextBossStage()) {
+            return { success: false, message: '보스 직전 단계에서만 돌입할 수 있습니다.' };
+        }
+        const fromStage = this.enemy.stage;
+        this.enemy.advanceStage();
+        this.clearBossTimer();
+        this.startBossTimer();
+        this.lastSave = Date.now();
+        return { success: true, fromStage, bossStage: this.enemy.stage };
+    }
+
     goNextEnemy() {
         const defeatedStage = this.enemy.stage;
         const reward = this.enemyReward();
@@ -1267,6 +1304,9 @@ const UI = {
     enemyMaxHp: document.getElementById('enemyMaxHp'),
     enemyHealthBar: document.getElementById('enemyHealthBar'),
     bossTimer: document.getElementById('bossTimer'),
+    bossControls: document.getElementById('bossControls'),
+    bossRetreat: document.getElementById('bossRetreat'),
+    bossAdvance: document.getElementById('bossAdvance'),
     tapButton: document.getElementById('tapButton'),
     enemy: document.getElementById('enemy'),
     heroList: document.getElementById('heroList'),
@@ -1398,6 +1438,12 @@ class GameUI {
         UI.enemy.addEventListener('click', () => this.handleTap());
         UI.upgradeClick.addEventListener('click', () => this.handleClickUpgrade());
         UI.sortHeroes.addEventListener('click', () => this.toggleHeroSort());
+        if (UI.bossRetreat) {
+            UI.bossRetreat.addEventListener('click', () => this.handleBossRetreat());
+        }
+        if (UI.bossAdvance) {
+            UI.bossAdvance.addEventListener('click', () => this.handleBossAdvance());
+        }
         if (UI.gachaSingle) {
             UI.gachaSingle.addEventListener('click', () => this.handleGachaRoll(1));
         }
@@ -2582,6 +2628,22 @@ class GameUI {
         }
     }
 
+    updateBossControls() {
+        const controls = UI.bossControls;
+        if (!controls) return;
+        const canRetreat = this.state.canRetreatFromBoss();
+        const canAdvance = this.state.canAdvanceToNextBossStage();
+        if (UI.bossRetreat) {
+            UI.bossRetreat.disabled = !canRetreat;
+        }
+        if (UI.bossAdvance) {
+            UI.bossAdvance.disabled = !canAdvance;
+        }
+        const visible = canRetreat || canAdvance;
+        controls.classList.toggle('boss-controls--visible', visible);
+        controls.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    }
+
     updateUI() {
         this.updateStats();
         this.updateMissionUI();
@@ -2590,6 +2652,7 @@ class GameUI {
         this.updateEnemy();
         this.updateFrenzyUI();
         this.updateBossTimerUI();
+        this.updateBossControls();
     }
 
     handleTap() {
@@ -2638,6 +2701,38 @@ class GameUI {
             this.addLog('환생의 기운이 깨어났습니다! 환생 메뉴에서 포인트를 획득하세요.', 'success');
         }
         this.handleMissionProgress('enemyDefeat', 1);
+    }
+
+    handleBossRetreat() {
+        const result = this.state.retreatFromBoss();
+        if (!result.success) {
+            if (result.message) {
+                this.addLog(result.message, 'warning');
+            }
+            return;
+        }
+        this.addLog(
+            `${result.bossStage}층 보스에서 퇴각합니다. 전열을 재정비하기 위해 ${result.fallbackStage}층으로 이동합니다.`,
+            'warning',
+        );
+        this.updateUI();
+        saveGame(this.state);
+    }
+
+    handleBossAdvance() {
+        const result = this.state.advanceToNextBossStage();
+        if (!result.success) {
+            if (result.message) {
+                this.addLog(result.message, 'warning');
+            }
+            return;
+        }
+        this.addLog(
+            `${result.fromStage}층을 넘어 ${result.bossStage}층 보스로 즉시 돌입합니다!`,
+            'success',
+        );
+        this.updateUI();
+        saveGame(this.state);
     }
 
     handleClickUpgrade() {
@@ -2799,6 +2894,7 @@ class GameUI {
             return;
         }
         this.updateBossTimerUI();
+        this.updateBossControls();
     }
 
     startLoops() {
@@ -2822,6 +2918,7 @@ class GameUI {
         this.updateGachaUI();
         this.updateHeroes();
         this.updateBossTimerUI();
+        this.updateBossControls();
     }
 
     useFrenzy() {

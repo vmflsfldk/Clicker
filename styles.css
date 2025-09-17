@@ -153,6 +153,36 @@ h1,
     text-shadow: 0 0 12px rgba(248, 113, 113, 0.6);
 }
 
+.boss-controls {
+    display: none;
+    gap: 0.75rem;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    margin-top: 0.5rem;
+}
+
+.boss-controls--visible {
+    display: flex;
+    opacity: 1;
+}
+
+.boss-control__button {
+    flex: 1 1 140px;
+    max-width: 180px;
+    font-size: 0.95rem;
+    padding: 0.6rem 1.25rem;
+}
+
+.boss-control__button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
 .enemy {
     width: 260px;
     height: 260px;
