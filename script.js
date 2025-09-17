@@ -121,6 +121,172 @@ const HERO_SKIN_LIBRARY = {
     ],
 };
 
+const HERO_TRAIT_GROUPS = [
+    {
+        id: 'school',
+        label: '학교',
+        shortLabel: '학교',
+        icon: '🏫',
+        traits: [
+            {
+                id: 'abydos',
+                name: '아비도스 고등학교',
+                shortName: '아비도스',
+                description: '사막을 지키는 아비도스 대책위원회의 학생들입니다.',
+                accentColor: '#38bdf8',
+            },
+            {
+                id: 'gehenna',
+                name: '게헨나 학원',
+                shortName: '게헨나',
+                description: '폭발적인 화력을 자랑하는 게헨나 학생들입니다.',
+                accentColor: '#f97316',
+            },
+            {
+                id: 'millennium',
+                name: '밀레니엄 사이언스 스쿨',
+                shortName: '밀레니엄',
+                description: '첨단 장비로 전장을 지휘하는 밀레니엄 학생들입니다.',
+                accentColor: '#22d3ee',
+            },
+        ],
+    },
+    {
+        id: 'weapon',
+        label: '주무기',
+        shortLabel: '무기',
+        icon: '🔫',
+        traits: [
+            {
+                id: 'ar',
+                name: '돌격소총',
+                shortName: 'AR',
+                description: '탄막과 정확도를 모두 갖춘 범용 돌격소총 사용 학생입니다.',
+                accentColor: '#34d399',
+            },
+            {
+                id: 'mg',
+                name: '기관총',
+                shortName: 'MG',
+                description: '지속 화력 지원에 특화된 기관총 사용 학생입니다.',
+                accentColor: '#f97316',
+            },
+            {
+                id: 'artillery',
+                name: '포격 장비',
+                shortName: '포격',
+                description: '장거리 지원을 담당하는 포격/중화기 사용 학생입니다.',
+                accentColor: '#facc15',
+            },
+        ],
+    },
+    {
+        id: 'position',
+        label: '포지션',
+        shortLabel: '포지션',
+        icon: '🎖️',
+        traits: [
+            {
+                id: 'striker',
+                name: '스트라이커',
+                shortName: '스트라이커',
+                description: '전선에 서서 직접 전투를 수행하는 학생입니다.',
+                accentColor: '#60a5fa',
+            },
+            {
+                id: 'special',
+                name: '스페셜',
+                shortName: '스페셜',
+                description: '후방에서 전술 지원을 담당하는 학생입니다.',
+                accentColor: '#a855f7',
+            },
+        ],
+    },
+];
+
+const HERO_TRAIT_GROUP_MAP = new Map(HERO_TRAIT_GROUPS.map((group) => [group.id, group]));
+const HERO_TRAIT_MAP = HERO_TRAIT_GROUPS.reduce((acc, group) => {
+    acc[group.id] = new Map(group.traits.map((trait) => [trait.id, trait]));
+    return acc;
+}, {});
+
+const HERO_SET_BONUSES = [
+    {
+        id: 'abydos-alliance',
+        name: '아비도스 합동 작전',
+        description: '사막에서 단련된 대책위원회의 전술 호흡이 빛납니다.',
+        requirement: { type: 'school', trait: 'abydos', count: 2 },
+        effects: { hero: 0.08, gold: 0.05 },
+    },
+    {
+        id: 'millennium-strategy',
+        name: '밀레니엄 전략 분석',
+        description: '첨단 분석과 드론 지원으로 전술 호출 효율을 극대화합니다.',
+        requirement: { type: 'school', trait: 'millennium', count: 2 },
+        effects: { skill: 0.08, critChance: 0.02 },
+    },
+    {
+        id: 'rapid-response',
+        name: '기동 포위망',
+        description: 'AR 운용 학생들이 기동력을 살려 전장을 장악합니다.',
+        requirement: { type: 'weapon', trait: 'ar', count: 2 },
+        effects: { tap: 0.05, hero: 0.04 },
+    },
+    {
+        id: 'artillery-support',
+        name: '중화기 포격 지원',
+        description: '장거리 포격망을 구축해 지속적인 화력을 제공합니다.',
+        requirement: { type: 'weapon', trait: 'artillery', count: 2 },
+        effects: { skill: 0.06, hero: 0.03 },
+    },
+    {
+        id: 'frontline-spearhead',
+        name: '전선 돌파대',
+        description: '스트라이커 부대가 전선을 돌파하며 공격력을 끌어올립니다.',
+        requirement: { type: 'position', trait: 'striker', count: 3 },
+        effects: { hero: 0.07, tap: 0.04 },
+    },
+    {
+        id: 'tactical-command',
+        name: '전술 지휘망',
+        description: '스페셜 포지션 학생들이 전장의 흐름을 통제합니다.',
+        requirement: { type: 'position', trait: 'special', count: 2 },
+        effects: { skill: 0.05, critDamage: 0.1 },
+    },
+];
+
+const HERO_TRAIT_TYPES = ['school', 'weapon', 'position'];
+
+const getHeroTraitGroup = (type) => HERO_TRAIT_GROUP_MAP.get(type) ?? null;
+
+const getHeroTraitDefinition = (type, traitId) => {
+    if (!type || !traitId) return null;
+    const map = HERO_TRAIT_MAP[type];
+    if (!map) return null;
+    return map.get(traitId) ?? null;
+};
+
+const describeSetBonusRequirement = (requirement) => {
+    if (!requirement) return '특수 조건';
+    const { type, trait, count } = requirement;
+    const group = getHeroTraitGroup(type);
+    const traitData = getHeroTraitDefinition(type, trait);
+    const traitName = traitData?.name ?? trait ?? '특성';
+    const label = group?.label ?? type ?? '조건';
+    const required = Number.isFinite(count) ? Math.max(1, Math.floor(count)) : 1;
+    return `${label} ${traitName} ${required}명 편성`;
+};
+
+const formatSetBonusEffects = (effects) => {
+    if (!effects || typeof effects !== 'object') {
+        return '추가 효과 없음';
+    }
+    const entries = Object.entries(effects)
+        .map(([effectId, value]) => describeEquipmentEffect(effectId, Number(value) || 0))
+        .filter(Boolean);
+    return entries.length > 0 ? entries.join(' · ') : '추가 효과 없음';
+};
+
 const defaultHeroes = [
     {
         id: 'shiroko',
@@ -131,6 +297,9 @@ const defaultHeroes = [
         baseDamage: 5,
         rarity: 'common',
         skins: HERO_SKIN_LIBRARY.shiroko,
+        school: 'abydos',
+        weapon: 'ar',
+        position: 'striker',
     },
     {
         id: 'hoshino',
@@ -141,6 +310,9 @@ const defaultHeroes = [
         baseDamage: 18,
         rarity: 'uncommon',
         skins: HERO_SKIN_LIBRARY.hoshino,
+        school: 'abydos',
+        weapon: 'mg',
+        position: 'striker',
     },
     {
         id: 'aru',
@@ -151,6 +323,9 @@ const defaultHeroes = [
         baseDamage: 75,
         rarity: 'rare',
         skins: HERO_SKIN_LIBRARY.aru,
+        school: 'gehenna',
+        weapon: 'ar',
+        position: 'striker',
     },
     {
         id: 'hibiki',
@@ -161,6 +336,9 @@ const defaultHeroes = [
         baseDamage: 220,
         rarity: 'unique',
         skins: HERO_SKIN_LIBRARY.hibiki,
+        school: 'millennium',
+        weapon: 'artillery',
+        position: 'special',
     },
     {
         id: 'iroha',
@@ -171,6 +349,9 @@ const defaultHeroes = [
         baseDamage: 620,
         rarity: 'legendary',
         skins: HERO_SKIN_LIBRARY.iroha,
+        school: 'millennium',
+        weapon: 'artillery',
+        position: 'special',
     },
 ];
 
@@ -766,7 +947,10 @@ const generateEquipmentItem = (stage, isBoss) => {
 };
 
 class Hero {
-    constructor({ id, name, description, baseDamage, rarity, skins }, savedState) {
+    constructor(
+        { id, name, description, baseDamage, rarity, skins, school, weapon, position },
+        savedState,
+    ) {
         this.id = id;
         this.name = name;
         this.description = description;
@@ -778,6 +962,9 @@ class Hero {
         this.skins = this.initializeSkins(Array.isArray(skins) ? skins : [], savedState);
         const savedSelection = typeof savedState?.selectedSkinId === 'string' ? savedState.selectedSkinId : null;
         this.selectedSkinId = savedSelection ?? this.skins[0]?.id ?? null;
+        this.schoolId = typeof school === 'string' ? school : null;
+        this.weaponId = typeof weapon === 'string' ? weapon : null;
+        this.positionId = typeof position === 'string' ? position : null;
         this.refreshSkinUnlocks();
     }
 
@@ -838,6 +1025,46 @@ class Hero {
     get gachaDuplicateGain() {
         const value = this.rarity?.duplicateGain ?? 1;
         return Math.max(1, Math.floor(Number(value) || 1));
+    }
+
+    get school() {
+        return getHeroTraitDefinition('school', this.schoolId);
+    }
+
+    get weapon() {
+        return getHeroTraitDefinition('weapon', this.weaponId);
+    }
+
+    get position() {
+        return getHeroTraitDefinition('position', this.positionId);
+    }
+
+    get traitEntries() {
+        return HERO_TRAIT_TYPES.map((type) => {
+            const trait = getHeroTraitDefinition(type, this.getTraitId(type));
+            const group = getHeroTraitGroup(type);
+            if (!trait || !group) return null;
+            return { type, trait, group };
+        }).filter(Boolean);
+    }
+
+    getTraitId(type) {
+        switch (type) {
+            case 'school':
+                return this.schoolId;
+            case 'weapon':
+                return this.weaponId;
+            case 'position':
+                return this.positionId;
+            default:
+                return null;
+        }
+    }
+
+    hasTrait(type, traitId) {
+        if (!type || !traitId) return false;
+        const normalizedId = this.getTraitId(type);
+        return normalizedId === traitId;
     }
 
     increaseLevel(amount = 1) {
@@ -1149,7 +1376,9 @@ class GameState {
 
     get tapBonus() {
         const equipment = this.getTotalEquipmentEffect('tap');
-        return equipment + this.getRebirthBonusValue('tap');
+        const rebirth = this.getRebirthBonusValue('tap');
+        const setBonus = this.getSetBonusEffect('tap');
+        return equipment + rebirth + setBonus;
     }
 
     get heroTrainingBonus() {
@@ -1158,25 +1387,35 @@ class GameState {
 
     get heroBonus() {
         const equipment = this.getTotalEquipmentEffect('hero');
-        return equipment + this.getRebirthBonusValue('hero') + this.heroTrainingBonus;
+        const rebirth = this.getRebirthBonusValue('hero');
+        const setBonus = this.getSetBonusEffect('hero');
+        return equipment + rebirth + this.heroTrainingBonus + setBonus;
     }
 
     get skillBonus() {
         const equipment = this.getTotalEquipmentEffect('skill');
-        return equipment + this.getRebirthBonusValue('skill');
+        const rebirth = this.getRebirthBonusValue('skill');
+        const setBonus = this.getSetBonusEffect('skill');
+        return equipment + rebirth + setBonus;
     }
 
     get goldBonus() {
         const equipment = this.getTotalEquipmentEffect('gold');
-        return equipment + this.getRebirthBonusValue('gold');
+        const rebirth = this.getRebirthBonusValue('gold');
+        const setBonus = this.getSetBonusEffect('gold');
+        return equipment + rebirth + setBonus;
     }
 
     get equipmentDropBonus() {
-        return this.getRebirthBonusValue('equipmentDrop');
+        const rebirth = this.getRebirthBonusValue('equipmentDrop');
+        const setBonus = this.getSetBonusEffect('equipmentDrop');
+        return rebirth + setBonus;
     }
 
     get gachaDropBonus() {
-        return this.getRebirthBonusValue('gachaDrop');
+        const rebirth = this.getRebirthBonusValue('gachaDrop');
+        const setBonus = this.getSetBonusEffect('gachaDrop');
+        return rebirth + setBonus;
     }
 
     get pendingRebirthPoints() {
@@ -1287,7 +1526,8 @@ class GameState {
         const bonus = this.clickCritChanceLevel * CLICK_CRIT_CHANCE_UPGRADE_CONFIG.increasePerLevel;
         const equipment = this.getTotalEquipmentEffect('critChance');
         const rebirth = this.getRebirthBonusValue('critChance');
-        const total = base + bonus + equipment + rebirth;
+        const setBonus = this.getSetBonusEffect('critChance');
+        const total = base + bonus + equipment + rebirth + setBonus;
         return Math.min(CLICK_CRIT_CHANCE_UPGRADE_CONFIG.maxChance, total);
     }
 
@@ -1296,7 +1536,8 @@ class GameState {
         const bonus = this.clickCritDamageLevel * CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.increasePerLevel;
         const equipment = this.getTotalEquipmentEffect('critDamage');
         const rebirth = this.getRebirthBonusValue('critDamage');
-        const total = base + bonus + equipment + rebirth;
+        const setBonus = this.getSetBonusEffect('critDamage');
+        const total = base + bonus + equipment + rebirth + setBonus;
         return Math.min(CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.maxMultiplier, total);
     }
 
@@ -2121,6 +2362,51 @@ class GameState {
         }, 0);
     }
 
+    getAllSetBonusStatuses() {
+        return HERO_SET_BONUSES.map((bonus) => {
+            const requirement = bonus.requirement;
+            if (!requirement?.type || !requirement?.trait) {
+                return { bonus, count: 0, required: 0, active: false, heroes: [] };
+            }
+            const required = Number.isFinite(requirement.count)
+                ? Math.max(1, Math.floor(requirement.count))
+                : 1;
+            const members = this.heroes.filter(
+                (hero) => hero.isUnlocked && hero.hasTrait(requirement.type, requirement.trait),
+            );
+            const count = members.length;
+            return {
+                bonus,
+                count,
+                required,
+                active: count >= required,
+                heroes: members,
+            };
+        });
+    }
+
+    getActiveSetBonuses() {
+        return this.getAllSetBonusStatuses().filter((entry) => entry.active);
+    }
+
+    getSetBonusSummary() {
+        return this.getActiveSetBonuses().reduce((acc, entry) => {
+            Object.entries(entry.bonus.effects ?? {}).forEach(([effectId, value]) => {
+                if (!Number.isFinite(value)) return;
+                acc[effectId] = (acc[effectId] ?? 0) + value;
+            });
+            return acc;
+        }, {});
+    }
+
+    getSetBonusEffect(effectId) {
+        if (!effectId) return 0;
+        return this.getActiveSetBonuses().reduce((total, entry) => {
+            const value = Number(entry.bonus.effects?.[effectId] ?? 0);
+            return total + (Number.isFinite(value) ? value : 0);
+        }, 0);
+    }
+
     getHeroEffectiveDps(hero) {
         return hero.damagePerSecond * (1 + this.heroBonus);
     }
@@ -2196,6 +2482,8 @@ const UI = {
     tapButton: document.getElementById('tapButton'),
     enemy: document.getElementById('enemy'),
     heroList: document.getElementById('heroList'),
+    setBonusSummary: document.getElementById('setBonusSummary'),
+    setBonusList: document.getElementById('setBonusList'),
     gachaTokens: document.getElementById('gachaTokens'),
     gachaSingle: document.getElementById('gachaSingle'),
     gachaTen: document.getElementById('gachaTen'),
@@ -2264,6 +2552,7 @@ class GameUI {
         this.state = state;
         this.heroTemplate = document.getElementById('heroTemplate');
         this.heroElements = new Map();
+        this.setBonusElements = new Map();
         this.rebirthSkillElements = new Map();
         this.missionElements = new Map();
         this.gachaPoolElements = new Map();
@@ -2292,6 +2581,7 @@ class GameUI {
         }
         this.updateGachaHistoryVisibility();
         this.renderGachaOverview();
+        this.renderHeroSetBonuses();
         this.renderHeroes();
         this.renderEquipmentUI();
         this.renderMissionUI();
@@ -2510,6 +2800,7 @@ class GameUI {
             });
         }
         sorted.forEach((hero) => this.addHero(hero));
+        this.updateHeroSetBonuses();
     }
 
     renderGachaOverview() {
@@ -2594,6 +2885,7 @@ class GameUI {
         const statusState = node.querySelector('.hero__status-state');
         const statusDetail = node.querySelector('.hero__status-detail');
         const rarity = node.querySelector('.hero__rarity');
+        const traits = node.querySelector('.hero__traits');
         const skinPreview = node.querySelector('.hero__skin-preview');
         const skinList = node.querySelector('.hero__skin-list');
         const skinButtons = new Map();
@@ -2641,6 +2933,7 @@ class GameUI {
             statusState,
             statusDetail,
             rarity,
+            traits,
             skinPreview,
             skinList,
             skinButtons,
@@ -2666,6 +2959,7 @@ class GameUI {
         }
         heroUI.level.textContent = `Lv. ${hero.level}`;
         heroUI.dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
+        this.updateHeroTraits(hero);
         heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
         if (hero.isUnlocked) {
             heroUI.statusState.textContent = '합류 완료';
@@ -2696,6 +2990,51 @@ class GameUI {
         }
         this.updateHeroSkins(hero);
         this.updateHeroGachaEntry(hero);
+    }
+
+    updateHeroTraits(hero) {
+        const heroUI = this.heroElements.get(hero.id);
+        if (!heroUI?.traits) return;
+        const container = heroUI.traits;
+        container.innerHTML = '';
+        const entries = Array.isArray(hero.traitEntries) ? hero.traitEntries : [];
+        if (entries.length === 0) {
+            container.dataset.state = 'empty';
+            return;
+        }
+        container.dataset.state = 'ready';
+        entries.forEach(({ type, trait, group }) => {
+            const badge = document.createElement('span');
+            badge.className = 'hero-trait';
+            badge.dataset.traitType = type;
+            if (trait?.id) {
+                badge.dataset.traitId = trait.id;
+            } else {
+                delete badge.dataset.traitId;
+            }
+            if (trait.accentColor) {
+                badge.style.setProperty('--hero-trait-accent', trait.accentColor);
+            } else {
+                badge.style.removeProperty('--hero-trait-accent');
+            }
+            const labelParts = [];
+            if (group?.label) labelParts.push(group.label);
+            if (trait?.name) labelParts.push(trait.name);
+            if (trait?.description) labelParts.push(trait.description);
+            if (labelParts.length > 0) {
+                badge.title = labelParts.join(' · ');
+            } else {
+                badge.removeAttribute('title');
+            }
+            const icon = document.createElement('span');
+            icon.className = 'hero-trait__icon';
+            icon.textContent = group?.icon ?? '•';
+            const text = document.createElement('span');
+            text.className = 'hero-trait__text';
+            text.textContent = trait?.shortName ?? trait?.name ?? '특성';
+            badge.append(icon, text);
+            container.appendChild(badge);
+        });
     }
 
     updateHeroSkins(hero) {
@@ -2786,6 +3125,104 @@ class GameUI {
             lines.push(`현재 레벨: ${hero.level}`);
         }
         return lines.join('\n');
+    }
+
+    renderHeroSetBonuses() {
+        if (!UI.setBonusList) return;
+        UI.setBonusList.innerHTML = '';
+        this.setBonusElements.clear();
+        HERO_SET_BONUSES.forEach((bonus) => {
+            const item = document.createElement('li');
+            item.className = 'set-bonus';
+            item.dataset.bonusId = bonus.id;
+
+            const header = document.createElement('div');
+            header.className = 'set-bonus__header';
+
+            const name = document.createElement('h3');
+            name.className = 'set-bonus__name';
+            name.textContent = bonus.name;
+
+            const status = document.createElement('span');
+            status.className = 'set-bonus__status';
+            status.textContent = '0/0';
+
+            header.append(name, status);
+
+            const requirement = document.createElement('p');
+            requirement.className = 'set-bonus__requirement';
+            const baseRequirement = describeSetBonusRequirement(bonus.requirement);
+            requirement.dataset.baseRequirement = baseRequirement;
+            requirement.textContent = baseRequirement;
+
+            const effects = document.createElement('p');
+            effects.className = 'set-bonus__effects';
+            const effectText = formatSetBonusEffects(bonus.effects);
+            effects.textContent = effectText;
+            effects.title = effectText;
+
+            item.append(header, requirement, effects);
+
+            if (bonus.description) {
+                const desc = document.createElement('p');
+                desc.className = 'set-bonus__desc';
+                desc.textContent = bonus.description;
+                item.appendChild(desc);
+            }
+
+            UI.setBonusList.appendChild(item);
+            this.setBonusElements.set(bonus.id, {
+                node: item,
+                status,
+                requirement,
+                effects,
+                baseRequirement,
+            });
+        });
+        this.updateHeroSetBonuses();
+    }
+
+    updateHeroSetBonuses() {
+        if (!this.setBonusElements || this.setBonusElements.size === 0) {
+            if (UI.setBonusSummary) {
+                UI.setBonusSummary.textContent = '발동 중인 세트 없음';
+                UI.setBonusSummary.title = '조건을 만족한 세트 효과가 없습니다.';
+            }
+            return;
+        }
+        const statuses = this.state.getAllSetBonusStatuses();
+        const activeNames = [];
+        statuses.forEach(({ bonus, count, required, active, heroes }) => {
+            const entry = this.setBonusElements.get(bonus.id);
+            if (!entry) return;
+            entry.node.dataset.active = active ? 'true' : 'false';
+            entry.status.textContent = active ? '발동 중' : `${count}/${required}`;
+            entry.status.title = active ? '세트 효과 발동 중' : `편성 ${count}/${required}`;
+            const baseRequirement = entry.baseRequirement ?? describeSetBonusRequirement(bonus.requirement);
+            entry.requirement.textContent = `${baseRequirement} (현재 ${count}명)`;
+            const memberNames = heroes.map((hero) => hero.name).join(', ');
+            const memberDetail = memberNames ? `참여 학생: ${memberNames}` : '조건을 충족하는 학생이 없습니다.';
+            entry.node.title = memberDetail;
+            entry.requirement.title = memberDetail;
+            if (active) {
+                activeNames.push(bonus.name);
+            }
+        });
+        if (UI.setBonusSummary) {
+            if (activeNames.length === 0) {
+                UI.setBonusSummary.textContent = '발동 중인 세트 없음';
+                UI.setBonusSummary.title = '조건을 만족한 세트 효과가 없습니다.';
+            } else {
+                UI.setBonusSummary.textContent = `발동 중 ${activeNames.length}개 · ${activeNames.join(' · ')}`;
+                const summaryEffects = this.state.getSetBonusSummary();
+                const effectTexts = Object.entries(summaryEffects)
+                    .map(([effectId, value]) => describeEquipmentEffect(effectId, value))
+                    .filter(Boolean);
+                UI.setBonusSummary.title = effectTexts.length > 0
+                    ? effectTexts.join('\n')
+                    : '활성화된 세트 효과가 있습니다.';
+            }
+        }
     }
 
     handleHeroListClick(event) {
@@ -2916,6 +3353,7 @@ class GameUI {
     updateEquipmentSummary() {
         const equipmentBonuses = this.state.getEquipmentBonuses();
         const rebirthBonuses = this.state.getRebirthBonusSummary();
+        const setBonuses = this.state.getSetBonusSummary();
         const summaryEffects = [
             { id: 'tap', element: UI.equipmentTapBonus },
             { id: 'hero', element: UI.equipmentHeroBonus },
@@ -2930,14 +3368,15 @@ class GameUI {
             const label = effect?.shortLabel ?? effect?.label ?? id;
             const equipmentValue = equipmentBonuses[id] ?? 0;
             const rebirthValue = rebirthBonuses[id] ?? 0;
-            this.setBonusDisplay(element, equipmentValue, rebirthValue);
-            return { id, label, equipmentValue, rebirthValue };
+            const setValue = setBonuses[id] ?? 0;
+            this.setBonusDisplay(element, equipmentValue, rebirthValue, setValue);
+            return { id, label, equipmentValue, rebirthValue, setValue };
         });
 
         if (UI.equipmentSummary) {
             const summaryText = summaryData
-                .map(({ label, equipmentValue, rebirthValue }) => {
-                    const total = (equipmentValue ?? 0) + (rebirthValue ?? 0);
+                .map(({ label, equipmentValue, rebirthValue, setValue }) => {
+                    const total = (equipmentValue ?? 0) + (rebirthValue ?? 0) + (setValue ?? 0);
                     if (total <= 0) return null;
                     return `${label} ${formatSignedPercent(total)}`;
                 })
@@ -2945,8 +3384,8 @@ class GameUI {
                 .join(' · ');
             UI.equipmentSummary.textContent = summaryText || '추가 지원 없음';
 
-            const tooltipParts = summaryData.map(({ label, equipmentValue, rebirthValue }) => {
-                const breakdown = this.buildBonusBreakdown(equipmentValue, rebirthValue);
+            const tooltipParts = summaryData.map(({ label, equipmentValue, rebirthValue, setValue }) => {
+                const breakdown = this.buildBonusBreakdown(equipmentValue, rebirthValue, setValue);
                 return `${label}: ${breakdown}`;
             });
             const dropBonus = this.state.equipmentDropBonus ?? 0;
@@ -2960,17 +3399,18 @@ class GameUI {
         }
     }
 
-    setBonusDisplay(element, equipmentValue = 0, rebirthValue = 0) {
+    setBonusDisplay(element, equipmentValue = 0, rebirthValue = 0, setValue = 0) {
         if (!element) return;
-        const total = (equipmentValue ?? 0) + (rebirthValue ?? 0);
+        const total = (equipmentValue ?? 0) + (rebirthValue ?? 0) + (setValue ?? 0);
         element.textContent = formatSignedPercent(total);
-        element.title = this.buildBonusBreakdown(equipmentValue, rebirthValue);
+        element.title = this.buildBonusBreakdown(equipmentValue, rebirthValue, setValue);
     }
 
-    buildBonusBreakdown(equipmentValue = 0, rebirthValue = 0) {
+    buildBonusBreakdown(equipmentValue = 0, rebirthValue = 0, setValue = 0) {
         const parts = [];
         if (equipmentValue > 0) parts.push(`장비 지원 ${formatPercent(equipmentValue)}`);
         if (rebirthValue > 0) parts.push(`환생 기억 ${formatPercent(rebirthValue)}`);
+        if (setValue > 0) parts.push(`세트 효과 ${formatPercent(setValue)}`);
         if (parts.length === 0) return '추가 지원 없음';
         return parts.join(' / ');
     }
@@ -4072,6 +4512,7 @@ class GameUI {
         this.updateMissionUI();
         this.updateGachaUI();
         this.updateHeroes();
+        this.updateHeroSetBonuses();
         this.updateEnemy();
         this.updateFrenzyUI();
         this.updateBossTimerUI();
