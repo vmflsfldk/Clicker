@@ -8,6 +8,119 @@ const formatNumber = (value) => {
     return '0';
 };
 
+const HERO_SKIN_LIBRARY = {
+    shiroko: [
+        {
+            id: 'standard',
+            name: '전술 제복',
+            description: '아비도스 전술 훈련용 기본 전투복입니다.',
+            requiredLevel: 1,
+            theme: 'shiroko-standard',
+            preview: 'linear-gradient(135deg, #38bdf8 0%, #1e293b 45%, #0f172a 100%)',
+            accentColor: '#38bdf8',
+            shadowColor: 'rgba(56, 189, 248, 0.35)',
+        },
+        {
+            id: 'rider',
+            name: '라이딩 기어',
+            description: '모래바람 속에서도 달릴 수 있는 시로코의 라이딩 장비.',
+            requiredLevel: 15,
+            theme: 'shiroko-rider',
+            preview: 'linear-gradient(135deg, #f97316 0%, #fb923c 45%, #0f172a 100%)',
+            accentColor: '#f97316',
+            shadowColor: 'rgba(249, 115, 22, 0.35)',
+        },
+    ],
+    hoshino: [
+        {
+            id: 'defense',
+            name: '방과후 전술복',
+            description: '방과후 대책위원회의 전투용 제복입니다.',
+            requiredLevel: 1,
+            theme: 'hoshino-defense',
+            preview: 'linear-gradient(135deg, #f472b6 0%, #db2777 55%, #111827 100%)',
+            accentColor: '#f472b6',
+            shadowColor: 'rgba(244, 114, 182, 0.35)',
+        },
+        {
+            id: 'beach',
+            name: '비치 타임',
+            description: '휴식 시간에도 방심하지 않는 호시노의 수영복 세트.',
+            requiredLevel: 25,
+            theme: 'hoshino-beach',
+            preview: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 50%, #0f172a 100%)',
+            accentColor: '#22d3ee',
+            shadowColor: 'rgba(34, 211, 238, 0.35)',
+        },
+    ],
+    aru: [
+        {
+            id: 'standard',
+            name: '청룡당 제복',
+            description: '청룡당의 기품을 드러내는 기본 제복입니다.',
+            requiredLevel: 1,
+            theme: 'aru-standard',
+            preview: 'linear-gradient(135deg, #a855f7 0%, #6d28d9 45%, #0f172a 100%)',
+            accentColor: '#a855f7',
+            shadowColor: 'rgba(168, 85, 247, 0.35)',
+        },
+        {
+            id: 'festival',
+            name: '축제 폭죽',
+            description: '폭죽처럼 화려한 아루의 이벤트 한정 복장.',
+            requiredLevel: 35,
+            theme: 'aru-festival',
+            preview: 'linear-gradient(135deg, #ef4444 0%, #f97316 50%, #0f172a 100%)',
+            accentColor: '#ef4444',
+            shadowColor: 'rgba(239, 68, 68, 0.35)',
+        },
+    ],
+    hibiki: [
+        {
+            id: 'artillery',
+            name: '밀레니엄 포격복',
+            description: '정밀 폭격 임무에 맞춘 밀레니엄 전투복.',
+            requiredLevel: 1,
+            theme: 'hibiki-artillery',
+            preview: 'linear-gradient(135deg, #c084fc 0%, #6366f1 50%, #111827 100%)',
+            accentColor: '#c084fc',
+            shadowColor: 'rgba(192, 132, 252, 0.35)',
+        },
+        {
+            id: 'engineer',
+            name: '지원 공학복',
+            description: '장비 정비에 최적화된 히비키의 공학복.',
+            requiredLevel: 45,
+            theme: 'hibiki-engineer',
+            preview: 'linear-gradient(135deg, #4ade80 0%, #22c55e 45%, #0f172a 100%)',
+            accentColor: '#4ade80',
+            shadowColor: 'rgba(74, 222, 128, 0.35)',
+        },
+    ],
+    iroha: [
+        {
+            id: 'commander',
+            name: '특무대 지휘복',
+            description: '코사카 특무대 지휘관다운 위엄 있는 제복입니다.',
+            requiredLevel: 1,
+            theme: 'iroha-commander',
+            preview: 'linear-gradient(135deg, #facc15 0%, #f97316 45%, #0f172a 100%)',
+            accentColor: '#facc15',
+            shadowColor: 'rgba(250, 204, 21, 0.35)',
+        },
+        {
+            id: 'parade',
+            name: '행진 준비',
+            description: '의장 행사를 위한 장식이 돋보이는 의상입니다.',
+            requiredLevel: 55,
+            theme: 'iroha-parade',
+            preview: 'linear-gradient(135deg, #7dd3fc 0%, #38bdf8 45%, #0f172a 100%)',
+            accentColor: '#7dd3fc',
+            shadowColor: 'rgba(125, 211, 252, 0.35)',
+        },
+    ],
+};
+
 const defaultHeroes = [
     {
         id: 'shiroko',
@@ -17,6 +130,7 @@ const defaultHeroes = [
         costMultiplier: 1.08,
         baseDamage: 5,
         rarity: 'common',
+        skins: HERO_SKIN_LIBRARY.shiroko,
     },
     {
         id: 'hoshino',
@@ -26,6 +140,7 @@ const defaultHeroes = [
         costMultiplier: 1.1,
         baseDamage: 18,
         rarity: 'uncommon',
+        skins: HERO_SKIN_LIBRARY.hoshino,
     },
     {
         id: 'aru',
@@ -35,6 +150,7 @@ const defaultHeroes = [
         costMultiplier: 1.12,
         baseDamage: 75,
         rarity: 'rare',
+        skins: HERO_SKIN_LIBRARY.aru,
     },
     {
         id: 'hibiki',
@@ -44,6 +160,7 @@ const defaultHeroes = [
         costMultiplier: 1.14,
         baseDamage: 220,
         rarity: 'unique',
+        skins: HERO_SKIN_LIBRARY.hibiki,
     },
     {
         id: 'iroha',
@@ -53,6 +170,7 @@ const defaultHeroes = [
         costMultiplier: 1.15,
         baseDamage: 620,
         rarity: 'legendary',
+        skins: HERO_SKIN_LIBRARY.iroha,
     },
 ];
 
@@ -401,14 +519,19 @@ const generateEquipmentItem = (stage, isBoss) => {
 };
 
 class Hero {
-    constructor({ id, name, description, baseDamage, rarity }, savedState) {
+    constructor({ id, name, description, baseDamage, rarity, skins }, savedState) {
         this.id = id;
         this.name = name;
         this.description = description;
         this.baseDamage = baseDamage;
-        this.level = savedState?.level ?? 0;
+        const savedLevel = Number(savedState?.level ?? 0);
+        this.level = Number.isFinite(savedLevel) ? Math.max(0, Math.floor(savedLevel)) : 0;
         const assignedRarity = typeof rarity === 'string' ? rarity : DEFAULT_HERO_RARITY_ID;
         this.rarityId = HERO_RARITY_MAP.has(assignedRarity) ? assignedRarity : DEFAULT_HERO_RARITY_ID;
+        this.skins = this.initializeSkins(Array.isArray(skins) ? skins : [], savedState);
+        const savedSelection = typeof savedState?.selectedSkinId === 'string' ? savedState.selectedSkinId : null;
+        this.selectedSkinId = savedSelection ?? this.skins[0]?.id ?? null;
+        this.refreshSkinUnlocks();
     }
 
     get damagePerSecond() {
@@ -424,6 +547,23 @@ class Hero {
     get enhancementLevel() {
         if (this.level === 0) return 0;
         return Math.max(0, this.level - this.gachaInitialLevel);
+    }
+
+    get activeSkin() {
+        return this.getSkin(this.selectedSkinId) ?? this.skins[0] ?? null;
+    }
+
+    get activeSkinKey() {
+        const skin = this.activeSkin;
+        if (!skin) return null;
+        return `${this.id}:${skin.id}`;
+    }
+
+    get nextSkinUnlock() {
+        const lockedSkins = this.skins
+            .filter((skin) => !skin.unlocked)
+            .sort((a, b) => a.requiredLevel - b.requiredLevel);
+        return lockedSkins[0] ?? null;
     }
 
     get rarity() {
@@ -456,11 +596,132 @@ class Hero {
     increaseLevel(amount = 1) {
         const normalized = Number.isFinite(amount) ? Math.max(1, Math.floor(amount)) : 1;
         this.level += normalized;
-        return this.level;
+        return this.refreshSkinUnlocks();
+    }
+
+    isSkinUnlocked(skinId) {
+        const skin = this.getSkin(skinId);
+        if (!skin) return false;
+        if (this.level <= 0) return false;
+        return Boolean(skin.unlocked);
+    }
+
+    getSkin(skinId) {
+        if (!skinId) return null;
+        return this.skins.find((skin) => skin.id === skinId) ?? null;
+    }
+
+    getSkinPublicData(skinId) {
+        const skin = typeof skinId === 'object' ? skinId : this.getSkin(skinId);
+        if (!skin) return null;
+        return {
+            id: skin.id,
+            name: skin.name,
+            requiredLevel: skin.requiredLevel,
+            description: skin.description,
+            theme: skin.theme,
+            accentColor: skin.accentColor,
+            shadowColor: skin.shadowColor,
+            preview: skin.preview,
+        };
+    }
+
+    selectSkin(skinId) {
+        const skin = this.getSkin(skinId);
+        if (!skin) {
+            return { success: false, message: '스킨 정보를 찾을 수 없습니다.' };
+        }
+        if (this.level <= 0 || !skin.unlocked) {
+            return {
+                success: false,
+                message: `해당 스킨은 Lv. ${skin.requiredLevel} 달성 후 사용 가능합니다.`,
+                requiredLevel: skin.requiredLevel,
+            };
+        }
+        if (this.selectedSkinId === skin.id) {
+            return { success: false, message: '이미 적용 중인 스킨입니다.', skin: this.getSkinPublicData(skin) };
+        }
+        this.selectedSkinId = skin.id;
+        return { success: true, skin: this.getSkinPublicData(skin) };
+    }
+
+    resetProgress() {
+        this.level = 0;
+        this.skins.forEach((skin) => {
+            skin.unlocked = false;
+        });
+        this.selectedSkinId = this.skins[0]?.id ?? null;
+        this.refreshSkinUnlocks();
+    }
+
+    refreshSkinUnlocks() {
+        const newlyUnlocked = [];
+        this.skins.forEach((skin) => {
+            const wasUnlocked = Boolean(skin.unlocked);
+            const shouldUnlock = this.level > 0 && this.level >= skin.requiredLevel;
+            if (shouldUnlock && !wasUnlocked) {
+                skin.unlocked = true;
+                newlyUnlocked.push(this.getSkinPublicData(skin));
+            } else if (!shouldUnlock && wasUnlocked) {
+                skin.unlocked = false;
+            }
+        });
+        if (!this.selectedSkinId || !this.isSkinUnlocked(this.selectedSkinId)) {
+            const fallback = this.skins.find((skin) => skin.unlocked) ?? this.skins[0] ?? null;
+            this.selectedSkinId = fallback?.id ?? null;
+        }
+        return newlyUnlocked;
+    }
+
+    initializeSkins(definitions, savedState) {
+        const savedSkins = Array.isArray(savedState?.skins) ? savedState.skins : [];
+        const normalized = definitions.map((definition, index) => {
+            const skinId = typeof definition.id === 'string' && definition.id.trim().length > 0
+                ? definition.id
+                : `skin-${index + 1}`;
+            const saved = savedSkins.find((entry) => entry.id === skinId);
+            const requiredLevel = Number.isFinite(definition.requiredLevel)
+                ? Math.max(1, Math.floor(definition.requiredLevel))
+                : 1;
+            return {
+                id: skinId,
+                name: definition.name ?? '스킨',
+                description: definition.description ?? '',
+                requiredLevel,
+                theme: definition.theme ?? `${this.id}-${skinId}`,
+                preview:
+                    typeof definition.preview === 'string'
+                        ? definition.preview
+                        : 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
+                accentColor: definition.accentColor ?? '#38bdf8',
+                shadowColor: definition.shadowColor ?? 'rgba(56, 189, 248, 0.25)',
+                unlocked: saved ? Boolean(saved.unlocked) : false,
+            };
+        });
+        if (normalized.length === 0) {
+            normalized.push({
+                id: `${this.id}-default`,
+                name: '전술 제복',
+                description: '기본 전술 제복입니다.',
+                requiredLevel: 1,
+                theme: `${this.id}-default`,
+                preview: 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
+                accentColor: '#38bdf8',
+                shadowColor: 'rgba(56, 189, 248, 0.25)',
+                unlocked: this.level > 0,
+            });
+        }
+        normalized.sort((a, b) => a.requiredLevel - b.requiredLevel);
+        return normalized;
     }
 
     toJSON() {
-        return { id: this.id, level: this.level };
+        return {
+            id: this.id,
+            level: this.level,
+            selectedSkinId: this.selectedSkinId,
+            skins: this.skins.map((skin) => ({ id: skin.id, unlocked: Boolean(skin.unlocked) })),
+        };
     }
 }
 
@@ -745,6 +1006,18 @@ class GameState {
         return this.heroes.find((hero) => hero.id === heroId) ?? null;
     }
 
+    selectHeroSkin(heroId, skinId) {
+        const hero = this.getHeroById(heroId);
+        if (!hero) {
+            return { success: false, message: '학생을 찾을 수 없습니다.' };
+        }
+        const result = hero.selectSkin(skinId);
+        if (result.success) {
+            this.lastSave = Date.now();
+        }
+        return result;
+    }
+
     getGachaCost(count) {
         if (count === GACHA_MULTI_COUNT) return GACHA_MULTI_COST;
         if (!Number.isFinite(count) || count <= 0) return GACHA_SINGLE_COST;
@@ -769,13 +1042,14 @@ class GameState {
             if (!hero) continue;
             const previousLevel = hero.level;
             const levelGain = previousLevel === 0 ? hero.gachaInitialLevel : hero.gachaDuplicateGain;
-            hero.increaseLevel(levelGain);
+            const unlockedSkins = hero.increaseLevel(levelGain);
             results.push({
                 hero,
                 isNew: previousLevel === 0,
                 previousLevel,
                 newLevel: hero.level,
                 levelGain,
+                unlockedSkins,
             });
         }
         this.lastSave = Date.now();
@@ -878,7 +1152,7 @@ class GameState {
         this.enemy.reset(1);
         this.clearBossTimer();
         this.heroes.forEach((hero) => {
-            hero.level = 0;
+            hero.resetProgress();
         });
         this.gachaTokens = 0;
         this.frenzyCooldown = 0;
@@ -1438,6 +1712,9 @@ class GameUI {
         UI.enemy.addEventListener('click', () => this.handleTap());
         UI.upgradeClick.addEventListener('click', () => this.handleClickUpgrade());
         UI.sortHeroes.addEventListener('click', () => this.toggleHeroSort());
+        if (UI.heroList) {
+            UI.heroList.addEventListener('click', (event) => this.handleHeroListClick(event));
+        }
         if (UI.bossRetreat) {
             UI.bossRetreat.addEventListener('click', () => this.handleBossRetreat());
         }
@@ -1592,6 +1869,9 @@ class GameUI {
         const statusState = node.querySelector('.hero__status-state');
         const statusDetail = node.querySelector('.hero__status-detail');
         const rarity = node.querySelector('.hero__rarity');
+        const skinPreview = node.querySelector('.hero__skin-preview');
+        const skinList = node.querySelector('.hero__skin-list');
+        const skinButtons = new Map();
 
         if (rarity) {
             rarity.classList.add('rarity-badge');
@@ -1602,7 +1882,44 @@ class GameUI {
         name.textContent = hero.name;
         desc.textContent = hero.description;
         node.dataset.rarity = hero.rarityId;
-        this.heroElements.set(hero.id, { node, name, desc, level, dps, statusState, statusDetail, rarity });
+        if (skinList) {
+            skinList.innerHTML = '';
+            hero.skins.forEach((skin) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'hero-skin';
+                button.dataset.heroSkinId = skin.id;
+                button.dataset.heroId = hero.id;
+
+                const skinName = document.createElement('span');
+                skinName.className = 'hero-skin__name';
+
+                const skinStatus = document.createElement('span');
+                skinStatus.className = 'hero-skin__status';
+
+                const skinDesc = document.createElement('span');
+                skinDesc.className = 'hero-skin__desc';
+                skinDesc.textContent = skin.description ?? '';
+
+                button.append(skinName, skinStatus, skinDesc);
+                skinList.appendChild(button);
+                skinButtons.set(skin.id, { button, name: skinName, status: skinStatus, desc: skinDesc });
+            });
+        }
+
+        this.heroElements.set(hero.id, {
+            node,
+            name,
+            desc,
+            level,
+            dps,
+            statusState,
+            statusDetail,
+            rarity,
+            skinPreview,
+            skinList,
+            skinButtons,
+        });
         this.updateHero(hero);
 
         UI.heroList.appendChild(node);
@@ -1628,16 +1945,155 @@ class GameUI {
         if (hero.isUnlocked) {
             heroUI.statusState.textContent = '합류 완료';
             const extraLevels = hero.enhancementLevel;
+            const detailParts = [];
             if (extraLevels > 0) {
-                heroUI.statusDetail.textContent = `추가 성장 +${extraLevels} (Lv. ${hero.level})`;
+                detailParts.push(`추가 성장 +${extraLevels} (Lv. ${hero.level})`);
             } else {
-                heroUI.statusDetail.textContent = `초회 합류 Lv. ${hero.level}`;
+                detailParts.push(`초회 합류 Lv. ${hero.level}`);
             }
+            const activeSkin = hero.activeSkin;
+            if (activeSkin) {
+                detailParts.push(`현재 스킨: ${activeSkin.name}`);
+            }
+            const nextSkin = hero.nextSkinUnlock;
+            if (nextSkin) {
+                detailParts.push(`다음 스킨 Lv. ${nextSkin.requiredLevel} ${nextSkin.name}`);
+            }
+            heroUI.statusDetail.textContent = detailParts.join(' · ');
         } else {
             heroUI.statusState.textContent = '미합류';
-            heroUI.statusDetail.textContent = `${hero.rarityName} 학생을 가챠로 모집하세요.`;
+            const detailParts = [`${hero.rarityName} 학생을 가챠로 모집하세요.`];
+            const firstSkin = hero.skins?.[0];
+            if (firstSkin) {
+                detailParts.push(`첫 스킨 Lv. ${firstSkin.requiredLevel} ${firstSkin.name}`);
+            }
+            heroUI.statusDetail.textContent = detailParts.join(' · ');
         }
+        this.updateHeroSkins(hero);
         this.updateHeroGachaEntry(hero);
+    }
+
+    updateHeroSkins(hero) {
+        const heroUI = this.heroElements.get(hero.id);
+        if (!heroUI) return;
+        const activeSkin = hero.activeSkin;
+        if (heroUI.skinPreview) {
+            if (hero.isUnlocked && activeSkin) {
+                heroUI.skinPreview.dataset.locked = 'false';
+                heroUI.skinPreview.style.background = activeSkin.preview ??
+                    'linear-gradient(135deg, #334155 0%, #0f172a 100%)';
+                heroUI.skinPreview.style.borderColor = activeSkin.accentColor ?? 'rgba(148, 163, 184, 0.28)';
+                heroUI.skinPreview.style.boxShadow = activeSkin.shadowColor
+                    ? `0 18px 32px ${activeSkin.shadowColor}`
+                    : 'none';
+                const tooltip = [activeSkin.name, activeSkin.description]
+                    .filter(Boolean)
+                    .join(' · ');
+                heroUI.skinPreview.title = tooltip || `${hero.name} 스킨 프리뷰`;
+            } else {
+                heroUI.skinPreview.dataset.locked = 'true';
+                heroUI.skinPreview.style.background = 'linear-gradient(135deg, #334155 0%, #0f172a 100%)';
+                heroUI.skinPreview.style.borderColor = 'rgba(148, 163, 184, 0.28)';
+                heroUI.skinPreview.style.boxShadow = 'none';
+                heroUI.skinPreview.title = '학생 모집 후 스킨을 확인할 수 있습니다.';
+            }
+        }
+        if (heroUI.node) {
+            if (hero.isUnlocked && activeSkin) {
+                heroUI.node.dataset.skinTheme = activeSkin.theme ?? '';
+                heroUI.node.style.setProperty(
+                    '--hero-skin-accent',
+                    activeSkin.accentColor ?? 'rgba(148, 163, 184, 0.25)',
+                );
+                heroUI.node.style.setProperty(
+                    '--hero-skin-shadow',
+                    activeSkin.shadowColor ?? 'rgba(15, 23, 42, 0)',
+                );
+            } else {
+                delete heroUI.node.dataset.skinTheme;
+                heroUI.node.style.removeProperty('--hero-skin-accent');
+                heroUI.node.style.removeProperty('--hero-skin-shadow');
+            }
+        }
+        if (heroUI.skinButtons && heroUI.skinButtons.size > 0) {
+            hero.skins.forEach((skin) => {
+                const entry = heroUI.skinButtons.get(skin.id);
+                if (!entry) return;
+                entry.name.textContent = skin.name;
+                if (entry.desc) {
+                    entry.desc.textContent = skin.description ?? '';
+                }
+                const unlocked = hero.isSkinUnlocked(skin.id);
+                entry.button.dataset.locked = unlocked ? 'false' : 'true';
+                entry.button.dataset.heroSkinId = skin.id;
+                entry.button.dataset.heroId = hero.id;
+                entry.button.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+                entry.button.classList.toggle('is-selected', skin.id === hero.selectedSkinId);
+                entry.button.setAttribute('aria-pressed', skin.id === hero.selectedSkinId ? 'true' : 'false');
+                entry.button.style.setProperty('--hero-skin-accent', skin.accentColor ?? '#38bdf8');
+                entry.status.textContent = this.getHeroSkinRequirementText(hero, skin);
+                entry.button.title = this.buildHeroSkinTooltip(hero, skin);
+            });
+        }
+    }
+
+    getHeroSkinRequirementText(hero, skin) {
+        if (hero.level <= 0) {
+            return '학생 모집 필요';
+        }
+        if (hero.isSkinUnlocked(skin.id)) {
+            return skin.id === hero.selectedSkinId ? '적용 중' : '해금 완료';
+        }
+        return `필요 Lv. ${skin.requiredLevel} (현재 ${hero.level})`;
+    }
+
+    buildHeroSkinTooltip(hero, skin) {
+        const lines = [];
+        if (skin.description) {
+            lines.push(skin.description);
+        }
+        if (hero.level <= 0) {
+            lines.push('학생을 모집하면 해금됩니다.');
+        } else if (hero.isSkinUnlocked(skin.id)) {
+            lines.push('해금 완료');
+        } else {
+            lines.push(`필요 레벨: ${skin.requiredLevel}`);
+            lines.push(`현재 레벨: ${hero.level}`);
+        }
+        return lines.join('\n');
+    }
+
+    handleHeroListClick(event) {
+        const button = event.target.closest('.hero-skin');
+        if (!button) return;
+        const heroElement = button.closest('.hero');
+        const heroId = heroElement?.dataset.heroId;
+        const skinId = button.dataset.heroSkinId;
+        if (!heroId || !skinId) return;
+        const hero = this.state.getHeroById(heroId);
+        if (!hero) return;
+        if (!hero.isSkinUnlocked(skinId)) {
+            const skin = hero.getSkinPublicData(skinId) ?? hero.getSkin(skinId);
+            if (hero.level <= 0) {
+                this.addLog(`${hero.name}을(를) 먼저 모집해야 스킨을 사용할 수 있습니다.`, 'info');
+            } else if (skin) {
+                this.addLog(`${hero.name}의 ${skin.name} 스킨은 Lv. ${skin.requiredLevel}에서 해금됩니다.`, 'info');
+            } else {
+                this.addLog('스킨 정보를 확인할 수 없습니다.', 'warning');
+            }
+            return;
+        }
+        const result = this.state.selectHeroSkin(heroId, skinId);
+        if (!result.success) {
+            if (result.message) {
+                this.addLog(result.message, 'warning');
+            }
+            return;
+        }
+        const skinName = result.skin?.name ?? hero.getSkinPublicData(skinId)?.name ?? '스킨';
+        this.addLog(`${hero.name}에게 ${skinName} 스킨을 적용했습니다!`, 'success');
+        this.updateHero(hero);
+        saveGame(this.state);
     }
 
     updateHeroes() {
@@ -2771,6 +3227,11 @@ class GameUI {
                     'info',
                 );
             }
+            if (Array.isArray(entry.unlockedSkins) && entry.unlockedSkins.length > 0) {
+                entry.unlockedSkins.forEach((skin) => {
+                    this.addLog(`🎨 ${entry.hero.name} - ${skin.name} 스킨 해금! (필요 Lv. ${skin.requiredLevel})`, 'success');
+                });
+            }
         });
         this.renderHeroes();
         this.updateStats();
@@ -2814,6 +3275,17 @@ class GameUI {
             }
 
             item.append(header, detail);
+            if (Array.isArray(entry.unlockedSkins) && entry.unlockedSkins.length > 0) {
+                const skins = document.createElement('ul');
+                skins.className = 'gacha-result__skins';
+                entry.unlockedSkins.forEach((skin) => {
+                    const skinItem = document.createElement('li');
+                    skinItem.className = 'gacha-result__skin';
+                    skinItem.textContent = `${skin.name} 스킨 해금 (필요 Lv. ${skin.requiredLevel})`;
+                    skins.appendChild(skinItem);
+                });
+                item.appendChild(skins);
+            }
             UI.gachaResults.prepend(item);
         });
         const maxEntries = 12;
