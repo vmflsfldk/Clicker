@@ -2,8 +2,8 @@ export const HERO_SKIN_LIBRARY = {
     shiroko: [
         {
             id: 'standard',
-            name: '전술 제복',
-            description: '아비도스 전술 훈련용 기본 전투복입니다.',
+            name: '시로코(교복)',
+            description: '내 도움이 필요해?',
             requiredLevel: 1,
             theme: 'shiroko-standard',
             preview: 'linear-gradient(135deg, #38bdf8 0%, #1e293b 45%, #0f172a 100%)',
@@ -13,8 +13,8 @@ export const HERO_SKIN_LIBRARY = {
         },
         {
             id: 'rider',
-            name: '라이딩 기어',
-            description: '모래바람 속에서도 달릴 수 있는 시로코의 라이딩 장비.',
+            name: '시로코(라이딩)',
+            description: '다녀올게, 선생님. 연락 할 테니까.',
             requiredLevel: 15,
             theme: 'shiroko-rider',
             preview: 'linear-gradient(135deg, #f97316 0%, #fb923c 45%, #0f172a 100%)',
@@ -26,8 +26,8 @@ export const HERO_SKIN_LIBRARY = {
     hoshino: [
         {
             id: 'defense',
-            name: '방과후 전술복',
-            description: '방과후 대책위원회의 전투용 제복입니다.',
+            name: '호시노(무장)',
+            description: '낮잠 중~ 긴급상황은 전화로 부탁!',
             requiredLevel: 1,
             theme: 'hoshino-defense',
             preview: 'linear-gradient(135deg, #f472b6 0%, #db2777 55%, #111827 100%)',
@@ -37,8 +37,8 @@ export const HERO_SKIN_LIBRARY = {
         },
         {
             id: 'beach',
-            name: '비치 타임',
-            description: '휴식 시간에도 방심하지 않는 호시노의 수영복 세트.',
+            name: '호시노(수영복)',
+            description: '이쪽으로 와, 선생.꽤 시원하다고',
             requiredLevel: 25,
             theme: 'hoshino-beach',
             preview: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 50%, #0f172a 100%)',
@@ -50,8 +50,8 @@ export const HERO_SKIN_LIBRARY = {
     aru: [
         {
             id: 'standard',
-            name: '청룡당 제복',
-            description: '청룡당의 기품을 드러내는 기본 제복입니다.',
+            name: '아루(교복)',
+            description: '날 고용하는 비용은 꽤 비싸다고? 선생님.',
             requiredLevel: 1,
             theme: 'aru-standard',
             preview: 'linear-gradient(135deg, #a855f7 0%, #6d28d9 45%, #0f172a 100%)',
@@ -61,8 +61,8 @@ export const HERO_SKIN_LIBRARY = {
         },
         {
             id: 'festival',
-            name: '축제 폭죽',
-            description: '폭죽처럼 화려한 아루의 이벤트 한정 복장.',
+            name: '아루(새해)',
+            description: '우후후, 올해의 첫 의뢰란 거지? 좋아. 멋지게 해결해줄게.',
             requiredLevel: 35,
             theme: 'aru-festival',
             preview: 'linear-gradient(135deg, #ef4444 0%, #f97316 50%, #0f172a 100%)',
@@ -74,8 +74,8 @@ export const HERO_SKIN_LIBRARY = {
     hibiki: [
         {
             id: 'artillery',
-            name: '밀레니엄 포격복',
-            description: '정밀 폭격 임무에 맞춘 밀레니엄 전투복.',
+            name: '히비키(사복)',
+            description: '개조가 필요한 물건이라도 있어?',
             requiredLevel: 1,
             theme: 'hibiki-artillery',
             preview: 'linear-gradient(135deg, #c084fc 0%, #6366f1 50%, #111827 100%)',
@@ -85,8 +85,8 @@ export const HERO_SKIN_LIBRARY = {
         },
         {
             id: 'engineer',
-            name: '지원 공학복',
-            description: '장비 정비에 최적화된 히비키의 공학복.',
+            name: '히비키(응원단)',
+            description: '플레이! 플레이⋯! ⋯아으으',
             requiredLevel: 45,
             theme: 'hibiki-engineer',
             preview: 'linear-gradient(135deg, #4ade80 0%, #22c55e 45%, #0f172a 100%)',
@@ -98,8 +98,8 @@ export const HERO_SKIN_LIBRARY = {
     iroha: [
         {
             id: 'commander',
-            name: '특무대 지휘복',
-            description: '코사카 특무대 지휘관다운 위엄 있는 제복입니다.',
+            name: '이로하(교복)',
+            description: '제가 필요하신 거죠?이것 참, 어쩔 수 없네요.',
             requiredLevel: 1,
             theme: 'iroha-commander',
             preview: 'linear-gradient(135deg, #facc15 0%, #f97316 45%, #0f172a 100%)',
@@ -122,8 +122,8 @@ export const HERO_SKIN_LIBRARY = {
     yuuka: [
         {
             id: 'standard',
-            name: '생도 회계복',
-            description: '밀레니엄 재무국의 단정한 제복으로 꼼꼼함이 느껴집니다.',
+            name: '유우카(교복)',
+            description: '운이 좋았다고요? 아뇨, 계산대로에요.',
             requiredLevel: 1,
             theme: 'yuuka-standard',
             preview: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 50%, #0f172a 100%)',
@@ -133,8 +133,8 @@ export const HERO_SKIN_LIBRARY = {
         },
         {
             id: 'resort',
-            name: '리조트 체크인',
-            description: '휴양지에서도 예산을 챙기는 유우카의 세련된 휴가 복장입니다.',
+            name: '유우카(체육복)',
+            description: '이번 황륜대제의 준비도 완벽해!',
             requiredLevel: 40,
             theme: 'yuuka-resort',
             preview: 'linear-gradient(135deg, #f472b6 0%, #fb7185 45%, #0f172a 100%)',
