@@ -14,7 +14,8 @@ import {
     HERO_TRAIT_MAP,
     clampProbability,
 } from '../state/gameState.js';
-import { HERO_SET_BONUSES } from '../data/heroes.js';
+import { HERO_SET_BONUSES, HERO_RARITIES } from '../data/heroes.js';
+import { MISSIONS } from '../data/missions.js';
 import { EQUIPMENT_TYPES, EQUIPMENT_DROP_CHANCE, EQUIPMENT_BOSS_DROP_CHANCE } from '../data/equipment.js';
 import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
 import { saveGame } from '../storage/save.js';
