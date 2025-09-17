@@ -70,23 +70,7 @@
             </section>
 
             <aside class="game__panel">
-                <div class="mobile-panel-control">
-                    <span class="mobile-panel-control__label" id="mobilePanelLabel">패널 선택</span>
-                    <div class="mobile-panel-control__field">
-                        <select
-                            id="mobilePanelSelect"
-                            class="mobile-panel-control__select"
-                            aria-labelledby="mobilePanelLabel"
-                        >
-                            <option value="heroes" selected>학생</option>
-                            <option value="recruit">학생 모집</option>
-                            <option value="rebirth">환생</option>
-                            <option value="equipment">전술 장비</option>
-                            <option value="missions">임무</option>
-                            <option value="log">전투 로그</option>
-                        </select>
-                    </div>
-                </div>
+                <div id="panelOverlayBackdrop" class="panel-overlay__backdrop" aria-hidden="true"></div>
                 <nav class="panel-tabs" role="tablist" aria-label="보조 패널">
                     <button
                         type="button"
@@ -162,6 +146,14 @@
                 </nav>
 
                 <div class="panel-views">
+                    <button
+                        type="button"
+                        id="panelOverlayClose"
+                        class="panel-overlay__close"
+                        aria-label="보조 패널 닫기"
+                    >
+                        닫기 ✕
+                    </button>
                     <div
                         class="panel-view is-active"
                         id="panel-heroes"
