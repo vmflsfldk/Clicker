@@ -16,6 +16,7 @@ const defaultHeroes = [
         baseCost: 25,
         costMultiplier: 1.08,
         baseDamage: 5,
+        rarity: 'common',
     },
     {
         id: 'hoshino',
@@ -24,6 +25,7 @@ const defaultHeroes = [
         baseCost: 120,
         costMultiplier: 1.1,
         baseDamage: 18,
+        rarity: 'uncommon',
     },
     {
         id: 'aru',
@@ -32,6 +34,7 @@ const defaultHeroes = [
         baseCost: 450,
         costMultiplier: 1.12,
         baseDamage: 75,
+        rarity: 'rare',
     },
     {
         id: 'hibiki',
@@ -40,6 +43,7 @@ const defaultHeroes = [
         baseCost: 1800,
         costMultiplier: 1.14,
         baseDamage: 220,
+        rarity: 'unique',
     },
     {
         id: 'iroha',
@@ -48,8 +52,60 @@ const defaultHeroes = [
         baseCost: 5200,
         costMultiplier: 1.15,
         baseDamage: 620,
+        rarity: 'legendary',
     },
 ];
+
+const HERO_RARITIES = [
+    {
+        id: 'common',
+        name: '커먼',
+        color: '#94a3b8',
+        weight: 40,
+        initialLevel: 1,
+        duplicateGain: 1,
+        description: '기본적인 지원 학생으로 쉽게 합류합니다.',
+    },
+    {
+        id: 'uncommon',
+        name: '언커먼',
+        color: '#22d3ee',
+        weight: 25,
+        initialLevel: 2,
+        duplicateGain: 1,
+        description: '특별한 전술을 가진 학생으로 합류 확률이 조금 낮습니다.',
+    },
+    {
+        id: 'rare',
+        name: '레어',
+        color: '#a855f7',
+        weight: 18,
+        initialLevel: 3,
+        duplicateGain: 2,
+        description: '강력한 화력을 보유한 학생으로 합류 시 높은 전력 상승을 제공합니다.',
+    },
+    {
+        id: 'unique',
+        name: '유니크',
+        color: '#f97316',
+        weight: 12,
+        initialLevel: 4,
+        duplicateGain: 2,
+        description: '전용 장비와 전술을 가진 학생으로 등장 확률이 낮습니다.',
+    },
+    {
+        id: 'legendary',
+        name: '레전더리',
+        color: '#facc15',
+        weight: 5,
+        initialLevel: 5,
+        duplicateGain: 3,
+        description: '전장을 지배하는 최상급 학생으로 만나기 매우 어렵습니다.',
+    },
+];
+
+const HERO_RARITY_MAP = new Map(HERO_RARITIES.map((rarity) => [rarity.id, rarity]));
+const DEFAULT_HERO_RARITY_ID = 'common';
 
 const EQUIPMENT_TYPES = [
     { id: 'tap', label: '전술 공격력', description: '학생의 기본 전투력을 강화합니다.' },
@@ -272,6 +328,31 @@ const formatPercent = (value) => `${(value * 100).toFixed(1)}%`;
 
 const randomFromArray = (array) => array[Math.floor(Math.random() * array.length)];
 
+const weightedRandom = (items, getWeight) => {
+    if (!Array.isArray(items) || items.length === 0) return null;
+    const pool = [];
+    let totalWeight = 0;
+    items.forEach((item) => {
+        const rawWeight = typeof getWeight === 'function' ? Number(getWeight(item)) : 0;
+        const weight = Number.isFinite(rawWeight) ? Math.max(0, rawWeight) : 0;
+        if (weight > 0) {
+            pool.push({ item, weight });
+            totalWeight += weight;
+        }
+    });
+    if (pool.length === 0 || totalWeight <= 0) {
+        return randomFromArray(items);
+    }
+    let roll = Math.random() * totalWeight;
+    for (const entry of pool) {
+        roll -= entry.weight;
+        if (roll < 0) {
+            return entry.item;
+        }
+    }
+    return pool[pool.length - 1]?.item ?? null;
+};
+
 const calculateRebirthPoints = (highestStage) => {
     if (highestStage < REBIRTH_STAGE_REQUIREMENT) return 0;
     return Math.max(1, Math.floor((highestStage - (REBIRTH_STAGE_REQUIREMENT - 5)) / 5));
@@ -320,12 +401,14 @@ const generateEquipmentItem = (stage, isBoss) => {
 };
 
 class Hero {
-    constructor({ id, name, description, baseDamage }, savedState) {
+    constructor({ id, name, description, baseDamage, rarity }, savedState) {
         this.id = id;
         this.name = name;
         this.description = description;
         this.baseDamage = baseDamage;
         this.level = savedState?.level ?? 0;
+        const assignedRarity = typeof rarity === 'string' ? rarity : DEFAULT_HERO_RARITY_ID;
+        this.rarityId = HERO_RARITY_MAP.has(assignedRarity) ? assignedRarity : DEFAULT_HERO_RARITY_ID;
     }
 
     get damagePerSecond() {
@@ -339,7 +422,35 @@ class Hero {
     }
 
     get enhancementLevel() {
-        return Math.max(0, this.level - 1);
+        if (this.level === 0) return 0;
+        return Math.max(0, this.level - this.gachaInitialLevel);
+    }
+
+    get rarity() {
+        return HERO_RARITY_MAP.get(this.rarityId) ?? HERO_RARITY_MAP.get(DEFAULT_HERO_RARITY_ID);
+    }
+
+    get rarityName() {
+        return this.rarity?.name ?? '커먼';
+    }
+
+    get rarityColor() {
+        return this.rarity?.color ?? '#94a3b8';
+    }
+
+    get gachaWeight() {
+        const weight = this.rarity?.weight ?? 1;
+        return Math.max(0, Number(weight)) || 0;
+    }
+
+    get gachaInitialLevel() {
+        const value = this.rarity?.initialLevel ?? 1;
+        return Math.max(1, Math.floor(Number(value) || 1));
+    }
+
+    get gachaDuplicateGain() {
+        const value = this.rarity?.duplicateGain ?? 1;
+        return Math.max(1, Math.floor(Number(value) || 1));
     }
 
     increaseLevel(amount = 1) {
@@ -654,15 +765,17 @@ class GameState {
         this.gachaTokens -= cost;
         const results = [];
         for (let i = 0; i < normalizedCount; i += 1) {
-            const hero = randomFromArray(this.heroes);
+            const hero = weightedRandom(this.heroes, (candidate) => candidate.gachaWeight);
             if (!hero) continue;
             const previousLevel = hero.level;
-            hero.increaseLevel(1);
+            const levelGain = previousLevel === 0 ? hero.gachaInitialLevel : hero.gachaDuplicateGain;
+            hero.increaseLevel(levelGain);
             results.push({
                 hero,
                 isNew: previousLevel === 0,
                 previousLevel,
                 newLevel: hero.level,
+                levelGain,
             });
         }
         this.lastSave = Date.now();
@@ -1160,6 +1273,8 @@ const UI = {
     gachaTokens: document.getElementById('gachaTokens'),
     gachaSingle: document.getElementById('gachaSingle'),
     gachaTen: document.getElementById('gachaTen'),
+    gachaRateList: document.getElementById('gachaRateList'),
+    gachaPoolList: document.getElementById('gachaPoolList'),
     gachaResults: document.getElementById('gachaResults'),
     gachaResultsEmpty: document.getElementById('gachaResultsEmpty'),
     upgradeClick: document.getElementById('upgradeClick'),
@@ -1212,6 +1327,7 @@ class GameUI {
         this.heroElements = new Map();
         this.rebirthSkillElements = new Map();
         this.missionElements = new Map();
+        this.gachaPoolElements = new Map();
         this.selectedEquipmentIds = new Set();
         this.filterSalvageable = false;
         this.pendingSalvageIds = [];
@@ -1221,6 +1337,7 @@ class GameUI {
         this.setupTabs();
         this.setupEvents();
         this.updateGachaHistoryVisibility();
+        this.renderGachaOverview();
         this.renderHeroes();
         this.renderEquipmentUI();
         this.renderMissionUI();
@@ -1347,6 +1464,78 @@ class GameUI {
         sorted.forEach((hero) => this.addHero(hero));
     }
 
+    renderGachaOverview() {
+        const heroes = this.state.heroes ?? [];
+        const totalWeight = heroes.reduce((acc, hero) => acc + hero.gachaWeight, 0);
+
+        if (UI.gachaRateList) {
+            UI.gachaRateList.innerHTML = '';
+            HERO_RARITIES.forEach((rarity) => {
+                const rarityHeroes = heroes.filter((hero) => hero.rarityId === rarity.id);
+                if (rarityHeroes.length === 0) return;
+                const rarityWeight = rarityHeroes.reduce((sum, hero) => sum + hero.gachaWeight, 0);
+                const rate = totalWeight > 0 ? rarityWeight / totalWeight : 0;
+                const item = document.createElement('li');
+                item.dataset.rarity = rarity.id;
+                const label = document.createElement('span');
+                label.className = 'gacha-rate__label';
+                const badge = document.createElement('span');
+                badge.className = 'rarity-badge';
+                badge.textContent = rarity.name;
+                label.appendChild(badge);
+
+                const count = document.createElement('span');
+                count.className = 'gacha-rate__count';
+                count.textContent = `${rarityHeroes.length}명`;
+
+                const value = document.createElement('span');
+                value.className = 'gacha-rate__value';
+                value.textContent = formatPercent(rate);
+
+                const tooltipRate = (rate * 100).toFixed(2);
+                item.title = `${rarity.description} · 등장률 ${tooltipRate}%`;
+
+                item.append(label, count, value);
+                UI.gachaRateList.appendChild(item);
+            });
+        }
+
+        if (UI.gachaPoolList) {
+            UI.gachaPoolList.innerHTML = '';
+            this.gachaPoolElements.clear();
+            heroes.forEach((hero) => {
+                const item = document.createElement('li');
+                item.dataset.heroId = hero.id;
+                item.dataset.rarity = hero.rarityId;
+                item.dataset.ownership = hero.isUnlocked ? 'owned' : 'unowned';
+
+                const name = document.createElement('span');
+                name.className = 'gacha-pool__name';
+                name.textContent = hero.name;
+
+                const rarityBadge = document.createElement('span');
+                rarityBadge.className = 'rarity-badge gacha-pool__rarity';
+                rarityBadge.textContent = hero.rarityName;
+
+                const rate = document.createElement('span');
+                rate.className = 'gacha-pool__rate';
+                const heroRate = totalWeight > 0 ? hero.gachaWeight / totalWeight : 0;
+                rate.textContent = formatPercent(heroRate);
+
+                const status = document.createElement('span');
+                status.className = 'gacha-pool__status';
+                status.textContent = hero.isUnlocked ? `보유 Lv. ${hero.level}` : '미보유';
+
+                item.title = `초회 Lv. ${hero.gachaInitialLevel} · 중복 +${hero.gachaDuplicateGain} 레벨`;
+                item.append(name, rarityBadge, rate, status);
+                UI.gachaPoolList.appendChild(item);
+                this.gachaPoolElements.set(hero.id, { item, status, rate });
+            });
+        } else {
+            this.gachaPoolElements.clear();
+        }
+    }
+
     addHero(hero) {
         const node = this.heroTemplate.content.firstElementChild.cloneNode(true);
         node.dataset.heroId = hero.id;
@@ -1356,10 +1545,18 @@ class GameUI {
         const dps = node.querySelector('.hero__dps');
         const statusState = node.querySelector('.hero__status-state');
         const statusDetail = node.querySelector('.hero__status-detail');
+        const rarity = node.querySelector('.hero__rarity');
+
+        if (rarity) {
+            rarity.classList.add('rarity-badge');
+            rarity.textContent = hero.rarityName;
+            rarity.title = hero.rarity?.description ?? '';
+        }
 
         name.textContent = hero.name;
         desc.textContent = hero.description;
-        this.heroElements.set(hero.id, { node, level, dps, statusState, statusDetail });
+        node.dataset.rarity = hero.rarityId;
+        this.heroElements.set(hero.id, { node, name, desc, level, dps, statusState, statusDetail, rarity });
         this.updateHero(hero);
 
         UI.heroList.appendChild(node);
@@ -1368,21 +1565,46 @@ class GameUI {
     updateHero(hero) {
         const heroUI = this.heroElements.get(hero.id);
         if (!heroUI) return;
+        heroUI.node.dataset.rarity = hero.rarityId;
+        if (heroUI.name) {
+            heroUI.name.textContent = hero.name;
+        }
+        if (heroUI.desc) {
+            heroUI.desc.textContent = hero.description;
+        }
+        if (heroUI.rarity) {
+            heroUI.rarity.textContent = hero.rarityName;
+            heroUI.rarity.title = hero.rarity?.description ?? '';
+        }
         heroUI.level.textContent = `Lv. ${hero.level}`;
         heroUI.dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
         heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
         if (hero.isUnlocked) {
             heroUI.statusState.textContent = '합류 완료';
-            heroUI.statusDetail.textContent =
-                hero.enhancementLevel > 0 ? `강화 +${hero.enhancementLevel}` : '강화 없음';
+            const extraLevels = hero.enhancementLevel;
+            if (extraLevels > 0) {
+                heroUI.statusDetail.textContent = `추가 성장 +${extraLevels} (Lv. ${hero.level})`;
+            } else {
+                heroUI.statusDetail.textContent = `초회 합류 Lv. ${hero.level}`;
+            }
         } else {
             heroUI.statusState.textContent = '미합류';
-            heroUI.statusDetail.textContent = '가챠로 학생을 모집하세요.';
+            heroUI.statusDetail.textContent = `${hero.rarityName} 학생을 가챠로 모집하세요.`;
         }
+        this.updateHeroGachaEntry(hero);
     }
 
     updateHeroes() {
         this.state.heroes.forEach((hero) => this.updateHero(hero));
+    }
+
+    updateHeroGachaEntry(hero) {
+        const entry = this.gachaPoolElements.get(hero.id);
+        if (!entry) return;
+        entry.item.dataset.ownership = hero.isUnlocked ? 'owned' : 'unowned';
+        if (entry.status) {
+            entry.status.textContent = hero.isUnlocked ? `보유 Lv. ${hero.level}` : '미보유';
+        }
     }
 
     renderEquipmentUI() {
@@ -2442,11 +2664,15 @@ class GameUI {
         }
         this.addGachaResults(result.results);
         result.results.forEach((entry) => {
+            const rarityLabel = `[${entry.hero.rarityName}]`;
             if (entry.isNew) {
-                this.addLog(`[가챠] ${entry.hero.name}이(가) 합류했습니다! Lv. ${entry.newLevel}`, 'success');
+                this.addLog(
+                    `[가챠] ${rarityLabel} ${entry.hero.name} 합류! Lv. ${entry.newLevel} (초회)`,
+                    'success',
+                );
             } else {
                 this.addLog(
-                    `[가챠] ${entry.hero.name} 강화 성공! Lv. ${entry.previousLevel} → ${entry.newLevel}`,
+                    `[가챠] ${rarityLabel} ${entry.hero.name} 강화! Lv. ${entry.previousLevel} → ${entry.newLevel} (+${entry.levelGain})`,
                     'info',
                 );
             }
@@ -2463,11 +2689,36 @@ class GameUI {
         entries.forEach((entry) => {
             const item = document.createElement('li');
             item.dataset.resultType = entry.isNew ? 'new' : 'duplicate';
+            item.dataset.rarity = entry.hero.rarityId;
+
+            const header = document.createElement('div');
+            header.className = 'gacha-result__header';
+
+            const rarity = document.createElement('span');
+            rarity.className = 'gacha-result__rarity rarity-badge';
+            rarity.textContent = entry.hero.rarityName;
+
+            const name = document.createElement('span');
+            name.className = 'gacha-result__name';
+            name.textContent = entry.hero.name;
+
+            const state = document.createElement('span');
+            state.className = 'gacha-result__state';
+            state.textContent = entry.isNew ? '신규 합류' : '강화 성공';
+
+            header.append(rarity, name, state);
+
+            const detail = document.createElement('span');
+            detail.className = 'gacha-result__detail';
             if (entry.isNew) {
-                item.textContent = `${entry.hero.name} 합류! Lv. ${entry.newLevel}`;
+                detail.textContent = `초회 획득 Lv. ${entry.newLevel}`;
+                item.title = `희귀도 ${entry.hero.rarityName} · 초회 Lv. ${entry.newLevel}`;
             } else {
-                item.textContent = `${entry.hero.name} 강화! Lv. ${entry.previousLevel} → ${entry.newLevel}`;
+                detail.textContent = `Lv. ${entry.previousLevel} → ${entry.newLevel} (+${entry.levelGain})`;
+                item.title = `희귀도 ${entry.hero.rarityName} · 중복 +${entry.levelGain} 레벨`;
             }
+
+            item.append(header, detail);
             UI.gachaResults.prepend(item);
         });
         const maxEntries = 12;

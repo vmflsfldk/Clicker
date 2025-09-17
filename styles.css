@@ -11,6 +11,11 @@
     --hero-card: rgba(30, 41, 59, 0.9);
     --shadow: 0 15px 45px rgba(15, 23, 42, 0.45);
     --font-sans: 'Do Hyeon', sans-serif;
+    --rarity-common: #94a3b8;
+    --rarity-uncommon: #22d3ee;
+    --rarity-rare: #a855f7;
+    --rarity-unique: #f97316;
+    --rarity-legendary: #facc15;
 }
 
 * {
@@ -643,6 +648,86 @@ h1,
     color: rgba(148, 197, 255, 0.85);
 }
 
+.gacha-panel__rates,
+.gacha-panel__pool {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 14px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.gacha-panel__rates-title,
+.gacha-panel__pool-title {
+    font-size: 1rem;
+}
+
+.gacha-rate-list,
+.gacha-pool-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.gacha-rate-list li,
+.gacha-pool-list li {
+    background: rgba(148, 163, 184, 0.12);
+    border-radius: 12px;
+    padding: 0.55rem 0.7rem;
+    display: grid;
+    gap: 0.35rem;
+    border-left: 3px solid rgba(148, 163, 184, 0.4);
+}
+
+.gacha-rate-list li {
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+}
+
+.gacha-rate__label {
+    font-size: 0.95rem;
+}
+
+.gacha-rate__value,
+.gacha-rate__count {
+    font-size: 0.85rem;
+    color: rgba(224, 242, 254, 0.85);
+}
+
+.gacha-rate__count {
+    text-align: right;
+}
+
+.gacha-pool-list li {
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.25rem;
+}
+
+.gacha-pool__name {
+    font-size: 0.95rem;
+}
+
+.gacha-pool__rarity {
+    font-size: 0.8rem;
+    justify-self: start;
+}
+
+.gacha-pool__rate {
+    font-size: 0.85rem;
+    color: rgba(224, 242, 254, 0.85);
+    justify-self: end;
+}
+
+.gacha-pool__status {
+    grid-column: 1 / -1;
+    font-size: 0.8rem;
+    color: rgba(148, 163, 184, 0.9);
+}
+
 .gacha-results {
     list-style: none;
     display: flex;
@@ -655,24 +740,53 @@ h1,
 .gacha-results li {
     background: rgba(148, 163, 184, 0.12);
     border-radius: 14px;
-    padding: 0.55rem 0.75rem;
+    padding: 0.6rem 0.75rem;
     font-size: 0.9rem;
     color: #e2e8f0;
     border-left: 3px solid rgba(148, 163, 184, 0.35);
+    display: grid;
+    gap: 0.3rem;
 }
 
-.gacha-results li[data-result-type='new'] {
-    border-left-color: rgba(52, 211, 153, 0.75);
+.gacha-result__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
 }
 
-.gacha-results li[data-result-type='duplicate'] {
-    border-left-color: rgba(96, 165, 250, 0.75);
+.gacha-result__rarity {
+    font-size: 0.8rem;
+}
+
+.gacha-result__state {
+    font-size: 0.8rem;
+    color: rgba(224, 242, 254, 0.85);
+}
+
+.gacha-result__detail {
+    font-size: 0.85rem;
+    color: rgba(148, 163, 184, 0.9);
 }
 
 .gacha-results__empty {
     font-size: 0.85rem;
     color: var(--subtext-color);
     text-align: right;
+}
+
+.rarity-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: rgba(226, 232, 240, 0.95);
 }
 
 .hero {
@@ -698,6 +812,17 @@ h1,
 
 .hero[data-recruited='false'] .hero__meta {
     color: rgba(148, 163, 184, 0.7);
+}
+
+.hero__header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.35rem;
+}
+
+.hero__rarity {
+    font-size: 0.8rem;
 }
 
 .hero__name {
@@ -737,6 +862,118 @@ h1,
 .hero__status-detail {
     font-size: 0.9rem;
     color: var(--subtext-color);
+}
+
+[data-rarity='common'] {
+    --rarity-color: var(--rarity-common);
+}
+
+[data-rarity='uncommon'] {
+    --rarity-color: var(--rarity-uncommon);
+}
+
+[data-rarity='rare'] {
+    --rarity-color: var(--rarity-rare);
+}
+
+[data-rarity='unique'] {
+    --rarity-color: var(--rarity-unique);
+}
+
+[data-rarity='legendary'] {
+    --rarity-color: var(--rarity-legendary);
+}
+
+.hero[data-rarity] .hero__name,
+.hero[data-rarity] .hero__rarity {
+    color: var(--rarity-color, #e2e8f0);
+}
+
+.hero[data-rarity='common'] {
+    border-color: rgba(148, 163, 184, 0.35);
+}
+
+.hero[data-rarity='uncommon'] {
+    border-color: rgba(34, 211, 238, 0.35);
+}
+
+.hero[data-rarity='rare'] {
+    border-color: rgba(168, 85, 247, 0.35);
+}
+
+.hero[data-rarity='unique'] {
+    border-color: rgba(249, 115, 22, 0.35);
+}
+
+.hero[data-rarity='legendary'] {
+    border-color: rgba(250, 204, 21, 0.45);
+}
+
+.gacha-rate-list li[data-rarity] .rarity-badge,
+.gacha-pool-list li[data-rarity] .rarity-badge,
+.gacha-result__rarity {
+    color: var(--rarity-color, #e2e8f0);
+}
+
+.gacha-rate-list li[data-rarity='common'],
+.gacha-pool-list li[data-rarity='common'] {
+    border-left-color: rgba(148, 163, 184, 0.45);
+}
+
+.gacha-rate-list li[data-rarity='uncommon'],
+.gacha-pool-list li[data-rarity='uncommon'] {
+    border-left-color: rgba(34, 211, 238, 0.45);
+}
+
+.gacha-rate-list li[data-rarity='rare'],
+.gacha-pool-list li[data-rarity='rare'] {
+    border-left-color: rgba(168, 85, 247, 0.45);
+}
+
+.gacha-rate-list li[data-rarity='unique'],
+.gacha-pool-list li[data-rarity='unique'] {
+    border-left-color: rgba(249, 115, 22, 0.45);
+}
+
+.gacha-rate-list li[data-rarity='legendary'],
+.gacha-pool-list li[data-rarity='legendary'] {
+    border-left-color: rgba(250, 204, 21, 0.55);
+}
+
+.gacha-pool-list li[data-ownership='owned'] .gacha-pool__status {
+    color: rgba(52, 211, 153, 0.85);
+}
+
+.gacha-pool-list li[data-ownership='unowned'] .gacha-pool__status {
+    color: rgba(148, 163, 184, 0.85);
+}
+
+.gacha-results li[data-rarity='common'] {
+    border-left-color: rgba(148, 163, 184, 0.45);
+}
+
+.gacha-results li[data-rarity='uncommon'] {
+    border-left-color: rgba(34, 211, 238, 0.45);
+}
+
+.gacha-results li[data-rarity='rare'] {
+    border-left-color: rgba(168, 85, 247, 0.45);
+}
+
+.gacha-results li[data-rarity='unique'] {
+    border-left-color: rgba(249, 115, 22, 0.45);
+}
+
+.gacha-results li[data-rarity='legendary'] {
+    border-left-color: rgba(250, 204, 21, 0.55);
+}
+
+.gacha-results li[data-result-type='new'] .gacha-result__detail {
+    color: rgba(52, 211, 153, 0.85);
+}
+
+.gacha-results li[data-result-type='duplicate'] .gacha-result__detail {
+    color: rgba(96, 165, 250, 0.85);
 }
 
 .equipment__summary {
