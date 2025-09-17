@@ -27,6 +27,15 @@ const HERO_TRAIT_MAP = HERO_TRAIT_GROUPS.reduce((acc, group) => {
 const HERO_RARITY_MAP = new Map(HERO_RARITIES.map((rarity) => [rarity.id, rarity]));
 const DEFAULT_HERO_RARITY_ID = 'common';
 
+const getHeroTraitGroup = (type) => (type ? HERO_TRAIT_GROUP_MAP.get(type) ?? null : null);
+
+const getHeroTraitDefinition = (type, traitId) => {
+    if (!type || !traitId) return null;
+    const map = HERO_TRAIT_MAP[type];
+    if (!map) return null;
+    return map.get(traitId) ?? null;
+};
+
 const EQUIPMENT_EFFECT_MAP = new Map(EQUIPMENT_EFFECTS.map((effect) => [effect.id, effect]));
 const EQUIPMENT_TYPE_MAP = new Map(EQUIPMENT_TYPES.map((type) => [type.id, type]));
 const EQUIPMENT_RARITY_MAP = new Map(EQUIPMENT_RARITIES.map((rarity) => [rarity.id, rarity]));
