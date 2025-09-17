@@ -90,6 +90,12 @@ const HERO_DPS_UPGRADE_CONFIG = {
     increasePerLevel: 0.08,
 };
 
+const GOLD_GAIN_UPGRADE_CONFIG = {
+    baseCost: 125,
+    costGrowth: 1.27,
+    increasePerLevel: 0.05,
+};
+
 const STAGE_REWARD_CONFIG = {
     base: 12,
     growth: 1.1,
@@ -643,6 +649,10 @@ export class GameState {
         this.heroDpsLevel = Number.isFinite(savedHeroTrainingLevel)
             ? Math.max(0, Math.floor(savedHeroTrainingLevel))
             : 0;
+        const savedGoldGainLevel = Number(saved?.goldGainLevel ?? 0);
+        this.goldGainLevel = Number.isFinite(savedGoldGainLevel)
+            ? Math.max(0, Math.floor(savedGoldGainLevel))
+            : 0;
         this.lastSave = saved?.lastSave ?? Date.now();
         this.frenzyCooldown = saved?.frenzyCooldown ?? 0;
         this.frenzyActiveUntil = saved?.frenzyActiveUntil ?? 0;
@@ -719,6 +729,10 @@ export class GameState {
         return this.heroDpsLevel * HERO_DPS_UPGRADE_CONFIG.increasePerLevel;
     }
 
+    get goldTrainingBonus() {
+        return this.goldGainLevel * GOLD_GAIN_UPGRADE_CONFIG.increasePerLevel;
+    }
+
     get heroBonus() {
         const equipment = this.getTotalEquipmentEffect('hero');
         const rebirth = this.getRebirthBonusValue('hero');
@@ -737,7 +751,7 @@ export class GameState {
         const equipment = this.getTotalEquipmentEffect('gold');
         const rebirth = this.getRebirthBonusValue('gold');
         const setBonus = this.getSetBonusEffect('gold');
-        return equipment + rebirth + setBonus;
+        return equipment + rebirth + this.goldTrainingBonus + setBonus;
     }
 
     get equipmentDropBonus() {
@@ -834,6 +848,7 @@ export class GameState {
         this.clickCritChanceLevel = 0;
         this.clickCritDamageLevel = 0;
         this.heroDpsLevel = 0;
+        this.goldGainLevel = 0;
         this.lastSave = Date.now();
         this.enemy.reset(1);
         this.clearBossTimer();
@@ -1055,6 +1070,49 @@ export class GameState {
         };
     }
 
+    getGoldGainUpgradeContext() {
+        const cost = calculateScalingUpgradeCost(this.goldGainLevel, GOLD_GAIN_UPGRADE_CONFIG);
+        const baseBonus = this.goldBonus - this.goldTrainingBonus;
+        const currentTraining = this.goldTrainingBonus;
+        const nextTraining = currentTraining + GOLD_GAIN_UPGRADE_CONFIG.increasePerLevel;
+        const currentTotal = baseBonus + currentTraining;
+        const nextTotal = baseBonus + nextTraining;
+        return {
+            cost,
+            currentTraining,
+            nextTraining,
+            currentTotal,
+            nextTotal,
+            currentMultiplier: 1 + currentTotal,
+            nextMultiplier: 1 + nextTotal,
+            gain: GOLD_GAIN_UPGRADE_CONFIG.increasePerLevel,
+            canUpgrade: true,
+        };
+    }
+
+    levelUpGoldGain() {
+        const cost = calculateScalingUpgradeCost(this.goldGainLevel, GOLD_GAIN_UPGRADE_CONFIG);
+        if (this.gold < cost) {
+            return { success: false, message: '골드가 부족합니다.' };
+        }
+        const baseBonus = this.goldBonus - this.goldTrainingBonus;
+        const previousTraining = this.goldTrainingBonus;
+        const previousTotal = baseBonus + previousTraining;
+        this.gold -= cost;
+        this.goldGainLevel += 1;
+        const newTraining = this.goldTrainingBonus;
+        const newTotal = baseBonus + newTraining;
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            cost,
+            previousTraining,
+            newTraining,
+            previousTotal,
+            newTotal,
+        };
+    }
+
     getHeroById(heroId) {
         return this.heroes.find((hero) => hero.id === heroId) ?? null;
     }
@@ -1231,6 +1289,7 @@ export class GameState {
         this.currentRunHighestStage = 0;
         this.rebirthPoints = 0;
         this.totalRebirths = 0;
+        this.goldGainLevel = 0;
         this.initializeRebirthSkills({});
         this.initializeMissions({});
     }
@@ -1243,6 +1302,7 @@ export class GameState {
             clickCritChanceLevel: this.clickCritChanceLevel,
             clickCritDamageLevel: this.clickCritDamageLevel,
             heroDpsLevel: this.heroDpsLevel,
+            goldGainLevel: this.goldGainLevel,
             lastSave: Date.now(),
             enemy: this.enemy.toJSON(),
             heroes: this.heroes.map((hero) => hero.toJSON()),
@@ -1819,6 +1879,7 @@ export {
     CLICK_CRIT_CHANCE_UPGRADE_CONFIG,
     CLICK_CRIT_DAMAGE_UPGRADE_CONFIG,
     HERO_DPS_UPGRADE_CONFIG,
+    GOLD_GAIN_UPGRADE_CONFIG,
     STAGE_REWARD_CONFIG,
     calculateClickUpgradeCost,
     calculateScalingUpgradeCost,

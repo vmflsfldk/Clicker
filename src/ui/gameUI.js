@@ -59,6 +59,8 @@ const UI = {
     upgradeCritDamageInfo: document.getElementById('critDamageUpgradeInfo'),
     upgradeHeroDps: document.getElementById('upgradeHeroDps'),
     upgradeHeroDpsInfo: document.getElementById('heroDpsUpgradeInfo'),
+    upgradeGoldGain: document.getElementById('upgradeGoldGain'),
+    upgradeGoldGainInfo: document.getElementById('goldGainUpgradeInfo'),
     log: document.getElementById('log'),
     sortHeroes: document.getElementById('sortHeroes'),
     stageProgressTrack: document.getElementById('stageProgressTrack'),
@@ -277,6 +279,9 @@ export class GameUI {
         }
         if (UI.upgradeHeroDps) {
             UI.upgradeHeroDps.addEventListener('click', () => this.handleHeroDpsUpgrade());
+        }
+        if (UI.upgradeGoldGain) {
+            UI.upgradeGoldGain.addEventListener('click', () => this.handleGoldGainUpgrade());
         }
         UI.sortHeroes.addEventListener('click', () => this.toggleHeroSort());
         if (UI.heroList) {
@@ -2062,6 +2067,20 @@ export class GameUI {
                 UI.upgradeHeroDpsInfo.textContent = infoParts.join(' · ');
             }
         }
+        if (UI.upgradeGoldGain) {
+            const context = this.state.getGoldGainUpgradeContext();
+            UI.upgradeGoldGain.textContent = `자금 운용 훈련 (${formatNumber(context.cost)} 골드)`;
+            if (UI.upgradeGoldGainInfo) {
+                const infoParts = [];
+                infoParts.push(
+                    `훈련 보너스 ${formatPercent(context.currentTraining)} → ${formatPercent(context.nextTraining)}`,
+                );
+                infoParts.push(
+                    `총 배율 ${context.currentMultiplier.toFixed(2)}배 → ${context.nextMultiplier.toFixed(2)}배`,
+                );
+                UI.upgradeGoldGainInfo.textContent = infoParts.join(' · ');
+            }
+        }
         this.updateEquipmentSummary();
         this.updateRebirthUI();
     }
@@ -2288,6 +2307,31 @@ export class GameUI {
         const newText = formatPercent(this.state.heroTrainingBonus);
         this.addLog(
             `지원 화력 지휘 과정 레벨이 ${this.state.heroDpsLevel}이 되었습니다! (보너스 ${previousText} → ${newText})`,
+            'success',
+        );
+        this.updateStats();
+    }
+
+    handleGoldGainUpgrade() {
+        const context = this.state.getGoldGainUpgradeContext();
+        const result = this.state.levelUpGoldGain();
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const previousTrainingText = formatPercent(result.previousTraining);
+        const newTrainingText = formatPercent(result.newTraining);
+        const previousMultiplierText = `${(1 + result.previousTotal).toFixed(2)}배`;
+        const newMultiplierText = `${(1 + result.newTotal).toFixed(2)}배`;
+        const detailParts = [
+            `훈련 보너스 ${previousTrainingText} → ${newTrainingText}`,
+            `총 배율 ${previousMultiplierText} → ${newMultiplierText}`,
+        ];
+        if (context.gain > 0) {
+            detailParts.push(`증가량 +${formatPercent(context.gain)}`);
+        }
+        this.addLog(
+            `자금 운용 훈련 레벨이 ${this.state.goldGainLevel}이 되었습니다! (${detailParts.join(' · ')})`,
             'success',
         );
         this.updateStats();
