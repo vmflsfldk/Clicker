@@ -167,10 +167,22 @@ export class GameUI {
                 : null;
         this.setupTabs();
         this.setupEvents();
+        this.removeMobileViewportListener = null;
         if (this.mobileViewport) {
-            this.mobileViewport.addEventListener('change', () => {
+            const viewportListener = () => {
                 this.handleViewportChange();
-            });
+            };
+            if (typeof this.mobileViewport.addEventListener === 'function') {
+                this.mobileViewport.addEventListener('change', viewportListener);
+                this.removeMobileViewportListener = () => {
+                    this.mobileViewport?.removeEventListener('change', viewportListener);
+                };
+            } else if (typeof this.mobileViewport.addListener === 'function') {
+                this.mobileViewport.addListener(viewportListener);
+                this.removeMobileViewportListener = () => {
+                    this.mobileViewport?.removeListener(viewportListener);
+                };
+            }
             this.handleViewportChange();
         } else {
             this.handleViewportChange();
