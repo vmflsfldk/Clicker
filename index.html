@@ -63,6 +63,14 @@
                             <span id="totalDps" class="stat__value">0</span>
                         </div>
                         <div class="stat">
+                            <span class="stat__label">학생 치명타 확률</span>
+                            <span id="heroCritChance" class="stat__value">0%</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat__label">학생 치명타 배율</span>
+                            <span id="heroCritMultiplier" class="stat__value">0배</span>
+                        </div>
+                        <div class="stat">
                             <span class="stat__label">치명타 확률</span>
                             <span id="critChance" class="stat__value">0%</span>
                         </div>
@@ -214,6 +222,22 @@
                                 </div>
                                 <button id="upgradeCritDamage" class="btn btn-upgrade">탄두 연구 (75 골드)</button>
                                 <p id="critDamageUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
+                            </div>
+                            <div class="upgrade">
+                                <div>
+                                    <h3>학생 정밀 사격 훈련</h3>
+                                    <p>지원 학생들의 치명타 확률을 향상시킵니다.</p>
+                                </div>
+                                <button id="upgradeHeroCritChance" class="btn btn-upgrade">학생 치명타 교정 (150 골드)</button>
+                                <p id="heroCritChanceUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
+                            </div>
+                            <div class="upgrade">
+                                <div>
+                                    <h3>학생 탄두 개량 연구</h3>
+                                    <p>학생 치명타 발생 시 피해 배율을 높입니다.</p>
+                                </div>
+                                <button id="upgradeHeroCritDamage" class="btn btn-upgrade">학생 탄두 개량 (200 골드)</button>
+                                <p id="heroCritDamageUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
                             </div>
                             <div class="upgrade">
                                 <div>
