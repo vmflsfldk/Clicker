@@ -119,6 +119,28 @@ const HERO_SKIN_LIBRARY = {
             shadowColor: 'rgba(125, 211, 252, 0.35)',
         },
     ],
+    yuuka: [
+        {
+            id: 'standard',
+            name: '생도 회계복',
+            description: '밀레니엄 재무국의 단정한 제복으로 꼼꼼함이 느껴집니다.',
+            requiredLevel: 1,
+            theme: 'yuuka-standard',
+            preview: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 50%, #0f172a 100%)',
+            accentColor: '#60a5fa',
+            shadowColor: 'rgba(96, 165, 250, 0.35)',
+        },
+        {
+            id: 'resort',
+            name: '리조트 체크인',
+            description: '휴양지에서도 예산을 챙기는 유우카의 세련된 휴가 복장입니다.',
+            requiredLevel: 40,
+            theme: 'yuuka-resort',
+            preview: 'linear-gradient(135deg, #f472b6 0%, #fb7185 45%, #0f172a 100%)',
+            accentColor: '#f472b6',
+            shadowColor: 'rgba(244, 114, 182, 0.35)',
+        },
+    ],
 };
 
 const HERO_TRAIT_GROUPS = [
@@ -177,6 +199,13 @@ const HERO_TRAIT_GROUPS = [
                 shortName: '포격',
                 description: '장거리 지원을 담당하는 포격/중화기 사용 학생입니다.',
                 accentColor: '#facc15',
+            },
+            {
+                id: 'smg',
+                name: '기관단총',
+                shortName: 'SMG',
+                description: '근거리에서 기동력을 살린 기관단총 사용 학생입니다.',
+                accentColor: '#60a5fa',
             },
         ],
     },
@@ -352,6 +381,19 @@ const defaultHeroes = [
         school: 'millennium',
         weapon: 'artillery',
         position: 'special',
+    },
+    {
+        id: 'yuuka',
+        name: '유우카 - 밀레니엄 회계',
+        description: '밀레니엄 재무국의 회계 담당. 냉철한 판단으로 자원을 효율적으로 운용합니다.',
+        baseCost: 2300,
+        costMultiplier: 1.13,
+        baseDamage: 360,
+        rarity: 'unique',
+        skins: HERO_SKIN_LIBRARY.yuuka,
+        school: 'millennium',
+        weapon: 'smg',
+        position: 'striker',
     },
 ];
 
