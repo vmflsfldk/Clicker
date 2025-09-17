@@ -225,10 +225,84 @@ const HERO_RARITIES = [
 const HERO_RARITY_MAP = new Map(HERO_RARITIES.map((rarity) => [rarity.id, rarity]));
 const DEFAULT_HERO_RARITY_ID = 'common';
 
+const EQUIPMENT_EFFECTS = [
+    {
+        id: 'tap',
+        label: '클릭 데미지 증가',
+        shortLabel: '클릭 데미지',
+        description: '학생의 기본 전술 공격력을 강화합니다.',
+        format: 'percent',
+        maxValue: 0.6,
+        stageMultiplier: 1,
+    },
+    {
+        id: 'hero',
+        label: '지원 화력 증가',
+        shortLabel: '지원 화력',
+        description: '후방 지원 부대의 지속 화력을 끌어올립니다.',
+        format: 'percent',
+        maxValue: 0.6,
+        stageMultiplier: 1,
+    },
+    {
+        id: 'skill',
+        label: '전술 스킬 효과 증가',
+        shortLabel: '전술 스킬',
+        description: '샬레 전술 지원 호출의 효율을 강화합니다.',
+        format: 'percent',
+        maxValue: 0.6,
+        stageMultiplier: 1,
+    },
+    {
+        id: 'gold',
+        label: '골드 획득 증가',
+        shortLabel: '골드 획득',
+        description: '적 처치 시 획득하는 골드를 증가시킵니다.',
+        format: 'percent',
+        maxValue: 0.5,
+        stageMultiplier: 0.9,
+    },
+    {
+        id: 'critChance',
+        label: '클릭 치명타 확률 증가',
+        shortLabel: '치명타 확률',
+        description: '클릭 공격이 치명타로 적중할 확률을 높입니다.',
+        format: 'percent',
+        maxValue: 0.35,
+        stageMultiplier: 0.65,
+    },
+    {
+        id: 'critDamage',
+        label: '클릭 치명타 데미지 증가',
+        shortLabel: '치명타 피해',
+        description: '치명타 발생 시 피해량을 증가시킵니다.',
+        format: 'percent',
+        maxValue: 1,
+        stageMultiplier: 1.1,
+    },
+];
+
+const EQUIPMENT_EFFECT_MAP = new Map(EQUIPMENT_EFFECTS.map((effect) => [effect.id, effect]));
+
 const EQUIPMENT_TYPES = [
-    { id: 'tap', label: '전술 공격력', description: '학생의 기본 전투력을 강화합니다.' },
-    { id: 'hero', label: '지원 화력', description: '후방 지원 부대의 지속 화력을 끌어올립니다.' },
-    { id: 'skill', label: '전술 스킬', description: '샬레 전술 지원 호출의 효율을 강화합니다.' },
+    {
+        id: 'tap',
+        label: '공격 보조 장비',
+        description: '클릭 데미지 관련 장비로 기본 전투력을 강화합니다.',
+        primaryEffect: 'tap',
+    },
+    {
+        id: 'hero',
+        label: '지원 장비',
+        description: '지원 부대의 화력을 끌어올리는 장비입니다.',
+        primaryEffect: 'hero',
+    },
+    {
+        id: 'skill',
+        label: '전술 장비',
+        description: '전술 스킬의 효율을 강화하는 장비입니다.',
+        primaryEffect: 'skill',
+    },
 ];
 
 const EQUIPMENT_BASE_NAMES = {
@@ -247,6 +321,7 @@ const EQUIPMENT_RARITIES = [
         valueRange: [0.02, 0.05],
         rank: 0,
         maxLevel: 3,
+        optionRange: [1, 1],
     },
     {
         id: 'uncommon',
@@ -257,6 +332,7 @@ const EQUIPMENT_RARITIES = [
         valueRange: [0.04, 0.07],
         rank: 1,
         maxLevel: 4,
+        optionRange: [1, 2],
     },
     {
         id: 'rare',
@@ -267,6 +343,7 @@ const EQUIPMENT_RARITIES = [
         valueRange: [0.07, 0.12],
         rank: 2,
         maxLevel: 5,
+        optionRange: [2, 3],
     },
     {
         id: 'unique',
@@ -277,6 +354,7 @@ const EQUIPMENT_RARITIES = [
         valueRange: [0.12, 0.18],
         rank: 3,
         maxLevel: 6,
+        optionRange: [3, 4],
     },
     {
         id: 'legendary',
@@ -287,17 +365,23 @@ const EQUIPMENT_RARITIES = [
         valueRange: [0.18, 0.26],
         rank: 4,
         maxLevel: 7,
+        optionRange: [4, 5],
     },
 ];
 
 const EQUIPMENT_MAX_VALUE = 0.6;
 const EQUIPMENT_UPGRADE_RATE = 0.2;
 
-const clampEquipmentValue = (value) => Math.min(EQUIPMENT_MAX_VALUE, Number(value.toFixed(3)));
-const calculateEquipmentValue = (baseValue, level = 1) => {
+const clampEquipmentValue = (value, effectId = null) => {
+    const effect = effectId ? EQUIPMENT_EFFECT_MAP.get(effectId) : null;
+    const cap = effect?.maxValue ?? EQUIPMENT_MAX_VALUE;
+    return Math.min(cap, Number(value.toFixed(3)));
+};
+
+const calculateEquipmentValue = (baseValue, level = 1, effectId = null) => {
     const normalizedLevel = Math.max(1, Math.floor(level));
     const multiplier = 1 + EQUIPMENT_UPGRADE_RATE * (normalizedLevel - 1);
-    return clampEquipmentValue(baseValue * multiplier);
+    return clampEquipmentValue(baseValue * multiplier, effectId);
 };
 
 const clampProbability = (value) => Math.min(1, Math.max(0, value));
@@ -457,6 +541,8 @@ const REBIRTH_EFFECT_LABELS = {
     hero: '지원 화력',
     skill: '전술 스킬',
     gold: '작전 보상',
+    critChance: '치명타 확률',
+    critDamage: '치명타 피해',
     equipmentDrop: '전술 장비 드롭',
     gachaDrop: '모집권 드롭',
     rebirthGain: '환생 포인트',
@@ -539,7 +625,28 @@ const REBIRTH_SKILL_MAP = new Map(REBIRTH_SKILLS.map((skill) => [skill.id, skill
 
 const formatPercent = (value) => `${(value * 100).toFixed(1)}%`;
 
+const formatSignedPercent = (value) => {
+    const normalized = Number.isFinite(value) ? value : 0;
+    const sign = normalized >= 0 ? '+' : '-';
+    return `${sign}${formatPercent(Math.abs(normalized))}`;
+};
+
+const describeEquipmentEffect = (effectId, value = 0) => {
+    const effect = EQUIPMENT_EFFECT_MAP.get(effectId);
+    if (!effect) return null;
+    const formattedValue = effect.format === 'percent' ? formatSignedPercent(value) : formatNumber(value);
+    const label = effect.shortLabel ?? effect.label;
+    return `${label} ${formattedValue}`;
+};
+
 const randomFromArray = (array) => array[Math.floor(Math.random() * array.length)];
+
+const randomInt = (min, max) => {
+    const normalizedMin = Math.max(0, Math.floor(Math.min(min, max)));
+    const normalizedMax = Math.max(0, Math.floor(Math.max(min, max)));
+    if (normalizedMax <= normalizedMin) return normalizedMin;
+    return normalizedMin + Math.floor(Math.random() * (normalizedMax - normalizedMin + 1));
+};
 
 const weightedRandom = (items, getWeight) => {
     if (!Array.isArray(items) || items.length === 0) return null;
@@ -595,10 +702,53 @@ const generateEquipmentName = (typeId) => {
 const generateEquipmentItem = (stage, isBoss) => {
     const rarity = chooseRarity(isBoss);
     const type = randomFromArray(EQUIPMENT_TYPES);
-    const [min, max] = rarity.valueRange;
+    const primaryEffect = EQUIPMENT_EFFECT_MAP.has(type.primaryEffect)
+        ? type.primaryEffect
+        : type.id;
     const stageBonus = 1 + Math.min(stage, 150) * 0.002;
-    const baseValue = clampEquipmentValue((min + Math.random() * (max - min)) * stageBonus);
-    const value = calculateEquipmentValue(baseValue, 1);
+    const optionRange = Array.isArray(rarity.optionRange) ? rarity.optionRange : [1, 1];
+    const optionCount = Math.max(
+        1,
+        Math.min(
+            EQUIPMENT_EFFECTS.length,
+            randomInt(optionRange[0], optionRange[1] ?? optionRange[0]),
+        ),
+    );
+    const selectedEffects = new Set([primaryEffect]);
+    const availableEffects = EQUIPMENT_EFFECTS.map((effect) => effect.id).filter(
+        (id) => id !== primaryEffect,
+    );
+    while (selectedEffects.size < optionCount && availableEffects.length > 0) {
+        const next = randomFromArray(availableEffects);
+        selectedEffects.add(next);
+        availableEffects.splice(availableEffects.indexOf(next), 1);
+    }
+
+    const effects = {};
+    const effectOrder = Array.from(selectedEffects);
+    for (const effectId of effectOrder) {
+        const effectData = EQUIPMENT_EFFECT_MAP.get(effectId);
+        if (!effectData) continue;
+        const rarityData = EQUIPMENT_RARITY_MAP.get(rarity.id);
+        const [min, max] = rarityData?.valueRange ?? [0.01, 0.02];
+        const multiplier = effectData.stageMultiplier ?? 1;
+        const base = clampEquipmentValue(
+            (min + Math.random() * Math.max(0, max - min)) * stageBonus * multiplier,
+            effectId,
+        );
+        effects[effectId] = {
+            baseValue: base,
+            value: calculateEquipmentValue(base, 1, effectId),
+        };
+    }
+    if (!effects[primaryEffect]) {
+        effects[primaryEffect] = {
+            baseValue: 0,
+            value: 0,
+        };
+    }
+    const baseValue = effects[primaryEffect]?.baseValue ?? 0;
+    const value = effects[primaryEffect]?.value ?? 0;
     return {
         id: `eq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         type: type.id,
@@ -610,6 +760,8 @@ const generateEquipmentItem = (stage, isBoss) => {
         name: generateEquipmentName(type.id),
         stage,
         locked: false,
+        effects,
+        effectOrder,
     };
 };
 
@@ -996,7 +1148,7 @@ class GameState {
     }
 
     get tapBonus() {
-        const equipment = this.getEquippedItem('tap')?.value ?? 0;
+        const equipment = this.getTotalEquipmentEffect('tap');
         return equipment + this.getRebirthBonusValue('tap');
     }
 
@@ -1005,17 +1157,18 @@ class GameState {
     }
 
     get heroBonus() {
-        const equipment = this.getEquippedItem('hero')?.value ?? 0;
+        const equipment = this.getTotalEquipmentEffect('hero');
         return equipment + this.getRebirthBonusValue('hero') + this.heroTrainingBonus;
     }
 
     get skillBonus() {
-        const equipment = this.getEquippedItem('skill')?.value ?? 0;
+        const equipment = this.getTotalEquipmentEffect('skill');
         return equipment + this.getRebirthBonusValue('skill');
     }
 
     get goldBonus() {
-        return this.getRebirthBonusValue('gold');
+        const equipment = this.getTotalEquipmentEffect('gold');
+        return equipment + this.getRebirthBonusValue('gold');
     }
 
     get equipmentDropBonus() {
@@ -1132,14 +1285,18 @@ class GameState {
     get clickCritChance() {
         const base = CLICK_CRIT_CHANCE_UPGRADE_CONFIG.baseChance;
         const bonus = this.clickCritChanceLevel * CLICK_CRIT_CHANCE_UPGRADE_CONFIG.increasePerLevel;
-        const total = base + bonus;
+        const equipment = this.getTotalEquipmentEffect('critChance');
+        const rebirth = this.getRebirthBonusValue('critChance');
+        const total = base + bonus + equipment + rebirth;
         return Math.min(CLICK_CRIT_CHANCE_UPGRADE_CONFIG.maxChance, total);
     }
 
     get clickCritMultiplier() {
         const base = CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.baseMultiplier;
         const bonus = this.clickCritDamageLevel * CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.increasePerLevel;
-        const total = base + bonus;
+        const equipment = this.getTotalEquipmentEffect('critDamage');
+        const rebirth = this.getRebirthBonusValue('critDamage');
+        const total = base + bonus + equipment + rebirth;
         return Math.min(CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.maxMultiplier, total);
     }
 
@@ -1648,15 +1805,76 @@ class GameState {
         if (!item) return null;
         const type = EQUIPMENT_TYPE_MAP.has(item.type) ? item.type : null;
         if (!type) return null;
+        const typeData = EQUIPMENT_TYPE_MAP.get(type);
+        const primaryEffect = EQUIPMENT_EFFECT_MAP.has(typeData?.primaryEffect)
+            ? typeData.primaryEffect
+            : type;
         const rarity = EQUIPMENT_RARITY_MAP.has(item.rarity) ? item.rarity : 'common';
         const rarityData = EQUIPMENT_RARITY_MAP.get(rarity);
-        const rawBaseValue = Number(item.baseValue ?? item.value ?? 0);
-        const baseValue = clampEquipmentValue(Math.max(0, Number.isFinite(rawBaseValue) ? rawBaseValue : 0));
         const rawMaxLevel = Number(item.maxLevel ?? rarityData?.maxLevel ?? 3);
         const maxLevel = Math.max(1, Math.floor(Number.isFinite(rawMaxLevel) ? rawMaxLevel : 1));
         const rawLevel = Number(item.level ?? 1);
         const level = Math.min(maxLevel, Math.max(1, Math.floor(Number.isFinite(rawLevel) ? rawLevel : 1)));
-        const value = calculateEquipmentValue(baseValue, level);
+
+        const normalizeEffectEntry = (effectId, effectEntry) => {
+            if (!EQUIPMENT_EFFECT_MAP.has(effectId)) return null;
+            const rawBase = Number(
+                effectEntry?.baseValue ?? effectEntry?.base ?? effectEntry?.value ?? effectEntry ?? 0,
+            );
+            const baseValue = clampEquipmentValue(
+                Math.max(0, Number.isFinite(rawBase) ? rawBase : 0),
+                effectId,
+            );
+            const value = calculateEquipmentValue(baseValue, level, effectId);
+            return { baseValue, value };
+        };
+
+        const normalizedEffects = {};
+        if (item.effects && typeof item.effects === 'object') {
+            Object.entries(item.effects).forEach(([effectId, effectEntry]) => {
+                const normalized = normalizeEffectEntry(effectId, effectEntry);
+                if (normalized) {
+                    normalizedEffects[effectId] = normalized;
+                }
+            });
+        }
+
+        if (!normalizedEffects[primaryEffect]) {
+            const rawBaseValue = Number(item.baseValue ?? item.value ?? 0);
+            const baseValue = clampEquipmentValue(
+                Math.max(0, Number.isFinite(rawBaseValue) ? rawBaseValue : 0),
+                primaryEffect,
+            );
+            normalizedEffects[primaryEffect] = {
+                baseValue,
+                value: calculateEquipmentValue(baseValue, level, primaryEffect),
+            };
+        } else {
+            const baseValue = normalizedEffects[primaryEffect].baseValue;
+            normalizedEffects[primaryEffect].value = calculateEquipmentValue(
+                baseValue,
+                level,
+                primaryEffect,
+            );
+        }
+
+        const effectOrderSource = Array.isArray(item.effectOrder)
+            ? item.effectOrder.filter((effectId) => normalizedEffects[effectId])
+            : [];
+        const effectOrder = [];
+        if (!effectOrderSource.includes(primaryEffect)) {
+            effectOrder.push(primaryEffect);
+        }
+        effectOrder.push(...effectOrderSource);
+        Object.keys(normalizedEffects).forEach((effectId) => {
+            if (!effectOrder.includes(effectId)) {
+                effectOrder.push(effectId);
+            }
+        });
+
+        const baseValue = normalizedEffects[primaryEffect]?.baseValue ?? 0;
+        const value = normalizedEffects[primaryEffect]?.value ?? 0;
+
         return {
             id: item.id ?? `eq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             type,
@@ -1668,6 +1886,8 @@ class GameState {
             name: item.name ?? generateEquipmentName(type),
             stage: Number(item.stage ?? 1) || 1,
             locked: Boolean(item.locked),
+            effects: normalizedEffects,
+            effectOrder,
         };
     }
 
@@ -1737,11 +1957,43 @@ class GameState {
         }
         const previousLevel = item.level;
         const previousValue = item.value;
-        if (!Number.isFinite(item.baseValue) || item.baseValue <= 0) {
-            item.baseValue = previousValue;
-        }
         item.level = Math.min(item.maxLevel, item.level + 1);
-        item.value = calculateEquipmentValue(item.baseValue, item.level);
+        if (!item.effects || typeof item.effects !== 'object') {
+            item.effects = {
+                [item.type]: {
+                    baseValue: Number.isFinite(item.baseValue) && item.baseValue > 0 ? item.baseValue : previousValue,
+                    value: previousValue,
+                },
+            };
+        }
+        const primaryEffect = item.type;
+        Object.entries(item.effects).forEach(([effectId, effect]) => {
+            const base = clampEquipmentValue(
+                Number.isFinite(effect.baseValue) && effect.baseValue > 0 ? effect.baseValue : previousValue,
+                effectId,
+            );
+            effect.baseValue = base;
+            effect.value = calculateEquipmentValue(base, item.level, effectId);
+        });
+        if (item.effects[primaryEffect]) {
+            item.baseValue = item.effects[primaryEffect].baseValue;
+            item.value = item.effects[primaryEffect].value;
+        } else {
+            const firstEffectId = Object.keys(item.effects)[0];
+            if (firstEffectId) {
+                item.baseValue = item.effects[firstEffectId].baseValue;
+                item.value = item.effects[firstEffectId].value;
+            }
+        }
+        if (!Array.isArray(item.effectOrder) || item.effectOrder.length === 0) {
+            const order = [primaryEffect];
+            Object.keys(item.effects).forEach((effectId) => {
+                if (!order.includes(effectId)) {
+                    order.push(effectId);
+                }
+            });
+            item.effectOrder = order;
+        }
 
         this.upgradeMaterials = Math.max(0, this.upgradeMaterials - materialCost);
         this.normalizeEquippedState();
@@ -1786,7 +2038,12 @@ class GameState {
         const materials = Math.max(1, Math.round(baseMaterials + levelBonus));
         const stage = Math.max(1, Number.isFinite(item.stage) ? Math.floor(item.stage) : 1);
         const baseGold = 20 + stage * 6;
-        const valueFactor = Math.max(1, (item.baseValue ?? item.value ?? 0) * 10 + 1);
+        const totalBase = Object.values(item.effects ?? {}).reduce(
+            (sum, effect) => sum + (Number(effect?.baseValue) || 0),
+            0,
+        );
+        const valueSource = totalBase > 0 ? totalBase : item.baseValue ?? item.value ?? 0;
+        const valueFactor = Math.max(1, valueSource * 10 + 1);
         const rarityMultiplier = 1 + rarityRank * 0.6;
         const gold = Math.max(15, Math.round(baseGold * rarityMultiplier * valueFactor));
         return { gold, materials };
@@ -1844,10 +2101,24 @@ class GameState {
     }
 
     getEquipmentBonuses() {
-        return EQUIPMENT_TYPES.reduce((acc, { id }) => {
-            acc[id] = this.getEquippedItem(id)?.value ?? 0;
+        const equippedItems = EQUIPMENT_TYPES.map(({ id }) => this.getEquippedItem(id)).filter(Boolean);
+        return EQUIPMENT_EFFECTS.reduce((acc, { id }) => {
+            acc[id] = equippedItems.reduce(
+                (total, item) => total + (item.effects?.[id]?.value ?? 0),
+                0,
+            );
             return acc;
         }, {});
+    }
+
+    getTotalEquipmentEffect(effectId) {
+        if (!EQUIPMENT_EFFECT_MAP.has(effectId)) return 0;
+        return EQUIPMENT_TYPES.reduce((total, { id }) => {
+            const item = this.getEquippedItem(id);
+            if (!item?.effects) return total;
+            const effectValue = Number(item.effects[effectId]?.value ?? 0);
+            return total + (Number.isFinite(effectValue) ? effectValue : 0);
+        }, 0);
     }
 
     getHeroEffectiveDps(hero) {
@@ -1960,6 +2231,9 @@ const UI = {
     equipmentTapBonus: document.getElementById('equipmentTapBonus'),
     equipmentHeroBonus: document.getElementById('equipmentHeroBonus'),
     equipmentSkillBonus: document.getElementById('equipmentSkillBonus'),
+    equipmentGoldBonus: document.getElementById('equipmentGoldBonus'),
+    equipmentCritChanceBonus: document.getElementById('equipmentCritChanceBonus'),
+    equipmentCritDamageBonus: document.getElementById('equipmentCritDamageBonus'),
     equipmentSlots: document.getElementById('equipmentSlots'),
     equipmentInventory: document.getElementById('equipmentInventory'),
     equipmentEmpty: document.getElementById('equipmentEmpty'),
@@ -2566,6 +2840,29 @@ class GameUI {
         this.updateEquipmentSummary();
     }
 
+    getEquipmentEffectDescriptions(item) {
+        if (!item?.effects) return [];
+        const order = Array.isArray(item.effectOrder) && item.effectOrder.length > 0
+            ? item.effectOrder
+            : Object.keys(item.effects);
+        return order
+            .map((effectId) => {
+                const effect = item.effects[effectId];
+                if (!effect) return null;
+                return describeEquipmentEffect(effectId, effect.value ?? 0);
+            })
+            .filter(Boolean);
+    }
+
+    getPrimaryEquipmentEffectValue(item) {
+        if (!item) return 0;
+        const primary = item.effects?.[item.type]?.value;
+        if (Number.isFinite(primary)) {
+            return primary;
+        }
+        return Number.isFinite(item.value) ? item.value : 0;
+    }
+
     renderRebirthUI() {
         if (!UI.rebirthSkillList) return;
         UI.rebirthSkillList.innerHTML = '';
@@ -2619,24 +2916,30 @@ class GameUI {
     updateEquipmentSummary() {
         const equipmentBonuses = this.state.getEquipmentBonuses();
         const rebirthBonuses = this.state.getRebirthBonusSummary();
-        const equipmentElements = {
-            tap: UI.equipmentTapBonus,
-            hero: UI.equipmentHeroBonus,
-            skill: UI.equipmentSkillBonus,
-        };
+        const summaryEffects = [
+            { id: 'tap', element: UI.equipmentTapBonus },
+            { id: 'hero', element: UI.equipmentHeroBonus },
+            { id: 'skill', element: UI.equipmentSkillBonus },
+            { id: 'gold', element: UI.equipmentGoldBonus },
+            { id: 'critChance', element: UI.equipmentCritChanceBonus },
+            { id: 'critDamage', element: UI.equipmentCritDamageBonus },
+        ];
 
-        const summaryData = EQUIPMENT_TYPES.map(({ id, label }) => {
+        const summaryData = summaryEffects.map(({ id, element }) => {
+            const effect = EQUIPMENT_EFFECT_MAP.get(id);
+            const label = effect?.shortLabel ?? effect?.label ?? id;
             const equipmentValue = equipmentBonuses[id] ?? 0;
             const rebirthValue = rebirthBonuses[id] ?? 0;
-            this.setBonusDisplay(equipmentElements[id], equipmentValue, rebirthValue);
-            return { label, equipmentValue, rebirthValue };
+            this.setBonusDisplay(element, equipmentValue, rebirthValue);
+            return { id, label, equipmentValue, rebirthValue };
         });
 
         if (UI.equipmentSummary) {
             const summaryText = summaryData
                 .map(({ label, equipmentValue, rebirthValue }) => {
                     const total = (equipmentValue ?? 0) + (rebirthValue ?? 0);
-                    return `${label} +${formatPercent(total)}`;
+                    if (total <= 0) return null;
+                    return `${label} ${formatSignedPercent(total)}`;
                 })
                 .filter(Boolean)
                 .join(' · ');
@@ -2660,7 +2963,7 @@ class GameUI {
     setBonusDisplay(element, equipmentValue = 0, rebirthValue = 0) {
         if (!element) return;
         const total = (equipmentValue ?? 0) + (rebirthValue ?? 0);
-        element.textContent = `+${formatPercent(total)}`;
+        element.textContent = formatSignedPercent(total);
         element.title = this.buildBonusBreakdown(equipmentValue, rebirthValue);
     }
 
@@ -2813,7 +3116,10 @@ class GameUI {
 
                 const value = document.createElement('span');
                 value.className = 'equipment-slot__value';
-                value.textContent = `+${formatPercent(item.value)}`;
+                const effects = this.getEquipmentEffectDescriptions(item);
+                const primaryValue = this.getPrimaryEquipmentEffectValue(item);
+                const fallback = describeEquipmentEffect(item.type, primaryValue) ?? formatSignedPercent(primaryValue);
+                value.textContent = effects.length > 0 ? effects.join(' · ') : fallback;
                 content.append(header, value);
             } else {
                 const empty = document.createElement('span');
@@ -2854,7 +3160,9 @@ class GameUI {
             const rarityA = EQUIPMENT_RARITY_MAP.get(a.rarity)?.rank ?? 0;
             const rarityB = EQUIPMENT_RARITY_MAP.get(b.rarity)?.rank ?? 0;
             if (rarityA !== rarityB) return rarityB - rarityA;
-            if (a.value !== b.value) return b.value - a.value;
+            const primaryA = a.effects?.[a.type]?.value ?? a.value ?? 0;
+            const primaryB = b.effects?.[b.type]?.value ?? b.value ?? 0;
+            if (primaryA !== primaryB) return primaryB - primaryA;
             return a.name.localeCompare(b.name, 'ko');
         });
 
@@ -2921,7 +3229,11 @@ class GameUI {
             const details = document.createElement('span');
             details.className = 'equipment-item__details';
             const typeLabel = type?.label ?? '전술 장비';
-            details.textContent = `${typeLabel} +${formatPercent(item.value)} · Lv. ${item.level}/${item.maxLevel} · 스테이지 ${item.stage}`;
+            const effects = this.getEquipmentEffectDescriptions(item);
+            const primary = item.effects?.[item.type]?.value ?? item.value ?? 0;
+            const fallbackEffect = describeEquipmentEffect(item.type, primary) ?? formatSignedPercent(primary);
+            const effectText = effects.length > 0 ? effects.join(' / ') : fallbackEffect;
+            details.textContent = `${typeLabel} · ${effectText} · Lv. ${item.level}/${item.maxLevel} · 스테이지 ${item.stage}`;
 
             const status = document.createElement('span');
             status.className = 'equipment-item__status';
@@ -3180,7 +3492,12 @@ class GameUI {
                 const type = EQUIPMENT_TYPE_MAP.get(item.type);
                 const reward = this.state.calculateSalvageReward(item);
                 const rarityLabel = rarity ? `[${rarity.name}] ` : '';
-                entry.textContent = `${rarityLabel}${item.name} · ${type?.label ?? '전술 장비'} +${formatPercent(item.value)} (재료 ${formatNumber(reward.materials)}개 / 골드 ${formatNumber(reward.gold)})`;
+                const effectSummary = this.getEquipmentEffectDescriptions(item);
+                const primaryValue = this.getPrimaryEquipmentEffectValue(item);
+                const typeLabel = type?.label ?? '전술 장비';
+                const fallbackOption = describeEquipmentEffect(item.type, primaryValue) ?? formatSignedPercent(primaryValue);
+                const optionText = effectSummary.length > 0 ? effectSummary.join(' / ') : fallbackOption;
+                entry.textContent = `${rarityLabel}${item.name} · ${typeLabel} · ${optionText} (재료 ${formatNumber(reward.materials)}개 / 골드 ${formatNumber(reward.gold)})`;
                 UI.salvageModalList.appendChild(entry);
             });
         }
@@ -3423,10 +3740,13 @@ class GameUI {
             const prefix = rarity ? `[${rarity.name}] ` : '';
             const label = type?.label ?? '전술 장비';
             const previousLevel = result.previousLevel;
-            const previousValueText = formatPercent(result.previousValue);
-            const newValueText = formatPercent(result.item.value);
+            const previousValueText = formatSignedPercent(result.previousValue);
+            const currentPrimary = this.getPrimaryEquipmentEffectValue(result.item);
+            const newValueText = formatSignedPercent(currentPrimary);
+            const effectDetails = this.getEquipmentEffectDescriptions(result.item);
+            const summaryText = effectDetails.length > 0 ? ` (옵션: ${effectDetails.join(' / ')})` : '';
             this.addLog(
-                `${prefix}${result.item.name} 강화 성공! Lv. ${previousLevel} → ${result.item.level}, ${label} ${previousValueText} → ${newValueText}`,
+                `${prefix}${result.item.name} 강화 성공! Lv. ${previousLevel} → ${result.item.level}, ${label} ${previousValueText} → ${newValueText}${summaryText}`,
                 'success',
             );
             if (result.materialsSpent > 0) {
@@ -3455,7 +3775,12 @@ class GameUI {
         const type = EQUIPMENT_TYPE_MAP.get(result.item.type);
         const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
         const prefix = rarity ? `[${rarity.name}] ` : '';
-        const bonusText = `${type?.label ?? '전술 장비'} +${formatPercent(result.item.value)} · Lv. ${result.item.level}/${result.item.maxLevel}`;
+        const typeLabel = type?.label ?? '전술 장비';
+        const effects = this.getEquipmentEffectDescriptions(result.item);
+        const primaryValue = this.getPrimaryEquipmentEffectValue(result.item);
+        const fallbackSummary = describeEquipmentEffect(result.item.type, primaryValue) ?? formatSignedPercent(primaryValue);
+        const effectSummary = effects.length > 0 ? effects.join(' / ') : fallbackSummary;
+        const bonusText = `${typeLabel} · ${effectSummary} · Lv. ${result.item.level}/${result.item.maxLevel}`;
         this.addLog(`${prefix}${result.item.name}을 장착했습니다. ${bonusText}`, 'success');
         if (result.previous && result.previous.id !== result.item.id) {
             const previousRarity = EQUIPMENT_RARITY_MAP.get(result.previous.rarity);
@@ -3543,7 +3868,12 @@ class GameUI {
         const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
         const type = EQUIPMENT_TYPE_MAP.get(item.type);
         const prefix = rarity ? `[${rarity.name}] ` : '';
-        const bonusText = `${type?.label ?? '전술 장비'} +${formatPercent(item.value)}`;
+        const typeLabel = type?.label ?? '전술 장비';
+        const effects = this.getEquipmentEffectDescriptions(item);
+        const primaryValue = this.getPrimaryEquipmentEffectValue(item);
+        const fallbackBonus = describeEquipmentEffect(item.type, primaryValue) ?? formatSignedPercent(primaryValue);
+        const bonusSummary = effects.length > 0 ? effects.join(' / ') : fallbackBonus;
+        const bonusText = `${typeLabel} · ${bonusSummary}`;
         const levelText = `Lv. ${item.level}/${item.maxLevel}`;
         const autoText = autoEquipped ? ' (자동 장착)' : '';
         const chanceDetail = this.buildChanceDetail('드롭 확률', baseChance, chance);
