@@ -2585,3 +2585,7 @@ export class GameUI {
         this.renderMissionUI();
         this.renderRebirthUI();
         this.updateUI();
+        this.addLog('진행 상황이 초기화되었습니다. 다시 시작해 볼까요?', 'warning');
+        saveGame(this.state);
+    }
+}
