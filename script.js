@@ -1428,13 +1428,7 @@ class GameState {
         if (item.level >= item.maxLevel) return false;
         const materialCost = this.getEquipmentUpgradeMaterialCost(item, item.level + 1);
         if (materialCost > this.upgradeMaterials) return false;
-        return this.inventory.some(
-            (entry) =>
-                entry.id !== item.id &&
-                entry.type === item.type &&
-                entry.rarity === item.rarity &&
-                !entry.locked,
-        );
+        return true;
     }
 
     upgradeEquipment(itemId) {
@@ -1455,26 +1449,6 @@ class GameState {
                 )}개`,
             };
         }
-        const candidates = [];
-        this.inventory.forEach((entry, entryIndex) => {
-            if (entry.id === item.id) return;
-            if (entry.type !== item.type || entry.rarity !== item.rarity) return;
-            if (entry.locked) return;
-            candidates.push({ entry, entryIndex });
-        });
-        if (candidates.length === 0) {
-            return { success: false, message: '강화에 사용할 동일한 전술 장비가 부족합니다.' };
-        }
-
-        const preferred = candidates.find(({ entry }) => this.equipped[item.type] !== entry.id);
-        const chosen = preferred ?? candidates[0];
-        const { entry: consumed, entryIndex } = chosen;
-        const wasEquipped = this.equipped[item.type] === consumed.id;
-        this.inventory.splice(entryIndex, 1);
-        if (wasEquipped) {
-            this.equipped[item.type] = null;
-        }
-
         const previousLevel = item.level;
         const previousValue = item.value;
         if (!Number.isFinite(item.baseValue) || item.baseValue <= 0) {
@@ -1493,8 +1467,6 @@ class GameState {
         return {
             success: true,
             item,
-            consumed,
-            consumedWasEquipped: wasEquipped,
             previousLevel,
             previousValue,
             materialsSpent: materialCost,
@@ -2436,27 +2408,15 @@ class GameUI {
             return {
                 cost: 0,
                 hasMaterials: false,
-                hasDuplicates: false,
-                duplicateCount: 0,
                 canUpgrade: false,
             };
         }
-        const duplicates = this.state.inventory.filter(
-            (other) =>
-                other.id !== item.id &&
-                other.type === item.type &&
-                other.rarity === item.rarity &&
-                !other.locked,
-        );
         const cost = this.state.getEquipmentUpgradeMaterialCost(item, item.level + 1);
-        const hasMaterials = this.state.upgradeMaterials >= cost && cost > 0;
-        const canUpgrade =
-            item.level < item.maxLevel && duplicates.length > 0 && (hasMaterials || cost === 0);
+        const hasMaterials = cost === 0 || this.state.upgradeMaterials >= cost;
+        const canUpgrade = item.level < item.maxLevel && hasMaterials;
         return {
             cost,
             hasMaterials,
-            hasDuplicates: duplicates.length > 0,
-            duplicateCount: duplicates.length,
             canUpgrade,
         };
     }
@@ -2587,9 +2547,7 @@ class GameUI {
                         : '강화';
                 upgradeButton.disabled = !upgradeAvailable;
                 if (!upgradeAvailable) {
-                    if (!upgradeContext.hasDuplicates) {
-                        upgradeButton.title = '동일 타입·등급의 전술 장비가 추가로 필요합니다.';
-                    } else if (!upgradeContext.hasMaterials && upgradeContext.cost > 0) {
+                    if (!upgradeContext.hasMaterials && upgradeContext.cost > 0) {
                         upgradeButton.title = `강화 재료가 부족합니다. 필요 ${formatNumber(
                             upgradeContext.cost,
                         )}개, 보유 ${formatNumber(this.state.upgradeMaterials)}개`;
@@ -2597,11 +2555,12 @@ class GameUI {
                         upgradeButton.title = '강화를 진행할 수 없습니다.';
                     }
                 } else {
-                    upgradeButton.title = `강화에 동일 타입·등급 전술 장비 1개와 강화 재료 ${formatNumber(
-                        upgradeContext.cost,
-                    )}개가 소모됩니다. (사용 가능한 장비 ${formatNumber(
-                        upgradeContext.duplicateCount,
-                    )}개 / 보유 재료 ${formatNumber(this.state.upgradeMaterials)}개)`;
+                    upgradeButton.title =
+                        upgradeContext.cost > 0
+                            ? `강화에 강화 재료 ${formatNumber(upgradeContext.cost)}개가 소모됩니다. (보유 재료 ${formatNumber(
+                                  this.state.upgradeMaterials,
+                              )}개)`
+                            : '강화 재료 없이 강화를 진행할 수 있습니다.';
                 }
             }
 
@@ -2699,9 +2658,7 @@ class GameUI {
                     context.cost > 0 ? `강화 (${formatNumber(context.cost)}개)` : '강화';
                 button.disabled = !context.canUpgrade;
                 if (!context.canUpgrade) {
-                    if (!context.hasDuplicates) {
-                        button.title = '동일 타입·등급의 전술 장비가 추가로 필요합니다.';
-                    } else if (!context.hasMaterials && context.cost > 0) {
+                    if (!context.hasMaterials && context.cost > 0) {
                         button.title = `강화 재료가 부족합니다. 필요 ${formatNumber(
                             context.cost,
                         )}개, 보유 ${formatNumber(this.state.upgradeMaterials)}개`;
@@ -2709,11 +2666,12 @@ class GameUI {
                         button.title = '강화를 진행할 수 없습니다.';
                     }
                 } else {
-                    button.title = `강화에 동일 타입·등급 전술 장비 1개와 강화 재료 ${formatNumber(
-                        context.cost,
-                    )}개가 소모됩니다. (사용 가능한 장비 ${formatNumber(
-                        context.duplicateCount,
-                    )}개 / 보유 재료 ${formatNumber(this.state.upgradeMaterials)}개)`;
+                    button.title =
+                        context.cost > 0
+                            ? `강화에 강화 재료 ${formatNumber(context.cost)}개가 소모됩니다. (보유 재료 ${formatNumber(
+                                  this.state.upgradeMaterials,
+                              )}개)`
+                            : '강화 재료 없이 강화를 진행할 수 있습니다.';
                 }
             });
         }
@@ -3046,18 +3004,6 @@ class GameUI {
                     `강화 재료 ${spentText}개를 사용했습니다. (보유 재료 ${remainingText}개)`,
                     'info',
                 );
-            }
-            if (result.consumed) {
-                this.selectedEquipmentIds.delete(result.consumed.id);
-                const consumedRarity = EQUIPMENT_RARITY_MAP.get(result.consumed.rarity);
-                const consumedPrefix = consumedRarity ? `[${consumedRarity.name}] ` : '';
-                this.addLog(
-                    `소모된 전술 장비: ${consumedPrefix}${result.consumed.name} (Lv. ${result.consumed.level}/${result.consumed.maxLevel})`,
-                    'info',
-                );
-            }
-            if (result.consumedWasEquipped) {
-                this.addLog('강화 재료로 사용된 전술 장비가 해제되었습니다.', 'warning');
             }
             this.renderEquipmentSlots();
             this.renderEquipmentInventory();
