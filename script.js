@@ -1794,6 +1794,7 @@ const UI = {
     salvageModalCancel: document.getElementById('salvageModalCancel'),
     panelTabButtons: document.querySelectorAll('[data-tab-target]'),
     panelViews: document.querySelectorAll('[data-tab]'),
+    mobilePanelSelect: document.getElementById('mobilePanelSelect'),
 };
 
 class GameUI {
@@ -1810,6 +1811,7 @@ class GameUI {
         this.sortState = state.sortOrder === 'dps' ? 'dps' : 'level';
         this.tabButtons = [];
         this.tabPanels = new Map();
+        this.mobilePanelSelect = UI.mobilePanelSelect ?? null;
         this.setupTabs();
         this.setupEvents();
         this.updateGachaHistoryVisibility();
@@ -1839,6 +1841,14 @@ class GameUI {
                 }
             });
         });
+        if (this.mobilePanelSelect) {
+            this.mobilePanelSelect.addEventListener('change', (event) => {
+                const target = event.target.value;
+                if (target) {
+                    this.activateTab(target);
+                }
+            });
+        }
         const initialButton = this.tabButtons.find((button) => button.classList.contains('is-active'));
         const initialTab = initialButton?.dataset.tabTarget ?? this.tabButtons[0]?.dataset.tabTarget;
         if (initialTab) {
@@ -1867,6 +1877,9 @@ class GameUI {
             }
         });
         this.activeTab = tabId;
+        if (this.mobilePanelSelect && this.mobilePanelSelect.value !== tabId) {
+            this.mobilePanelSelect.value = tabId;
+        }
     }
 
     setupEvents() {
