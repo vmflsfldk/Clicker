@@ -382,6 +382,28 @@ const CLICK_UPGRADE_CONFIG = {
     assumedClicksPerSecond: 4,
 };
 
+const CLICK_CRIT_CHANCE_UPGRADE_CONFIG = {
+    baseCost: 50,
+    costGrowth: 1.3,
+    baseChance: 0.05,
+    increasePerLevel: 0.02,
+    maxChance: 0.75,
+};
+
+const CLICK_CRIT_DAMAGE_UPGRADE_CONFIG = {
+    baseCost: 75,
+    costGrowth: 1.28,
+    baseMultiplier: 1.5,
+    increasePerLevel: 0.15,
+    maxMultiplier: 5,
+};
+
+const HERO_DPS_UPGRADE_CONFIG = {
+    baseCost: 100,
+    costGrowth: 1.25,
+    increasePerLevel: 0.08,
+};
+
 const STAGE_REWARD_CONFIG = {
     base: 12,
     growth: 1.1,
@@ -397,6 +419,11 @@ const calculateClickUpgradeCost = (level) => {
     const normalized = normalizeLevel(level);
     const exponent = Math.max(0, normalized - 1);
     return Math.ceil(CLICK_UPGRADE_CONFIG.baseCost * Math.pow(CLICK_UPGRADE_CONFIG.costGrowth, exponent));
+};
+
+const calculateScalingUpgradeCost = (level, config) => {
+    const normalized = Number.isFinite(level) ? Math.max(0, Math.floor(level)) : 0;
+    return Math.ceil(config.baseCost * Math.pow(config.costGrowth, normalized));
 };
 
 const calculateClickDamageAtLevel = (level) => {
@@ -891,6 +918,18 @@ class GameState {
         const savedClickLevel = Number(saved?.clickLevel ?? 1);
         this.clickLevel = Number.isFinite(savedClickLevel) ? Math.max(1, Math.floor(savedClickLevel)) : 1;
         this.clickDamage = calculateClickDamageAtLevel(this.clickLevel);
+        const savedCritChanceLevel = Number(saved?.clickCritChanceLevel ?? 0);
+        this.clickCritChanceLevel = Number.isFinite(savedCritChanceLevel)
+            ? Math.max(0, Math.floor(savedCritChanceLevel))
+            : 0;
+        const savedCritDamageLevel = Number(saved?.clickCritDamageLevel ?? 0);
+        this.clickCritDamageLevel = Number.isFinite(savedCritDamageLevel)
+            ? Math.max(0, Math.floor(savedCritDamageLevel))
+            : 0;
+        const savedHeroTrainingLevel = Number(saved?.heroDpsLevel ?? 0);
+        this.heroDpsLevel = Number.isFinite(savedHeroTrainingLevel)
+            ? Math.max(0, Math.floor(savedHeroTrainingLevel))
+            : 0;
         this.lastSave = saved?.lastSave ?? Date.now();
         this.frenzyCooldown = saved?.frenzyCooldown ?? 0;
         this.frenzyActiveUntil = saved?.frenzyActiveUntil ?? 0;
@@ -961,9 +1000,13 @@ class GameState {
         return equipment + this.getRebirthBonusValue('tap');
     }
 
+    get heroTrainingBonus() {
+        return this.heroDpsLevel * HERO_DPS_UPGRADE_CONFIG.increasePerLevel;
+    }
+
     get heroBonus() {
         const equipment = this.getEquippedItem('hero')?.value ?? 0;
-        return equipment + this.getRebirthBonusValue('hero');
+        return equipment + this.getRebirthBonusValue('hero') + this.heroTrainingBonus;
     }
 
     get skillBonus() {
@@ -1062,6 +1105,9 @@ class GameState {
         this.gold = 0;
         this.clickLevel = 1;
         this.clickDamage = 1;
+        this.clickCritChanceLevel = 0;
+        this.clickCritDamageLevel = 0;
+        this.heroDpsLevel = 0;
         this.lastSave = Date.now();
         this.enemy.reset(1);
         this.clearBossTimer();
@@ -1083,10 +1129,34 @@ class GameState {
         return this.clickDamage * (1 + this.tapBonus);
     }
 
+    get clickCritChance() {
+        const base = CLICK_CRIT_CHANCE_UPGRADE_CONFIG.baseChance;
+        const bonus = this.clickCritChanceLevel * CLICK_CRIT_CHANCE_UPGRADE_CONFIG.increasePerLevel;
+        const total = base + bonus;
+        return Math.min(CLICK_CRIT_CHANCE_UPGRADE_CONFIG.maxChance, total);
+    }
+
+    get clickCritMultiplier() {
+        const base = CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.baseMultiplier;
+        const bonus = this.clickCritDamageLevel * CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.increasePerLevel;
+        const total = base + bonus;
+        return Math.min(CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.maxMultiplier, total);
+    }
+
+    get clickCritAverageMultiplier() {
+        return 1 + this.clickCritChance * (this.clickCritMultiplier - 1);
+    }
+
+    get expectedClickDamage() {
+        return this.effectiveClickDamage * this.clickCritAverageMultiplier;
+    }
+
     applyClick() {
-        const damage = this.effectiveClickDamage;
+        const baseDamage = this.effectiveClickDamage;
+        const isCritical = Math.random() < this.clickCritChance;
+        const damage = isCritical ? Math.ceil(baseDamage * this.clickCritMultiplier) : baseDamage;
         const defeated = this.enemy.applyDamage(damage);
-        return { damage, defeated };
+        return { damage, defeated, critical: isCritical };
     }
 
     awardGold(amount) {
@@ -1111,19 +1181,23 @@ class GameState {
                 Math.pow(CLICK_UPGRADE_CONFIG.damageGrowth, simulatedLevel),
         );
         const nextDamage = nextBaseDamage * (1 + this.tapBonus);
-        const damageGain = nextDamage - currentDamage;
+        const expectedCurrent = this.expectedClickDamage;
+        const expectedNext = nextDamage * this.clickCritAverageMultiplier;
+        const damageGain = expectedNext - expectedCurrent;
+        const baseDamageGain = nextDamage - currentDamage;
         const assumedClicks = CLICK_UPGRADE_CONFIG.assumedClicksPerSecond;
         const enemyHp = Math.max(1, Number(this.enemy.maxHp) || 1);
         const reward = this.enemyReward();
-        const goldPerSecondBefore = (currentDamage * assumedClicks * reward) / enemyHp;
-        const goldPerSecondAfter = (nextDamage * assumedClicks * reward) / enemyHp;
+        const goldPerSecondBefore = (expectedCurrent * assumedClicks * reward) / enemyHp;
+        const goldPerSecondAfter = (expectedNext * assumedClicks * reward) / enemyHp;
         const goldGainPerSecond = Math.max(0, goldPerSecondAfter - goldPerSecondBefore);
         const paybackSeconds = goldGainPerSecond > 0 ? cost / goldGainPerSecond : Infinity;
         return {
             cost,
-            currentDamage,
-            nextDamage,
+            currentDamage: expectedCurrent,
+            nextDamage: expectedNext,
             damageGain,
+            baseDamageGain,
             goldGainPerSecond,
             paybackSeconds,
             assumedClicks,
@@ -1146,6 +1220,107 @@ class GameState {
         this.clickDamage = nextDamage;
         this.lastSave = Date.now();
         return { success: true, cost };
+    }
+
+    getClickCritChanceUpgradeContext() {
+        const currentChance = this.clickCritChance;
+        const nextLevel = this.clickCritChanceLevel + 1;
+        const rawNextChance =
+            CLICK_CRIT_CHANCE_UPGRADE_CONFIG.baseChance +
+            nextLevel * CLICK_CRIT_CHANCE_UPGRADE_CONFIG.increasePerLevel;
+        const nextChance = Math.min(CLICK_CRIT_CHANCE_UPGRADE_CONFIG.maxChance, rawNextChance);
+        const gain = Math.max(0, nextChance - currentChance);
+        const canUpgrade = gain > 0;
+        const cost = canUpgrade
+            ? calculateScalingUpgradeCost(this.clickCritChanceLevel, CLICK_CRIT_CHANCE_UPGRADE_CONFIG)
+            : 0;
+        return { cost, currentChance, nextChance, gain, canUpgrade };
+    }
+
+    levelUpClickCritChance() {
+        const context = this.getClickCritChanceUpgradeContext();
+        if (!context.canUpgrade) {
+            return { success: false, message: '치명타 확률이 이미 최대입니다.' };
+        }
+        if (this.gold < context.cost) {
+            return { success: false, message: '골드가 부족합니다.' };
+        }
+        this.gold -= context.cost;
+        this.clickCritChanceLevel += 1;
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            cost: context.cost,
+            previousChance: context.currentChance,
+            newChance: this.clickCritChance,
+        };
+    }
+
+    getClickCritDamageUpgradeContext() {
+        const currentMultiplier = this.clickCritMultiplier;
+        const nextLevel = this.clickCritDamageLevel + 1;
+        const rawNextMultiplier =
+            CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.baseMultiplier +
+            nextLevel * CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.increasePerLevel;
+        const nextMultiplier = Math.min(CLICK_CRIT_DAMAGE_UPGRADE_CONFIG.maxMultiplier, rawNextMultiplier);
+        const gain = Math.max(0, nextMultiplier - currentMultiplier);
+        const canUpgrade = gain > 0;
+        const cost = canUpgrade
+            ? calculateScalingUpgradeCost(this.clickCritDamageLevel, CLICK_CRIT_DAMAGE_UPGRADE_CONFIG)
+            : 0;
+        return { cost, currentMultiplier, nextMultiplier, gain, canUpgrade };
+    }
+
+    levelUpClickCritDamage() {
+        const context = this.getClickCritDamageUpgradeContext();
+        if (!context.canUpgrade) {
+            return { success: false, message: '치명타 피해 배율이 이미 최대입니다.' };
+        }
+        if (this.gold < context.cost) {
+            return { success: false, message: '골드가 부족합니다.' };
+        }
+        this.gold -= context.cost;
+        this.clickCritDamageLevel += 1;
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            cost: context.cost,
+            previousMultiplier: context.currentMultiplier,
+            newMultiplier: this.clickCritMultiplier,
+        };
+    }
+
+    getHeroDpsUpgradeContext() {
+        const currentBonus = this.heroTrainingBonus;
+        const nextBonus = currentBonus + HERO_DPS_UPGRADE_CONFIG.increasePerLevel;
+        const currentMultiplier = 1 + currentBonus;
+        const nextMultiplier = 1 + nextBonus;
+        const cost = calculateScalingUpgradeCost(this.heroDpsLevel, HERO_DPS_UPGRADE_CONFIG);
+        return {
+            cost,
+            currentBonus,
+            nextBonus,
+            currentMultiplier,
+            nextMultiplier,
+            gain: HERO_DPS_UPGRADE_CONFIG.increasePerLevel,
+            canUpgrade: true,
+        };
+    }
+
+    levelUpHeroDps() {
+        const context = this.getHeroDpsUpgradeContext();
+        if (this.gold < context.cost) {
+            return { success: false, message: '골드가 부족합니다.' };
+        }
+        this.gold -= context.cost;
+        this.heroDpsLevel += 1;
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            cost: context.cost,
+            previousBonus: context.currentBonus,
+            newBonus: this.heroTrainingBonus,
+        };
     }
 
     getHeroById(heroId) {
@@ -1333,6 +1508,9 @@ class GameState {
             gold: this.gold,
             clickLevel: this.clickLevel,
             clickDamage: this.clickDamage,
+            clickCritChanceLevel: this.clickCritChanceLevel,
+            clickCritDamageLevel: this.clickCritDamageLevel,
+            heroDpsLevel: this.heroDpsLevel,
             lastSave: Date.now(),
             enemy: this.enemy.toJSON(),
             heroes: this.heroes.map((hero) => hero.toJSON()),
@@ -1734,6 +1912,8 @@ const UI = {
     gachaTokensHeader: document.getElementById('gachaTokensHeader'),
     clickDamage: document.getElementById('clickDamage'),
     totalDps: document.getElementById('totalDps'),
+    critChance: document.getElementById('critChance'),
+    critMultiplier: document.getElementById('critMultiplier'),
     enemyName: document.getElementById('enemyName'),
     enemyCurrentHp: document.getElementById('enemyCurrentHp'),
     enemyMaxHp: document.getElementById('enemyMaxHp'),
@@ -1754,6 +1934,12 @@ const UI = {
     gachaResultsEmpty: document.getElementById('gachaResultsEmpty'),
     upgradeClick: document.getElementById('upgradeClick'),
     upgradeClickInfo: document.getElementById('clickUpgradeInfo'),
+    upgradeCritChance: document.getElementById('upgradeCritChance'),
+    upgradeCritChanceInfo: document.getElementById('critChanceUpgradeInfo'),
+    upgradeCritDamage: document.getElementById('upgradeCritDamage'),
+    upgradeCritDamageInfo: document.getElementById('critDamageUpgradeInfo'),
+    upgradeHeroDps: document.getElementById('upgradeHeroDps'),
+    upgradeHeroDpsInfo: document.getElementById('heroDpsUpgradeInfo'),
     log: document.getElementById('log'),
     sortHeroes: document.getElementById('sortHeroes'),
     stageProgressTrack: document.getElementById('stageProgressTrack'),
@@ -1961,6 +2147,15 @@ class GameUI {
         UI.tapButton.addEventListener('click', () => this.handleTap());
         UI.enemy.addEventListener('click', () => this.handleTap());
         UI.upgradeClick.addEventListener('click', () => this.handleClickUpgrade());
+        if (UI.upgradeCritChance) {
+            UI.upgradeCritChance.addEventListener('click', () => this.handleClickCritChanceUpgrade());
+        }
+        if (UI.upgradeCritDamage) {
+            UI.upgradeCritDamage.addEventListener('click', () => this.handleClickCritDamageUpgrade());
+        }
+        if (UI.upgradeHeroDps) {
+            UI.upgradeHeroDps.addEventListener('click', () => this.handleHeroDpsUpgrade());
+        }
         UI.sortHeroes.addEventListener('click', () => this.toggleHeroSort());
         if (UI.heroList) {
             UI.heroList.addEventListener('click', (event) => this.handleHeroListClick(event));
@@ -3386,17 +3581,28 @@ class GameUI {
         if (UI.upgradeMaterials) {
             UI.upgradeMaterials.textContent = formatNumber(this.state.upgradeMaterials);
         }
-        UI.clickDamage.textContent = formatNumber(this.state.effectiveClickDamage);
+        if (UI.clickDamage) {
+            UI.clickDamage.textContent = formatNumber(this.state.expectedClickDamage);
+        }
         UI.totalDps.textContent = formatNumber(this.state.totalDps);
+        if (UI.critChance) {
+            UI.critChance.textContent = formatPercent(this.state.clickCritChance);
+        }
+        if (UI.critMultiplier) {
+            UI.critMultiplier.textContent = `${this.state.clickCritMultiplier.toFixed(2)}배`;
+        }
         if (UI.upgradeClick) {
             const context = this.state.getClickUpgradeContext();
             UI.upgradeClick.textContent = `전술 교육 (${formatNumber(context.cost)} 골드)`;
             if (UI.upgradeClickInfo) {
                 const infoParts = [];
                 if (context.damageGain > 0) {
-                    infoParts.push(`추가 피해 +${formatNumber(context.damageGain)}`);
+                    infoParts.push(`평균 피해 +${formatNumber(context.damageGain)}`);
                 } else {
-                    infoParts.push('추가 피해 없음');
+                    infoParts.push('평균 피해 증가 없음');
+                }
+                if (context.baseDamageGain > 0) {
+                    infoParts.push(`기본 피해 +${formatNumber(context.baseDamageGain)}`);
                 }
                 if (context.goldGainPerSecond > 0) {
                     infoParts.push(`골드/초 +${formatNumber(context.goldGainPerSecond)}`);
@@ -3409,6 +3615,65 @@ class GameUI {
                 }
                 infoParts.push(`기준 ${context.assumedClicks}회/초 클릭`);
                 UI.upgradeClickInfo.textContent = infoParts.join(' · ');
+            }
+        }
+        if (UI.upgradeCritChance) {
+            const context = this.state.getClickCritChanceUpgradeContext();
+            if (context.canUpgrade) {
+                UI.upgradeCritChance.textContent = `정밀 교정 (${formatNumber(context.cost)} 골드)`;
+                UI.upgradeCritChance.disabled = false;
+            } else {
+                UI.upgradeCritChance.textContent = '정밀 교정 (최대)';
+                UI.upgradeCritChance.disabled = true;
+            }
+            if (UI.upgradeCritChanceInfo) {
+                const infoParts = [];
+                infoParts.push(
+                    `현재 ${formatPercent(context.currentChance)} → 다음 ${formatPercent(context.nextChance)}`,
+                );
+                if (context.canUpgrade) {
+                    infoParts.push(`증가량 +${formatPercent(context.gain)}`);
+                } else {
+                    infoParts.push('이미 최대 강화');
+                }
+                UI.upgradeCritChanceInfo.textContent = infoParts.join(' · ');
+            }
+        }
+        if (UI.upgradeCritDamage) {
+            const context = this.state.getClickCritDamageUpgradeContext();
+            if (context.canUpgrade) {
+                UI.upgradeCritDamage.textContent = `탄두 연구 (${formatNumber(context.cost)} 골드)`;
+                UI.upgradeCritDamage.disabled = false;
+            } else {
+                UI.upgradeCritDamage.textContent = '탄두 연구 (최대)';
+                UI.upgradeCritDamage.disabled = true;
+            }
+            if (UI.upgradeCritDamageInfo) {
+                const infoParts = [];
+                infoParts.push(
+                    `현재 ${context.currentMultiplier.toFixed(2)}배 → 다음 ${context.nextMultiplier.toFixed(2)}배`,
+                );
+                if (context.canUpgrade) {
+                    infoParts.push(`증가량 +${context.gain.toFixed(2)}배`);
+                } else {
+                    infoParts.push('이미 최대 강화');
+                }
+                UI.upgradeCritDamageInfo.textContent = infoParts.join(' · ');
+            }
+        }
+        if (UI.upgradeHeroDps) {
+            const context = this.state.getHeroDpsUpgradeContext();
+            UI.upgradeHeroDps.textContent = `지휘 과정 (${formatNumber(context.cost)} 골드)`;
+            UI.upgradeHeroDps.disabled = false;
+            if (UI.upgradeHeroDpsInfo) {
+                const infoParts = [];
+                infoParts.push(
+                    `지원 보너스 ${formatPercent(context.currentBonus)} → ${formatPercent(context.nextBonus)}`,
+                );
+                infoParts.push(
+                    `총 배율 ${context.currentMultiplier.toFixed(2)}배 → ${context.nextMultiplier.toFixed(2)}배`,
+                );
+                UI.upgradeHeroDpsInfo.textContent = infoParts.join(' · ');
             }
         }
         this.updateEquipmentSummary();
@@ -3484,22 +3749,29 @@ class GameUI {
     }
 
     handleTap() {
-        const { damage, defeated } = this.state.applyClick();
-        this.showDamageIndicator(damage);
+        const { damage, defeated, critical } = this.state.applyClick();
+        this.showDamageIndicator(damage, critical);
         if (defeated) {
             this.handleEnemyDefeat();
         }
         this.updateUI();
     }
 
-    showDamageIndicator(damage) {
+    showDamageIndicator(damage, isCritical = false) {
         const indicator = UI.damageIndicator;
-        indicator.textContent = `-${formatNumber(damage)}`;
+        indicator.textContent = isCritical
+            ? `치명타! -${formatNumber(damage)}`
+            : `-${formatNumber(damage)}`;
+        indicator.classList.toggle('damage-indicator--crit', isCritical);
         indicator.style.opacity = '1';
-        indicator.style.transform = 'translate(-50%, -60%)';
+        const startTransform = isCritical ? 'translate(-50%, -60%) scale(1.1)' : 'translate(-50%, -60%)';
+        indicator.style.transform = startTransform;
         setTimeout(() => {
             indicator.style.opacity = '0';
-            indicator.style.transform = 'translate(-50%, -40%)';
+            const endTransform = isCritical
+                ? 'translate(-50%, -40%) scale(1.05)'
+                : 'translate(-50%, -40%)';
+            indicator.style.transform = endTransform;
         }, 180);
     }
 
@@ -3572,7 +3844,10 @@ class GameUI {
         }
         const detailParts = [];
         if (context.damageGain > 0) {
-            detailParts.push(`추가 피해 +${formatNumber(context.damageGain)}`);
+            detailParts.push(`평균 피해 +${formatNumber(context.damageGain)}`);
+        }
+        if (context.baseDamageGain > 0) {
+            detailParts.push(`기본 피해 +${formatNumber(context.baseDamageGain)}`);
         }
         if (context.goldGainPerSecond > 0) {
             const paybackText = this.formatPayback(context.paybackSeconds);
@@ -3582,6 +3857,51 @@ class GameUI {
         }
         const detailText = detailParts.length > 0 ? ` (${detailParts.join(' · ')})` : '';
         this.addLog(`전술 교육 프로그램 레벨이 ${this.state.clickLevel}이 되었습니다!${detailText}`, 'success');
+        this.updateStats();
+    }
+
+    handleClickCritChanceUpgrade() {
+        const result = this.state.levelUpClickCritChance();
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const previousText = formatPercent(result.previousChance);
+        const newText = formatPercent(result.newChance);
+        this.addLog(
+            `정밀 사격 교정 레벨이 ${this.state.clickCritChanceLevel}이 되었습니다! (치명타 확률 ${previousText} → ${newText})`,
+            'success',
+        );
+        this.updateStats();
+    }
+
+    handleClickCritDamageUpgrade() {
+        const result = this.state.levelUpClickCritDamage();
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const previousText = `${result.previousMultiplier.toFixed(2)}배`;
+        const newText = `${this.state.clickCritMultiplier.toFixed(2)}배`;
+        this.addLog(
+            `특수 탄두 연구 레벨이 ${this.state.clickCritDamageLevel}이 되었습니다! (치명타 배율 ${previousText} → ${newText})`,
+            'success',
+        );
+        this.updateStats();
+    }
+
+    handleHeroDpsUpgrade() {
+        const result = this.state.levelUpHeroDps();
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const previousText = formatPercent(result.previousBonus);
+        const newText = formatPercent(this.state.heroTrainingBonus);
+        this.addLog(
+            `지원 화력 지휘 과정 레벨이 ${this.state.heroDpsLevel}이 되었습니다! (보너스 ${previousText} → ${newText})`,
+            'success',
+        );
         this.updateStats();
     }
 
