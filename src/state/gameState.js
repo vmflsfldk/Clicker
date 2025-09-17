@@ -90,6 +90,28 @@ const HERO_DPS_UPGRADE_CONFIG = {
     increasePerLevel: 0.08,
 };
 
+const GOLD_GAIN_UPGRADE_CONFIG = {
+    baseCost: 125,
+    costGrowth: 1.27,
+    increasePerLevel: 0.05,
+};
+
+const HERO_CRIT_CHANCE_UPGRADE_CONFIG = {
+    baseCost: 150,
+    costGrowth: 1.3,
+    baseChance: 0.05,
+    increasePerLevel: 0.015,
+    maxChance: 0.5,
+};
+
+const HERO_CRIT_DAMAGE_UPGRADE_CONFIG = {
+    baseCost: 175,
+    costGrowth: 1.28,
+    baseMultiplier: 1.5,
+    increasePerLevel: 0.1,
+    maxMultiplier: 4,
+};
+
 const STAGE_REWARD_CONFIG = {
     base: 12,
     growth: 1.1,
@@ -643,6 +665,18 @@ export class GameState {
         this.heroDpsLevel = Number.isFinite(savedHeroTrainingLevel)
             ? Math.max(0, Math.floor(savedHeroTrainingLevel))
             : 0;
+        const savedGoldGainLevel = Number(saved?.goldGainLevel ?? 0);
+        this.goldGainLevel = Number.isFinite(savedGoldGainLevel)
+            ? Math.max(0, Math.floor(savedGoldGainLevel))
+            : 0;
+        const savedHeroCritChanceLevel = Number(saved?.heroCritChanceLevel ?? 0);
+        this.heroCritChanceLevel = Number.isFinite(savedHeroCritChanceLevel)
+            ? Math.max(0, Math.floor(savedHeroCritChanceLevel))
+            : 0;
+        const savedHeroCritDamageLevel = Number(saved?.heroCritDamageLevel ?? 0);
+        this.heroCritDamageLevel = Number.isFinite(savedHeroCritDamageLevel)
+            ? Math.max(0, Math.floor(savedHeroCritDamageLevel))
+            : 0;
         this.lastSave = saved?.lastSave ?? Date.now();
         this.frenzyCooldown = saved?.frenzyCooldown ?? 0;
         this.frenzyActiveUntil = saved?.frenzyActiveUntil ?? 0;
@@ -696,8 +730,9 @@ export class GameState {
     get totalDps() {
         const heroDps = this.heroes.reduce((total, hero) => total + hero.damagePerSecond, 0);
         const heroMultiplier = 1 + this.heroBonus;
+        const critMultiplier = this.heroCritAverageMultiplier;
         const frenzyMultiplier = this.isFrenzyActive ? this.frenzyMultiplier : 1;
-        return heroDps * heroMultiplier * frenzyMultiplier;
+        return heroDps * heroMultiplier * critMultiplier * frenzyMultiplier;
     }
 
     get isFrenzyActive() {
@@ -719,11 +754,49 @@ export class GameState {
         return this.heroDpsLevel * HERO_DPS_UPGRADE_CONFIG.increasePerLevel;
     }
 
+    get goldTrainingBonus() {
+        return this.goldGainLevel * GOLD_GAIN_UPGRADE_CONFIG.increasePerLevel;
+    }
+
+    get heroCritChanceTraining() {
+        return this.heroCritChanceLevel * HERO_CRIT_CHANCE_UPGRADE_CONFIG.increasePerLevel;
+    }
+
+    get heroCritDamageTraining() {
+        return this.heroCritDamageLevel * HERO_CRIT_DAMAGE_UPGRADE_CONFIG.increasePerLevel;
+    }
+
     get heroBonus() {
         const equipment = this.getTotalEquipmentEffect('hero');
         const rebirth = this.getRebirthBonusValue('hero');
         const setBonus = this.getSetBonusEffect('hero');
         return equipment + rebirth + this.heroTrainingBonus + setBonus;
+    }
+
+    get heroCritChance() {
+        const equipment = this.getTotalEquipmentEffect('heroCritChance');
+        const rebirth = this.getRebirthBonusValue('heroCritChance');
+        const setBonus = this.getSetBonusEffect('heroCritChance');
+        const base =
+            HERO_CRIT_CHANCE_UPGRADE_CONFIG.baseChance + equipment + rebirth + setBonus;
+        const total = base + this.heroCritChanceTraining;
+        const capped = Math.min(HERO_CRIT_CHANCE_UPGRADE_CONFIG.maxChance, total);
+        return clampProbability(capped);
+    }
+
+    get heroCritMultiplier() {
+        const equipment = this.getTotalEquipmentEffect('heroCritDamage');
+        const rebirth = this.getRebirthBonusValue('heroCritDamage');
+        const setBonus = this.getSetBonusEffect('heroCritDamage');
+        const base =
+            HERO_CRIT_DAMAGE_UPGRADE_CONFIG.baseMultiplier + equipment + rebirth + setBonus;
+        const total = base + this.heroCritDamageTraining;
+        const capped = Math.min(HERO_CRIT_DAMAGE_UPGRADE_CONFIG.maxMultiplier, total);
+        return Math.max(1, capped);
+    }
+
+    get heroCritAverageMultiplier() {
+        return 1 + this.heroCritChance * (this.heroCritMultiplier - 1);
     }
 
     get skillBonus() {
@@ -737,7 +810,7 @@ export class GameState {
         const equipment = this.getTotalEquipmentEffect('gold');
         const rebirth = this.getRebirthBonusValue('gold');
         const setBonus = this.getSetBonusEffect('gold');
-        return equipment + rebirth + setBonus;
+        return equipment + rebirth + this.goldTrainingBonus + setBonus;
     }
 
     get equipmentDropBonus() {
@@ -834,6 +907,9 @@ export class GameState {
         this.clickCritChanceLevel = 0;
         this.clickCritDamageLevel = 0;
         this.heroDpsLevel = 0;
+        this.heroCritChanceLevel = 0;
+        this.heroCritDamageLevel = 0;
+        this.goldGainLevel = 0;
         this.lastSave = Date.now();
         this.enemy.reset(1);
         this.clearBossTimer();
@@ -1055,6 +1131,163 @@ export class GameState {
         };
     }
 
+    getHeroCritChanceUpgradeContext() {
+        const base =
+            HERO_CRIT_CHANCE_UPGRADE_CONFIG.baseChance +
+            this.getTotalEquipmentEffect('heroCritChance') +
+            this.getRebirthBonusValue('heroCritChance') +
+            this.getSetBonusEffect('heroCritChance');
+        const currentTraining = this.heroCritChanceTraining;
+        const currentChance = Math.min(
+            HERO_CRIT_CHANCE_UPGRADE_CONFIG.maxChance,
+            clampProbability(base + currentTraining),
+        );
+        const nextTraining = currentTraining + HERO_CRIT_CHANCE_UPGRADE_CONFIG.increasePerLevel;
+        const nextChance = Math.min(
+            HERO_CRIT_CHANCE_UPGRADE_CONFIG.maxChance,
+            clampProbability(base + nextTraining),
+        );
+        const gain = Math.max(0, nextChance - currentChance);
+        const canUpgrade = gain > 0;
+        const cost = canUpgrade
+            ? calculateScalingUpgradeCost(this.heroCritChanceLevel, HERO_CRIT_CHANCE_UPGRADE_CONFIG)
+            : 0;
+        const currentAverageMultiplier = this.heroCritAverageMultiplier;
+        const nextAverageMultiplier = 1 + nextChance * (this.heroCritMultiplier - 1);
+        return {
+            cost,
+            currentChance,
+            nextChance,
+            gain,
+            currentTraining,
+            nextTraining,
+            currentAverageMultiplier,
+            nextAverageMultiplier,
+            canUpgrade,
+        };
+    }
+
+    levelUpHeroCritChance() {
+        const context = this.getHeroCritChanceUpgradeContext();
+        if (!context.canUpgrade) {
+            return { success: false, message: '학생 치명타 확률이 이미 최대입니다.' };
+        }
+        if (this.gold < context.cost) {
+            return { success: false, message: '골드가 부족합니다.' };
+        }
+        this.gold -= context.cost;
+        this.heroCritChanceLevel += 1;
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            cost: context.cost,
+            previousChance: context.currentChance,
+            newChance: this.heroCritChance,
+            previousAverage: context.currentAverageMultiplier,
+            newAverage: this.heroCritAverageMultiplier,
+        };
+    }
+
+    getHeroCritDamageUpgradeContext() {
+        const base =
+            HERO_CRIT_DAMAGE_UPGRADE_CONFIG.baseMultiplier +
+            this.getTotalEquipmentEffect('heroCritDamage') +
+            this.getRebirthBonusValue('heroCritDamage') +
+            this.getSetBonusEffect('heroCritDamage');
+        const currentTraining = this.heroCritDamageTraining;
+        const currentMultiplier = Math.min(
+            HERO_CRIT_DAMAGE_UPGRADE_CONFIG.maxMultiplier,
+            Math.max(1, base + currentTraining),
+        );
+        const nextTraining = currentTraining + HERO_CRIT_DAMAGE_UPGRADE_CONFIG.increasePerLevel;
+        const nextMultiplier = Math.min(
+            HERO_CRIT_DAMAGE_UPGRADE_CONFIG.maxMultiplier,
+            Math.max(1, base + nextTraining),
+        );
+        const gain = Math.max(0, nextMultiplier - currentMultiplier);
+        const canUpgrade = gain > 0;
+        const cost = canUpgrade
+            ? calculateScalingUpgradeCost(this.heroCritDamageLevel, HERO_CRIT_DAMAGE_UPGRADE_CONFIG)
+            : 0;
+        const currentAverageMultiplier = this.heroCritAverageMultiplier;
+        const nextAverageMultiplier = 1 + this.heroCritChance * (nextMultiplier - 1);
+        return {
+            cost,
+            currentMultiplier,
+            nextMultiplier,
+            gain,
+            currentTraining,
+            nextTraining,
+            currentAverageMultiplier,
+            nextAverageMultiplier,
+            canUpgrade,
+        };
+    }
+
+    levelUpHeroCritDamage() {
+        const context = this.getHeroCritDamageUpgradeContext();
+        if (!context.canUpgrade) {
+            return { success: false, message: '학생 치명타 배율이 이미 최대입니다.' };
+        }
+        if (this.gold < context.cost) {
+            return { success: false, message: '골드가 부족합니다.' };
+        }
+        this.gold -= context.cost;
+        this.heroCritDamageLevel += 1;
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            cost: context.cost,
+            previousMultiplier: context.currentMultiplier,
+            newMultiplier: this.heroCritMultiplier,
+            previousAverage: context.currentAverageMultiplier,
+            newAverage: this.heroCritAverageMultiplier,
+        };
+    }
+
+    getGoldGainUpgradeContext() {
+        const cost = calculateScalingUpgradeCost(this.goldGainLevel, GOLD_GAIN_UPGRADE_CONFIG);
+        const baseBonus = this.goldBonus - this.goldTrainingBonus;
+        const currentTraining = this.goldTrainingBonus;
+        const nextTraining = currentTraining + GOLD_GAIN_UPGRADE_CONFIG.increasePerLevel;
+        const currentTotal = baseBonus + currentTraining;
+        const nextTotal = baseBonus + nextTraining;
+        return {
+            cost,
+            currentTraining,
+            nextTraining,
+            currentTotal,
+            nextTotal,
+            currentMultiplier: 1 + currentTotal,
+            nextMultiplier: 1 + nextTotal,
+            gain: GOLD_GAIN_UPGRADE_CONFIG.increasePerLevel,
+            canUpgrade: true,
+        };
+    }
+
+    levelUpGoldGain() {
+        const cost = calculateScalingUpgradeCost(this.goldGainLevel, GOLD_GAIN_UPGRADE_CONFIG);
+        if (this.gold < cost) {
+            return { success: false, message: '골드가 부족합니다.' };
+        }
+        const baseBonus = this.goldBonus - this.goldTrainingBonus;
+        const previousTraining = this.goldTrainingBonus;
+        const previousTotal = baseBonus + previousTraining;
+        this.gold -= cost;
+        this.goldGainLevel += 1;
+        const newTraining = this.goldTrainingBonus;
+        const newTotal = baseBonus + newTraining;
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            cost,
+            previousTraining,
+            newTraining,
+            previousTotal,
+            newTotal,
+        };
+    }
+
     getHeroById(heroId) {
         return this.heroes.find((hero) => hero.id === heroId) ?? null;
     }
@@ -1231,6 +1464,9 @@ export class GameState {
         this.currentRunHighestStage = 0;
         this.rebirthPoints = 0;
         this.totalRebirths = 0;
+        this.goldGainLevel = 0;
+        this.heroCritChanceLevel = 0;
+        this.heroCritDamageLevel = 0;
         this.initializeRebirthSkills({});
         this.initializeMissions({});
     }
@@ -1243,6 +1479,9 @@ export class GameState {
             clickCritChanceLevel: this.clickCritChanceLevel,
             clickCritDamageLevel: this.clickCritDamageLevel,
             heroDpsLevel: this.heroDpsLevel,
+            heroCritChanceLevel: this.heroCritChanceLevel,
+            heroCritDamageLevel: this.heroCritDamageLevel,
+            goldGainLevel: this.goldGainLevel,
             lastSave: Date.now(),
             enemy: this.enemy.toJSON(),
             heroes: this.heroes.map((hero) => hero.toJSON()),
@@ -1742,7 +1981,7 @@ export class GameState {
     }
 
     getHeroEffectiveDps(hero) {
-        return hero.damagePerSecond * (1 + this.heroBonus);
+        return hero.damagePerSecond * (1 + this.heroBonus) * this.heroCritAverageMultiplier;
     }
 
     addEquipment(item) {
@@ -1819,6 +2058,7 @@ export {
     CLICK_CRIT_CHANCE_UPGRADE_CONFIG,
     CLICK_CRIT_DAMAGE_UPGRADE_CONFIG,
     HERO_DPS_UPGRADE_CONFIG,
+    GOLD_GAIN_UPGRADE_CONFIG,
     STAGE_REWARD_CONFIG,
     calculateClickUpgradeCost,
     calculateScalingUpgradeCost,
