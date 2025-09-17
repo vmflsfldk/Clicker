@@ -23,6 +23,10 @@
                     <span id="gold" class="stat__value">0</span>
                 </div>
                 <div class="stat">
+                    <span class="stat__label">강화 재료</span>
+                    <span id="upgradeMaterials" class="stat__value">0</span>
+                </div>
+                <div class="stat">
                     <span class="stat__label">모집권</span>
                     <span id="gachaTokensHeader" class="stat__value">0</span>
                 </div>
@@ -258,6 +262,40 @@
                             </div>
                             <div class="equipment__section">
                                 <h3 class="equipment__subheading">인벤토리</h3>
+                                <div class="equipment__controls">
+                                    <p id="equipmentSalvageHint" class="equipment__hint">
+                                        잠긴 전술 장비는 분해되지 않습니다. <strong>분해 가능한 장비만 보기</strong>
+                                        옵션이나 <strong>분해 가능 전체 선택</strong> 버튼으로 손쉽게 정리하세요.
+                                        <span
+                                            id="equipmentSelectionCount"
+                                            class="equipment__hint-count"
+                                            aria-live="polite"
+                                        >
+                                            현재 선택: 없음
+                                        </span>
+                                    </p>
+                                    <div class="equipment__control-bar">
+                                        <label class="equipment__filter">
+                                            <input type="checkbox" id="equipmentFilterSalvageable" />
+                                            분해 가능한 장비만 보기
+                                        </label>
+                                        <button
+                                            id="equipmentSelectSalvageable"
+                                            class="btn btn-secondary btn-small"
+                                            type="button"
+                                        >
+                                            분해 가능 전체 선택
+                                        </button>
+                                        <button
+                                            id="equipmentSalvageSelected"
+                                            class="btn btn-danger btn-small"
+                                            type="button"
+                                            disabled
+                                        >
+                                            선택 분해
+                                        </button>
+                                    </div>
+                                </div>
                                 <ul id="equipmentInventory" class="equipment-list"></ul>
                                 <p id="equipmentEmpty" class="equipment-empty">아직 확보한 전술 장비가 없습니다.</p>
                             </div>
@@ -310,6 +348,24 @@
             </div>
             <p class="game__footer-text">비영리 블루 아카이브 팬게임을 위한 브라우저 전술 시뮬레이터 데모입니다.</p>
         </footer>
+    </div>
+
+    <div id="salvageModal" class="modal" hidden>
+        <div id="salvageModalOverlay" class="modal__overlay">
+            <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="salvageModalTitle">
+                <h3 id="salvageModalTitle" class="modal__title">전술 장비 분해 확인</h3>
+                <p class="modal__description">선택한 전술 장비를 분해하면 다음 보상을 획득합니다.</p>
+                <ul id="salvageModalList" class="modal__list"></ul>
+                <div class="modal__summary">
+                    <span id="salvageModalCount">선택된 장비 0개</span>
+                    <span id="salvageModalRewards">강화 재료 0개 · 골드 0</span>
+                </div>
+                <div class="modal__actions">
+                    <button id="salvageModalCancel" class="btn btn-secondary btn-small" type="button">취소</button>
+                    <button id="salvageModalConfirm" class="btn btn-danger btn-small" type="button">분해 진행</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <template id="heroTemplate">
