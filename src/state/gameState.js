@@ -27,15 +27,6 @@ const HERO_TRAIT_MAP = HERO_TRAIT_GROUPS.reduce((acc, group) => {
 const HERO_RARITY_MAP = new Map(HERO_RARITIES.map((rarity) => [rarity.id, rarity]));
 const DEFAULT_HERO_RARITY_ID = 'common';
 
-const getHeroTraitGroup = (type) => (type ? HERO_TRAIT_GROUP_MAP.get(type) ?? null : null);
-
-const getHeroTraitDefinition = (type, traitId) => {
-    if (!type || !traitId) return null;
-    const map = HERO_TRAIT_MAP[type];
-    if (!map) return null;
-    return map.get(traitId) ?? null;
-};
-
 const EQUIPMENT_EFFECT_MAP = new Map(EQUIPMENT_EFFECTS.map((effect) => [effect.id, effect]));
 const EQUIPMENT_TYPE_MAP = new Map(EQUIPMENT_TYPES.map((type) => [type.id, type]));
 const EQUIPMENT_RARITY_MAP = new Map(EQUIPMENT_RARITIES.map((rarity) => [rarity.id, rarity]));
@@ -275,6 +266,18 @@ const generateEquipmentItem = (stage, isBoss) => {
 };
 
 export class Hero {
+    static getTraitGroup(type) {
+        if (!type) return null;
+        return HERO_TRAIT_GROUP_MAP.get(type) ?? null;
+    }
+
+    static getTraitDefinition(type, traitId) {
+        if (!type || !traitId) return null;
+        const map = HERO_TRAIT_MAP[type];
+        if (!map) return null;
+        return map.get(traitId) ?? null;
+    }
+
     constructor(
         { id, name, description, baseDamage, rarity, skins, school, weapon, position },
         savedState,
@@ -356,21 +359,21 @@ export class Hero {
     }
 
     get school() {
-        return getHeroTraitDefinition('school', this.schoolId);
+        return Hero.getTraitDefinition('school', this.schoolId);
     }
 
     get weapon() {
-        return getHeroTraitDefinition('weapon', this.weaponId);
+        return Hero.getTraitDefinition('weapon', this.weaponId);
     }
 
     get position() {
-        return getHeroTraitDefinition('position', this.positionId);
+        return Hero.getTraitDefinition('position', this.positionId);
     }
 
     get traitEntries() {
         return HERO_TRAIT_TYPES.map((type) => {
-            const trait = getHeroTraitDefinition(type, this.getTraitId(type));
-            const group = getHeroTraitGroup(type);
+            const trait = Hero.getTraitDefinition(type, this.getTraitId(type));
+            const group = Hero.getTraitGroup(type);
             if (!trait || !group) return null;
             return { type, trait, group };
         }).filter(Boolean);
