@@ -19,6 +19,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #38bdf8 0%, #1e293b 45%, #0f172a 100%)',
             accentColor: '#38bdf8',
             shadowColor: 'rgba(56, 189, 248, 0.35)',
+            image: 'assets/images/students/shiroko/standard.png',
         },
         {
             id: 'rider',
@@ -29,6 +30,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #f97316 0%, #fb923c 45%, #0f172a 100%)',
             accentColor: '#f97316',
             shadowColor: 'rgba(249, 115, 22, 0.35)',
+            image: 'assets/images/students/shiroko/rider.png',
         },
     ],
     hoshino: [
@@ -41,6 +43,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #f472b6 0%, #db2777 55%, #111827 100%)',
             accentColor: '#f472b6',
             shadowColor: 'rgba(244, 114, 182, 0.35)',
+            image: 'assets/images/students/hoshino/defense.png',
         },
         {
             id: 'beach',
@@ -51,6 +54,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 50%, #0f172a 100%)',
             accentColor: '#22d3ee',
             shadowColor: 'rgba(34, 211, 238, 0.35)',
+            image: 'assets/images/students/hoshino/beach.png',
         },
     ],
     aru: [
@@ -63,6 +67,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #a855f7 0%, #6d28d9 45%, #0f172a 100%)',
             accentColor: '#a855f7',
             shadowColor: 'rgba(168, 85, 247, 0.35)',
+            image: 'assets/images/students/aru/standard.png',
         },
         {
             id: 'festival',
@@ -73,6 +78,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #ef4444 0%, #f97316 50%, #0f172a 100%)',
             accentColor: '#ef4444',
             shadowColor: 'rgba(239, 68, 68, 0.35)',
+            image: 'assets/images/students/aru/festival.png',
         },
     ],
     hibiki: [
@@ -85,6 +91,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #c084fc 0%, #6366f1 50%, #111827 100%)',
             accentColor: '#c084fc',
             shadowColor: 'rgba(192, 132, 252, 0.35)',
+            image: 'assets/images/students/hibiki/artillery.png',
         },
         {
             id: 'engineer',
@@ -95,6 +102,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #4ade80 0%, #22c55e 45%, #0f172a 100%)',
             accentColor: '#4ade80',
             shadowColor: 'rgba(74, 222, 128, 0.35)',
+            image: 'assets/images/students/hibiki/engineer.png',
         },
     ],
     iroha: [
@@ -107,6 +115,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #facc15 0%, #f97316 45%, #0f172a 100%)',
             accentColor: '#facc15',
             shadowColor: 'rgba(250, 204, 21, 0.35)',
+            image: 'assets/images/students/iroha/commander.png',
         },
         {
             id: 'parade',
@@ -117,6 +126,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #7dd3fc 0%, #38bdf8 45%, #0f172a 100%)',
             accentColor: '#7dd3fc',
             shadowColor: 'rgba(125, 211, 252, 0.35)',
+            image: 'assets/images/students/iroha/parade.png',
         },
     ],
     yuuka: [
@@ -129,6 +139,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 50%, #0f172a 100%)',
             accentColor: '#60a5fa',
             shadowColor: 'rgba(96, 165, 250, 0.35)',
+            image: 'assets/images/students/yuuka/standard.png',
         },
         {
             id: 'resort',
@@ -139,6 +150,7 @@ const HERO_SKIN_LIBRARY = {
             preview: 'linear-gradient(135deg, #f472b6 0%, #fb7185 45%, #0f172a 100%)',
             accentColor: '#f472b6',
             shadowColor: 'rgba(244, 114, 182, 0.35)',
+            image: 'assets/images/students/yuuka/resort.png',
         },
     ],
 };
@@ -1140,6 +1152,7 @@ class Hero {
             accentColor: skin.accentColor,
             shadowColor: skin.shadowColor,
             preview: skin.preview,
+            image: skin.image ?? null,
         };
     }
 
@@ -1212,6 +1225,7 @@ class Hero {
                         : 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
                 accentColor: definition.accentColor ?? '#38bdf8',
                 shadowColor: definition.shadowColor ?? 'rgba(56, 189, 248, 0.25)',
+                image: typeof definition.image === 'string' ? definition.image : null,
                 unlocked: saved ? Boolean(saved.unlocked) : false,
             };
         });
@@ -1225,6 +1239,7 @@ class Hero {
                 preview: 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
                 accentColor: '#38bdf8',
                 shadowColor: 'rgba(56, 189, 248, 0.25)',
+                image: null,
                 unlocked: this.level > 0,
             });
         }
@@ -2930,6 +2945,7 @@ class GameUI {
         const rarity = node.querySelector('.hero__rarity');
         const traits = node.querySelector('.hero__traits');
         const skinPreview = node.querySelector('.hero__skin-preview');
+        const skinPreviewImage = node.querySelector('.hero__skin-preview-image');
         const skinList = node.querySelector('.hero__skin-list');
         const skinButtons = new Map();
 
@@ -2967,6 +2983,27 @@ class GameUI {
             });
         }
 
+        if (skinPreview && skinPreviewImage) {
+            skinPreviewImage.dataset.loadError = 'false';
+            skinPreviewImage.addEventListener('error', () => {
+                skinPreview.dataset.hasImage = 'false';
+                skinPreview.setAttribute('aria-hidden', 'true');
+                skinPreviewImage.dataset.loadError = 'true';
+                skinPreviewImage.dataset.failedSrc = skinPreviewImage.dataset.currentSrc ?? skinPreviewImage.src ?? '';
+                delete skinPreviewImage.dataset.currentSrc;
+                if (skinPreviewImage.hasAttribute('src')) {
+                    skinPreviewImage.removeAttribute('src');
+                }
+                skinPreviewImage.hidden = true;
+            });
+            skinPreviewImage.addEventListener('load', () => {
+                skinPreviewImage.dataset.loadError = 'false';
+                delete skinPreviewImage.dataset.failedSrc;
+                skinPreview.dataset.hasImage = 'true';
+                skinPreview.setAttribute('aria-hidden', 'false');
+            });
+        }
+
         this.heroElements.set(hero.id, {
             node,
             name,
@@ -2978,6 +3015,7 @@ class GameUI {
             rarity,
             traits,
             skinPreview,
+            skinPreviewImage,
             skinList,
             skinButtons,
         });
@@ -3084,9 +3122,18 @@ class GameUI {
         const heroUI = this.heroElements.get(hero.id);
         if (!heroUI) return;
         const activeSkin = hero.activeSkin;
+        const skinImageElement = heroUI.skinPreviewImage ?? null;
+        const imagePath = hero.isUnlocked && activeSkin?.image ? activeSkin.image : null;
+        const previousFailedSrc = skinImageElement?.dataset?.failedSrc ?? '';
+        const previouslyErrored = skinImageElement?.dataset?.loadError === 'true';
+        const canDisplayImage = Boolean(imagePath) && Boolean(skinImageElement)
+            && (!previouslyErrored || previousFailedSrc !== imagePath);
+
         if (heroUI.skinPreview) {
             if (hero.isUnlocked && activeSkin) {
                 heroUI.skinPreview.dataset.locked = 'false';
+                heroUI.skinPreview.dataset.hasImage = canDisplayImage ? 'true' : 'false';
+                heroUI.skinPreview.setAttribute('aria-hidden', canDisplayImage ? 'false' : 'true');
                 heroUI.skinPreview.style.background = activeSkin.preview ??
                     'linear-gradient(135deg, #334155 0%, #0f172a 100%)';
                 heroUI.skinPreview.style.borderColor = activeSkin.accentColor ?? 'rgba(148, 163, 184, 0.28)';
@@ -3099,10 +3146,36 @@ class GameUI {
                 heroUI.skinPreview.title = tooltip || `${hero.name} 스킨 프리뷰`;
             } else {
                 heroUI.skinPreview.dataset.locked = 'true';
+                heroUI.skinPreview.dataset.hasImage = 'false';
+                heroUI.skinPreview.setAttribute('aria-hidden', 'true');
                 heroUI.skinPreview.style.background = 'linear-gradient(135deg, #334155 0%, #0f172a 100%)';
                 heroUI.skinPreview.style.borderColor = 'rgba(148, 163, 184, 0.28)';
                 heroUI.skinPreview.style.boxShadow = 'none';
                 heroUI.skinPreview.title = '학생 모집 후 스킨을 확인할 수 있습니다.';
+            }
+        }
+        if (skinImageElement) {
+            if (canDisplayImage && imagePath) {
+                const currentSrc = skinImageElement.dataset.currentSrc ?? '';
+                if (currentSrc !== imagePath) {
+                    skinImageElement.dataset.currentSrc = imagePath;
+                    skinImageElement.src = imagePath;
+                }
+                skinImageElement.dataset.loadError = 'false';
+                delete skinImageElement.dataset.failedSrc;
+                skinImageElement.alt = `${hero.name} - ${activeSkin?.name ?? '스킨'}`;
+                skinImageElement.hidden = false;
+            } else {
+                delete skinImageElement.dataset.currentSrc;
+                if (skinImageElement.hasAttribute('src')) {
+                    skinImageElement.removeAttribute('src');
+                }
+                if (!imagePath) {
+                    delete skinImageElement.dataset.failedSrc;
+                    skinImageElement.dataset.loadError = 'false';
+                }
+                skinImageElement.alt = '';
+                skinImageElement.hidden = true;
             }
         }
         if (heroUI.node) {
