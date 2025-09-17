@@ -1788,6 +1788,7 @@ export {
     HERO_TRAIT_GROUP_MAP,
     HERO_TRAIT_MAP,
     HERO_RARITY_MAP,
+    HERO_RARITIES,
     DEFAULT_HERO_RARITY_ID,
     EQUIPMENT_EFFECT_MAP,
     EQUIPMENT_TYPE_MAP,
@@ -1822,4 +1823,5 @@ export {
     randomInt,
     weightedRandom,
     chooseRarity,
+    MISSIONS,
 };
