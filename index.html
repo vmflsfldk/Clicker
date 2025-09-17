@@ -114,6 +114,18 @@
                     <button
                         type="button"
                         class="panel-tab"
+                        id="tab-skills"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-skills"
+                        data-tab-target="skills"
+                        tabindex="-1"
+                    >
+                        전술 스킬
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
                         id="tab-rebirth"
                         role="tab"
                         aria-selected="false"
@@ -255,14 +267,6 @@
                                 <button id="upgradeGoldGain" class="btn btn-upgrade">자금 운용 훈련 (125 골드)</button>
                                 <p id="goldGainUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
                             </div>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>아로나의 전술 지원</h3>
-                                    <p>샬레의 지원 네트워크로 잠시 총 지원 화력을 2배로 높입니다.</p>
-                                </div>
-                                <button id="skillFrenzy" class="btn btn-skill">지원 요청 (쿨타임 60초)</button>
-                                <p id="skillCooldown" class="cooldown"></p>
-                            </div>
                         </section>
                     </div>
 
@@ -310,6 +314,29 @@
                                 ></ul>
                                 <p id="gachaResultsEmpty" class="gacha-results__empty">아직 모집 기록이 없습니다.</p>
                             </section>
+                        </section>
+                    </div>
+
+                    <div
+                        class="panel-view"
+                        id="panel-skills"
+                        role="tabpanel"
+                        aria-labelledby="tab-skills"
+                        data-tab="skills"
+                        hidden
+                    >
+                        <section class="panel panel--skills">
+                            <header class="panel__header">
+                                <h2>전술 스킬</h2>
+                            </header>
+                            <div class="upgrade">
+                                <div>
+                                    <h3>아로나의 전술 지원</h3>
+                                    <p>샬레의 지원 네트워크로 잠시 총 지원 화력을 2배로 높입니다.</p>
+                                </div>
+                                <button id="skillFrenzy" class="btn btn-skill">지원 요청 (쿨타임 60초)</button>
+                                <p id="skillCooldown" class="cooldown"></p>
+                            </div>
                         </section>
                     </div>
 
