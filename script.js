@@ -618,7 +618,8 @@ const EQUIPMENT_TYPE_MAP = new Map(EQUIPMENT_TYPES.map((type) => [type.id, type]
 const GACHA_SINGLE_COST = 1;
 const GACHA_MULTI_COUNT = 10;
 const GACHA_MULTI_COST = 9;
-const GACHA_TOKEN_DROP_CHANCE = 0.35;
+const GACHA_TOKEN_NORMAL_DROP_CHANCE = 0.02;
+const GACHA_TOKEN_BOSS_DROP_CHANCE = 0.35;
 
 const MISSIONS = [
     {
@@ -2475,14 +2476,14 @@ class GameState {
     }
 
     tryDropGachaToken(stage) {
-        if (!this.isBossStage(stage)) return null;
-        const baseChance = GACHA_TOKEN_DROP_CHANCE;
+        const isBoss = this.isBossStage(stage);
+        const baseChance = isBoss ? GACHA_TOKEN_BOSS_DROP_CHANCE : GACHA_TOKEN_NORMAL_DROP_CHANCE;
         const bonus = this.gachaDropBonus;
         const finalChance = clampProbability(baseChance + bonus);
         if (Math.random() > finalChance) return null;
         this.gachaTokens += 1;
         this.lastSave = Date.now();
-        return { amount: 1, baseChance, chance: finalChance };
+        return { amount: 1, baseChance, chance: finalChance, isBoss };
     }
 
     tryDropEquipment(stage) {
@@ -4598,8 +4599,9 @@ class GameUI {
         if (gacha) {
             const chanceDetail = this.buildChanceDetail('드롭 확률', gacha.baseChance, gacha.chance);
             const chanceText = chanceDetail ? ` (${chanceDetail})` : '';
+            const sourceText = gacha.isBoss ? '보스 제압 보상으로' : '적 전리품에서';
             this.addLog(
-                `보스 제압 보상으로 모집권 ${gacha.amount.toLocaleString('ko-KR')}개를 확보했습니다!${chanceText}`,
+                `${sourceText} 모집권 ${gacha.amount.toLocaleString('ko-KR')}개를 확보했습니다!${chanceText}`,
                 'success',
             );
             this.updateGachaUI();
@@ -4833,13 +4835,25 @@ class GameUI {
         if (UI.gachaTokensHeader) {
             UI.gachaTokensHeader.textContent = tokenText;
         }
-        const finalChance = clampProbability(GACHA_TOKEN_DROP_CHANCE + (this.state.gachaDropBonus ?? 0));
-        const chanceDetail = this.buildChanceDetail('보스 모집권 드롭 확률', GACHA_TOKEN_DROP_CHANCE, finalChance);
+        const gachaBonus = this.state.gachaDropBonus ?? 0;
+        const normalChance = clampProbability(GACHA_TOKEN_NORMAL_DROP_CHANCE + gachaBonus);
+        const bossChance = clampProbability(GACHA_TOKEN_BOSS_DROP_CHANCE + gachaBonus);
+        const normalDetail = this.buildChanceDetail(
+            '일반 모집권 드롭 확률',
+            GACHA_TOKEN_NORMAL_DROP_CHANCE,
+            normalChance,
+        );
+        const bossDetail = this.buildChanceDetail(
+            '보스 모집권 드롭 확률',
+            GACHA_TOKEN_BOSS_DROP_CHANCE,
+            bossChance,
+        );
+        const chanceDetail = [normalDetail, bossDetail].filter(Boolean).join('\n');
         if (UI.gachaTokens) {
-            UI.gachaTokens.title = chanceDetail;
+            UI.gachaTokens.title = chanceDetail || '모집권 드롭 정보 없음';
         }
         if (UI.gachaTokensHeader) {
-            UI.gachaTokensHeader.title = chanceDetail;
+            UI.gachaTokensHeader.title = chanceDetail || '모집권 드롭 정보 없음';
         }
         if (UI.gachaSingle) {
             UI.gachaSingle.disabled = this.state.gachaTokens < GACHA_SINGLE_COST;
