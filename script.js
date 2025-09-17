@@ -1794,7 +1794,9 @@ const UI = {
     salvageModalCancel: document.getElementById('salvageModalCancel'),
     panelTabButtons: document.querySelectorAll('[data-tab-target]'),
     panelViews: document.querySelectorAll('[data-tab]'),
-    mobilePanelSelect: document.getElementById('mobilePanelSelect'),
+    panelOverlay: document.querySelector('.game__panel'),
+    panelOverlayBackdrop: document.getElementById('panelOverlayBackdrop'),
+    panelOverlayClose: document.getElementById('panelOverlayClose'),
 };
 
 class GameUI {
@@ -1811,9 +1813,23 @@ class GameUI {
         this.sortState = state.sortOrder === 'dps' ? 'dps' : 'level';
         this.tabButtons = [];
         this.tabPanels = new Map();
-        this.mobilePanelSelect = UI.mobilePanelSelect ?? null;
+        this.panelOverlay = UI.panelOverlay ?? null;
+        this.panelOverlayBackdrop = UI.panelOverlayBackdrop ?? null;
+        this.panelOverlayClose = UI.panelOverlayClose ?? null;
+        this.mobileViewport =
+            typeof window !== 'undefined' && 'matchMedia' in window
+                ? window.matchMedia('(max-width: 768px)')
+                : null;
         this.setupTabs();
         this.setupEvents();
+        if (this.mobileViewport) {
+            this.mobileViewport.addEventListener('change', () => {
+                this.handleViewportChange();
+            });
+            this.handleViewportChange();
+        } else {
+            this.handleViewportChange();
+        }
         this.updateGachaHistoryVisibility();
         this.renderGachaOverview();
         this.renderHeroes();
@@ -1838,17 +1854,12 @@ class GameUI {
                 const target = button.dataset.tabTarget;
                 if (target) {
                     this.activateTab(target);
+                    if (this.isMobileViewport()) {
+                        this.openPanelOverlay();
+                    }
                 }
             });
         });
-        if (this.mobilePanelSelect) {
-            this.mobilePanelSelect.addEventListener('change', (event) => {
-                const target = event.target.value;
-                if (target) {
-                    this.activateTab(target);
-                }
-            });
-        }
         const initialButton = this.tabButtons.find((button) => button.classList.contains('is-active'));
         const initialTab = initialButton?.dataset.tabTarget ?? this.tabButtons[0]?.dataset.tabTarget;
         if (initialTab) {
@@ -1877,9 +1888,73 @@ class GameUI {
             }
         });
         this.activeTab = tabId;
-        if (this.mobilePanelSelect && this.mobilePanelSelect.value !== tabId) {
-            this.mobilePanelSelect.value = tabId;
+        this.updateOverlayAriaState();
+    }
+
+    isMobileViewport() {
+        if (this.mobileViewport) {
+            return this.mobileViewport.matches;
         }
+        if (typeof window !== 'undefined') {
+            return window.innerWidth <= 768;
+        }
+        return false;
+    }
+
+    isPanelOverlayOpen() {
+        return this.panelOverlay?.classList.contains('is-overlay-open') ?? false;
+    }
+
+    openPanelOverlay() {
+        if (!this.isMobileViewport()) {
+            return;
+        }
+        if (this.panelOverlay) {
+            this.panelOverlay.classList.add('is-overlay-open');
+        }
+        document.body.classList.add('is-panel-overlay-open');
+        this.updateOverlayAriaState();
+    }
+
+    closePanelOverlay() {
+        if (this.panelOverlay) {
+            this.panelOverlay.classList.remove('is-overlay-open');
+        }
+        document.body.classList.remove('is-panel-overlay-open');
+        this.updateOverlayAriaState();
+    }
+
+    updateOverlayAriaState() {
+        const isMobile = this.isMobileViewport();
+        const isOpen = this.isPanelOverlayOpen();
+        this.tabButtons.forEach((button) => {
+            if (isMobile) {
+                const isActive = button.dataset.tabTarget === this.activeTab;
+                button.setAttribute('aria-expanded', isOpen && isActive ? 'true' : 'false');
+            } else {
+                button.removeAttribute('aria-expanded');
+            }
+        });
+        if (this.panelOverlayBackdrop) {
+            if (isMobile) {
+                this.panelOverlayBackdrop.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+            } else {
+                this.panelOverlayBackdrop.setAttribute('aria-hidden', 'true');
+            }
+        }
+        if (this.panelOverlayClose) {
+            if (isMobile) {
+                this.panelOverlayClose.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+                this.panelOverlayClose.setAttribute('tabindex', isOpen ? '0' : '-1');
+            } else {
+                this.panelOverlayClose.setAttribute('aria-hidden', 'true');
+                this.panelOverlayClose.setAttribute('tabindex', '-1');
+            }
+        }
+    }
+
+    handleViewportChange() {
+        this.closePanelOverlay();
     }
 
     setupEvents() {
@@ -1942,6 +2017,12 @@ class GameUI {
         document.addEventListener('keydown', (event) => this.handleKeyDown(event));
         if (UI.missionList) {
             UI.missionList.addEventListener('click', (event) => this.handleMissionListClick(event));
+        }
+        if (this.panelOverlayClose) {
+            this.panelOverlayClose.addEventListener('click', () => this.closePanelOverlay());
+        }
+        if (this.panelOverlayBackdrop) {
+            this.panelOverlayBackdrop.addEventListener('click', () => this.closePanelOverlay());
         }
     }
 
@@ -2959,9 +3040,17 @@ class GameUI {
     }
 
     handleKeyDown(event) {
-        if (event.key === 'Escape' && this.isSalvageModalOpen()) {
+        if (event.key !== 'Escape') {
+            return;
+        }
+        if (this.isSalvageModalOpen()) {
             event.preventDefault();
             this.closeSalvageModal();
+            return;
+        }
+        if (this.isMobileViewport() && this.isPanelOverlayOpen()) {
+            event.preventDefault();
+            this.closePanelOverlay();
         }
     }
 
