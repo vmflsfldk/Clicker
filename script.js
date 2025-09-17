@@ -728,7 +728,30 @@ class Hero {
 class Enemy {
     constructor(stage = 1, savedState) {
         this.stage = stage;
-        this.baseNames = ['훈련용 타깃', '전술 드론', '모의 전차', '연습용 자동포대', '합동 훈련 장비'];
+        this.baseNames = [
+            '훈련용 타깃',
+            '전술 드론',
+            '모의 전차',
+            '연습용 자동포대',
+            '합동 훈련 장비',
+            '도시전 모의 적',
+            '방어전 모의 중계기',
+            '실시간 전술 분석기',
+            '교차 사격 훈련 장치',
+            '모의 합동 지원기',
+            '전술 네트워크 수신기',
+            '방해전 모의 포탑',
+        ];
+        this.bossNames = [
+            '하코네 전술 골렘',
+            '특수 자동포탑',
+            '모의 메카니카',
+            '연합 실전 검증기',
+            '고출력 전술 요새',
+            '절차 통제 프로토타입',
+            '네트워크 통합 지휘기',
+            '종합 전술 모의체',
+        ];
         this.maxHp = savedState?.maxHp ?? this.calculateMaxHp(stage);
         this.hp = savedState?.hp ?? this.maxHp;
         this.defeated = savedState?.defeated ?? 0;
@@ -741,9 +764,20 @@ class Enemy {
     }
 
     get name() {
-        const index = Math.floor((this.stage - 1) % this.baseNames.length);
-        const suffix = this.stage % BOSS_STAGE_INTERVAL === 0 ? ' (보스)' : '';
-        return `${this.baseNames[index]}${suffix}`;
+        const isBossStage = this.stage % BOSS_STAGE_INTERVAL === 0;
+        const useBossNames = isBossStage && this.bossNames.length > 0;
+        const names = useBossNames ? this.bossNames : this.baseNames;
+        if (names.length === 0) {
+            return isBossStage ? '미지의 적 (보스)' : '미지의 적';
+        }
+        if (useBossNames) {
+            const bossIndex = Math.max(0, Math.floor(this.stage / BOSS_STAGE_INTERVAL) - 1);
+            const index = bossIndex % names.length;
+            return `${names[index]} (보스)`;
+        }
+        const index = Math.floor((this.stage - 1) % names.length);
+        const suffix = isBossStage ? ' (보스)' : '';
+        return `${names[index]}${suffix}`;
     }
 
     applyDamage(damage) {
