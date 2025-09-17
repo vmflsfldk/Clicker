@@ -339,6 +339,22 @@ const MISSIONS = [
         reward: { type: 'gold', amount: 1200 },
     },
     {
+        id: 'salvage_20',
+        name: '장비 정리 I',
+        description: '전술 장비를 20회 분해하세요.',
+        trigger: 'equipmentSalvage',
+        goal: 20,
+        reward: { type: 'gold', amount: 800 },
+    },
+    {
+        id: 'salvage_100',
+        name: '장비 정리 II',
+        description: '전술 장비를 100회 분해하세요.',
+        trigger: 'equipmentSalvage',
+        goal: 100,
+        reward: { type: 'gachaTokens', amount: 4 },
+    },
+    {
         id: 'rebirth_1',
         name: '새로운 출발',
         description: '환생을 1회 진행하세요.',
@@ -2826,6 +2842,7 @@ class GameUI {
             `전술 장비 ${countText}개를 분해하여 강화 재료 ${materialsText}개와 골드 ${goldText}을(를) 획득했습니다.`,
             'success',
         );
+        this.handleMissionProgress('equipmentSalvage', result.count);
         result.items.forEach((item) => {
             this.selectedEquipmentIds.delete(item.id);
         });
