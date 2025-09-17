@@ -190,6 +190,7 @@ const REBIRTH_EFFECT_LABELS = {
     gold: '작전 보상',
     equipmentDrop: '전술 장비 드롭',
     gachaDrop: '모집권 드롭',
+    rebirthGain: '환생 포인트',
 };
 
 const REBIRTH_SKILLS = [
@@ -251,6 +252,16 @@ const REBIRTH_SKILLS = [
         effect: { gachaDrop: 0.04 },
         baseCost: 4,
         costGrowth: 5,
+        maxLevel: 10,
+    },
+    {
+        id: 'rebirthInsight',
+        name: '환생 기억 각성',
+        description: '누적된 전투 경험이 새로운 시작을 더욱 강력하게 만들어 줍니다.',
+        effectDescription: '레벨당 환생 포인트 +5%',
+        effect: { rebirthGain: 0.05 },
+        baseCost: 6,
+        costGrowth: 6,
         maxLevel: 10,
     },
 ];
@@ -494,7 +505,12 @@ class GameState {
     }
 
     get pendingRebirthPoints() {
-        return calculateRebirthPoints(this.currentRunHighestStage);
+        const basePoints = calculateRebirthPoints(this.currentRunHighestStage);
+        if (basePoints <= 0) return 0;
+        const rebirthGain = this.getRebirthBonusValue('rebirthGain');
+        // 환생 포인트 증가는 기본 계산 이후 후처리로 적용합니다.
+        const modified = Math.floor(basePoints * (1 + rebirthGain));
+        return Math.max(1, modified);
     }
 
     get canRebirth() {
