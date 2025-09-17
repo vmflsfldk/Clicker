@@ -163,32 +163,9 @@ export class GameUI {
         this.panelOverlay = UI.panelOverlay ?? null;
         this.panelOverlayBackdrop = UI.panelOverlayBackdrop ?? null;
         this.panelOverlayClose = UI.panelOverlayClose ?? null;
-        this.mobileViewport =
-            typeof window !== 'undefined' && 'matchMedia' in window
-                ? window.matchMedia('(max-width: 768px)')
-                : null;
         this.setupTabs();
         this.setupEvents();
-        this.removeMobileViewportListener = null;
-        if (this.mobileViewport) {
-            const viewportListener = () => {
-                this.handleViewportChange();
-            };
-            if (typeof this.mobileViewport.addEventListener === 'function') {
-                this.mobileViewport.addEventListener('change', viewportListener);
-                this.removeMobileViewportListener = () => {
-                    this.mobileViewport?.removeEventListener('change', viewportListener);
-                };
-            } else if (typeof this.mobileViewport.addListener === 'function') {
-                this.mobileViewport.addListener(viewportListener);
-                this.removeMobileViewportListener = () => {
-                    this.mobileViewport?.removeListener(viewportListener);
-                };
-            }
-            this.handleViewportChange();
-        } else {
-            this.handleViewportChange();
-        }
+        this.handleViewportChange();
         this.updateGachaHistoryVisibility();
         this.renderGachaOverview();
         this.renderHeroSetBonuses();
@@ -214,9 +191,7 @@ export class GameUI {
                 const target = button.dataset.tabTarget;
                 if (target) {
                     this.activateTab(target);
-                    if (this.isMobileViewport()) {
-                        this.openPanelOverlay();
-                    }
+                    this.openPanelOverlay();
                 }
             });
         });
@@ -251,24 +226,11 @@ export class GameUI {
         this.updateOverlayAriaState();
     }
 
-    isMobileViewport() {
-        if (this.mobileViewport) {
-            return this.mobileViewport.matches;
-        }
-        if (typeof window !== 'undefined') {
-            return window.innerWidth <= 768;
-        }
-        return false;
-    }
-
     isPanelOverlayOpen() {
         return this.panelOverlay?.classList.contains('is-overlay-open') ?? false;
     }
 
     openPanelOverlay() {
-        if (!this.isMobileViewport()) {
-            return;
-        }
         if (this.panelOverlay) {
             this.panelOverlay.classList.add('is-overlay-open');
         }
@@ -285,31 +247,17 @@ export class GameUI {
     }
 
     updateOverlayAriaState() {
-        const isMobile = this.isMobileViewport();
         const isOpen = this.isPanelOverlayOpen();
         this.tabButtons.forEach((button) => {
-            if (isMobile) {
-                const isActive = button.dataset.tabTarget === this.activeTab;
-                button.setAttribute('aria-expanded', isOpen && isActive ? 'true' : 'false');
-            } else {
-                button.removeAttribute('aria-expanded');
-            }
+            const isActive = button.dataset.tabTarget === this.activeTab;
+            button.setAttribute('aria-expanded', isOpen && isActive ? 'true' : 'false');
         });
         if (this.panelOverlayBackdrop) {
-            if (isMobile) {
-                this.panelOverlayBackdrop.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-            } else {
-                this.panelOverlayBackdrop.setAttribute('aria-hidden', 'true');
-            }
+            this.panelOverlayBackdrop.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
         }
         if (this.panelOverlayClose) {
-            if (isMobile) {
-                this.panelOverlayClose.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-                this.panelOverlayClose.setAttribute('tabindex', isOpen ? '0' : '-1');
-            } else {
-                this.panelOverlayClose.setAttribute('aria-hidden', 'true');
-                this.panelOverlayClose.setAttribute('tabindex', '-1');
-            }
+            this.panelOverlayClose.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+            this.panelOverlayClose.setAttribute('tabindex', isOpen ? '0' : '-1');
         }
     }
 
@@ -1668,7 +1616,7 @@ export class GameUI {
             this.closeSalvageModal();
             return;
         }
-        if (this.isMobileViewport() && this.isPanelOverlayOpen()) {
+        if (this.isPanelOverlayOpen()) {
             event.preventDefault();
             this.closePanelOverlay();
         }
