@@ -209,6 +209,20 @@ export const HERO_TRAIT_GROUPS = [
                 description: '장거리 포격으로 적을 제압하는 중화기 학생입니다.',
                 accentColor: '#facc15',
             },
+            {
+                id: 'sr',
+                name: 'SR',
+                shortName: 'SR',
+                description: '장거리 사격으로 강력한 한발을 갖춘 학생입니다.',
+                accentColor: '#fa4e15',
+            },
+            {
+                id: 'sg',
+                name: 'SG',
+                shortName: 'SG',
+                description: '근접전에서 뛰어난 학생입니다.',
+                accentColor: '#e7fa15',
+            },
         ],
     },
     {
@@ -313,7 +327,7 @@ export const defaultHeroes = [
         rarity: 'uncommon',
         skins: HERO_SKIN_LIBRARY.hoshino,
         school: 'abydos',
-        weapon: 'mg',
+        weapon: 'sg',
         position: 'striker',
     },
     {
@@ -326,7 +340,7 @@ export const defaultHeroes = [
         rarity: 'rare',
         skins: HERO_SKIN_LIBRARY.aru,
         school: 'gehenna',
-        weapon: 'ar',
+        weapon: 'sr',
         position: 'striker',
     },
     {
