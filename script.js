@@ -877,10 +877,14 @@ class GameState {
         this.bossDeadline = Number.isFinite(savedBossDeadline)
             ? Math.max(0, Math.floor(savedBossDeadline))
             : 0;
+        this.pendingBossEntry = Boolean(saved?.pendingBossEntry);
         if (!this.isBossStage()) {
             this.clearBossTimer();
-        } else if (this.bossDeadline === 0) {
-            this.startBossTimer();
+        } else {
+            this.pendingBossEntry = false;
+            if (this.bossDeadline === 0) {
+                this.startBossTimer();
+            }
         }
     }
 
@@ -1008,6 +1012,7 @@ class GameState {
         this.lastSave = Date.now();
         this.enemy.reset(1);
         this.clearBossTimer();
+        this.pendingBossEntry = false;
         this.frenzyCooldown = 0;
         this.frenzyActiveUntil = 0;
         this.currentRunHighestStage = 0;
@@ -1112,6 +1117,7 @@ class GameState {
     }
 
     startBossTimer() {
+        this.pendingBossEntry = false;
         this.bossDeadline = Date.now() + BOSS_TIME_LIMIT;
     }
 
@@ -1137,6 +1143,8 @@ class GameState {
         this.enemy.retreatStage();
         const revertedStage = this.enemy.stage;
         this.clearBossTimer();
+        this.pendingBossEntry = true;
+        this.lastSave = Date.now();
         return { failedStage, revertedStage };
     }
 
@@ -1154,6 +1162,7 @@ class GameState {
         this.enemy.retreatStage();
         const fallbackStage = this.enemy.stage;
         this.clearBossTimer();
+        this.pendingBossEntry = true;
         this.lastSave = Date.now();
         return { success: true, bossStage, fallbackStage };
     }
@@ -1171,6 +1180,7 @@ class GameState {
         }
         const fromStage = this.enemy.stage;
         this.enemy.advanceStage();
+        this.pendingBossEntry = false;
         this.clearBossTimer();
         this.startBossTimer();
         this.lastSave = Date.now();
@@ -1185,11 +1195,16 @@ class GameState {
         const gacha = this.tryDropGachaToken(defeatedStage);
         this.highestStage = Math.max(this.highestStage, defeatedStage);
         this.currentRunHighestStage = Math.max(this.currentRunHighestStage, defeatedStage);
-        this.enemy.advanceStage();
-        if (this.isBossStage()) {
-            this.startBossTimer();
-        } else {
+        if (this.pendingBossEntry) {
+            this.enemy.reset(this.enemy.stage);
             this.clearBossTimer();
+        } else {
+            this.enemy.advanceStage();
+            if (this.isBossStage()) {
+                this.startBossTimer();
+            } else {
+                this.clearBossTimer();
+            }
         }
         return { reward, drop, gacha, defeatedStage };
     }
@@ -1201,6 +1216,7 @@ class GameState {
         this.lastSave = Date.now();
         this.enemy.reset(1);
         this.clearBossTimer();
+        this.pendingBossEntry = false;
         this.heroes.forEach((hero) => {
             hero.resetProgress();
         });
@@ -1238,6 +1254,7 @@ class GameState {
             highestStage: this.highestStage,
             currentRunHighestStage: this.currentRunHighestStage,
             bossDeadline: this.bossDeadline,
+            pendingBossEntry: this.pendingBossEntry,
             gachaTokens: this.gachaTokens,
             rebirthPoints: this.rebirthPoints,
             totalRebirths: this.totalRebirths,
