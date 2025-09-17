@@ -251,6 +251,12 @@ h1,
     transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
+.damage-indicator--crit {
+    color: #fda4af;
+    text-shadow: 0 0 16px rgba(248, 113, 113, 0.75);
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
 .enemy:active {
     transform: scale(0.98);
 }

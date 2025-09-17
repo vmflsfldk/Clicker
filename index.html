@@ -62,6 +62,14 @@
                             <span class="stat__label">총 지원 화력</span>
                             <span id="totalDps" class="stat__value">0</span>
                         </div>
+                        <div class="stat">
+                            <span class="stat__label">치명타 확률</span>
+                            <span id="critChance" class="stat__value">0%</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat__label">치명타 배율</span>
+                            <span id="critMultiplier" class="stat__value">0배</span>
+                        </div>
                     </div>
                 </div>
                 <div class="game__progress">
@@ -180,6 +188,30 @@
                                 </div>
                                 <button id="upgradeClick" class="btn btn-upgrade">전술 교육 (10 골드)</button>
                                 <p id="clickUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
+                            </div>
+                            <div class="upgrade">
+                                <div>
+                                    <h3>정밀 사격 교정</h3>
+                                    <p>전술 분석으로 클릭 치명타 확률을 향상시킵니다.</p>
+                                </div>
+                                <button id="upgradeCritChance" class="btn btn-upgrade">정밀 교정 (50 골드)</button>
+                                <p id="critChanceUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
+                            </div>
+                            <div class="upgrade">
+                                <div>
+                                    <h3>특수 탄두 연구</h3>
+                                    <p>치명타 발생 시 피해 배율을 높입니다.</p>
+                                </div>
+                                <button id="upgradeCritDamage" class="btn btn-upgrade">탄두 연구 (75 골드)</button>
+                                <p id="critDamageUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
+                            </div>
+                            <div class="upgrade">
+                                <div>
+                                    <h3>지원 화력 지휘 과정</h3>
+                                    <p>학생 전체의 DPS를 영구적으로 증가시킵니다.</p>
+                                </div>
+                                <button id="upgradeHeroDps" class="btn btn-upgrade">지휘 과정 (100 골드)</button>
+                                <p id="heroDpsUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
                             </div>
                             <div class="upgrade">
                                 <div>
