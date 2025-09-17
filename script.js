@@ -373,6 +373,58 @@ const BOSS_WARNING_THRESHOLD = 5000;
 
 const REBIRTH_STAGE_REQUIREMENT = 100;
 
+const CLICK_UPGRADE_CONFIG = {
+    baseCost: 10,
+    costGrowth: 1.2,
+    baseDamage: 1,
+    flatIncrease: 1,
+    damageGrowth: 1.12,
+    assumedClicksPerSecond: 4,
+};
+
+const STAGE_REWARD_CONFIG = {
+    base: 12,
+    growth: 1.1,
+    bossMultiplier: 5,
+};
+
+const normalizeLevel = (level) => {
+    const numeric = Number(level);
+    return Number.isFinite(numeric) ? Math.max(1, Math.floor(numeric)) : 1;
+};
+
+const calculateClickUpgradeCost = (level) => {
+    const normalized = normalizeLevel(level);
+    const exponent = Math.max(0, normalized - 1);
+    return Math.ceil(CLICK_UPGRADE_CONFIG.baseCost * Math.pow(CLICK_UPGRADE_CONFIG.costGrowth, exponent));
+};
+
+const calculateClickDamageAtLevel = (level) => {
+    const normalized = normalizeLevel(level);
+    let damage = CLICK_UPGRADE_CONFIG.baseDamage;
+    for (let step = 2; step <= normalized; step += 1) {
+        damage = Math.ceil(
+            damage +
+                CLICK_UPGRADE_CONFIG.flatIncrease +
+                Math.pow(CLICK_UPGRADE_CONFIG.damageGrowth, step),
+        );
+    }
+    return damage;
+};
+
+const calculateStageRewardValue = (stage) => {
+    const normalized = Number.isFinite(stage) ? Math.max(1, Math.floor(stage)) : 1;
+    const exponent = Math.max(0, normalized - 1);
+    return STAGE_REWARD_CONFIG.base * Math.pow(STAGE_REWARD_CONFIG.growth, exponent);
+};
+
+const calculateStageReward = (stage, isBoss, goldBonus = 0) => {
+    const baseReward = calculateStageRewardValue(stage);
+    const bossMultiplier = isBoss ? STAGE_REWARD_CONFIG.bossMultiplier : 1;
+    const bonusMultiplier = 1 + (Number.isFinite(goldBonus) ? goldBonus : 0);
+    return Math.ceil(baseReward * bossMultiplier * bonusMultiplier);
+};
+
 const REBIRTH_EFFECT_LABELS = {
     tap: '전술 공격력',
     hero: '지원 화력',
@@ -836,8 +888,9 @@ class Enemy {
 class GameState {
     constructor(saved) {
         this.gold = saved?.gold ?? 0;
-        this.clickLevel = saved?.clickLevel ?? 1;
-        this.clickDamage = saved?.clickDamage ?? 1;
+        const savedClickLevel = Number(saved?.clickLevel ?? 1);
+        this.clickLevel = Number.isFinite(savedClickLevel) ? Math.max(1, Math.floor(savedClickLevel)) : 1;
+        this.clickDamage = calculateClickDamageAtLevel(this.clickLevel);
         this.lastSave = saved?.lastSave ?? Date.now();
         this.frenzyCooldown = saved?.frenzyCooldown ?? 0;
         this.frenzyActiveUntil = saved?.frenzyActiveUntil ?? 0;
@@ -1040,20 +1093,58 @@ class GameState {
         this.gold += amount;
     }
 
-    enemyReward() {
-        const bossMultiplier = this.isBossStage() ? 5 : 1;
-        const bonusMultiplier = 1 + this.goldBonus;
-        return Math.ceil((10 + this.enemy.stage * 2) * bossMultiplier * bonusMultiplier);
+    getStageReward(stage = this.enemy.stage) {
+        return calculateStageReward(stage, this.isBossStage(stage), this.goldBonus);
+    }
+
+    enemyReward(stage = this.enemy.stage) {
+        return this.getStageReward(stage);
+    }
+
+    getClickUpgradeContext() {
+        const cost = calculateClickUpgradeCost(this.clickLevel);
+        const currentDamage = this.effectiveClickDamage;
+        const simulatedLevel = this.clickLevel + 1;
+        const nextBaseDamage = Math.ceil(
+            this.clickDamage +
+                CLICK_UPGRADE_CONFIG.flatIncrease +
+                Math.pow(CLICK_UPGRADE_CONFIG.damageGrowth, simulatedLevel),
+        );
+        const nextDamage = nextBaseDamage * (1 + this.tapBonus);
+        const damageGain = nextDamage - currentDamage;
+        const assumedClicks = CLICK_UPGRADE_CONFIG.assumedClicksPerSecond;
+        const enemyHp = Math.max(1, Number(this.enemy.maxHp) || 1);
+        const reward = this.enemyReward();
+        const goldPerSecondBefore = (currentDamage * assumedClicks * reward) / enemyHp;
+        const goldPerSecondAfter = (nextDamage * assumedClicks * reward) / enemyHp;
+        const goldGainPerSecond = Math.max(0, goldPerSecondAfter - goldPerSecondBefore);
+        const paybackSeconds = goldGainPerSecond > 0 ? cost / goldGainPerSecond : Infinity;
+        return {
+            cost,
+            currentDamage,
+            nextDamage,
+            damageGain,
+            goldGainPerSecond,
+            paybackSeconds,
+            assumedClicks,
+        };
     }
 
     levelUpClick() {
-        const cost = Math.ceil(10 * Math.pow(1.2, this.clickLevel - 1));
+        const cost = calculateClickUpgradeCost(this.clickLevel);
         if (this.gold < cost) {
             return { success: false, message: '골드가 부족합니다.' };
         }
         this.gold -= cost;
-        this.clickLevel += 1;
-        this.clickDamage = Math.ceil(this.clickDamage + 1 + Math.pow(1.12, this.clickLevel));
+        const newLevel = this.clickLevel + 1;
+        const nextDamage = Math.ceil(
+            this.clickDamage +
+                CLICK_UPGRADE_CONFIG.flatIncrease +
+                Math.pow(CLICK_UPGRADE_CONFIG.damageGrowth, newLevel),
+        );
+        this.clickLevel = newLevel;
+        this.clickDamage = nextDamage;
+        this.lastSave = Date.now();
         return { success: true, cost };
     }
 
@@ -1662,6 +1753,7 @@ const UI = {
     gachaResults: document.getElementById('gachaResults'),
     gachaResultsEmpty: document.getElementById('gachaResultsEmpty'),
     upgradeClick: document.getElementById('upgradeClick'),
+    upgradeClickInfo: document.getElementById('clickUpgradeInfo'),
     log: document.getElementById('log'),
     sortHeroes: document.getElementById('sortHeroes'),
     stageProgressTrack: document.getElementById('stageProgressTrack'),
@@ -2299,6 +2391,32 @@ class GameUI {
             return `${label} ${finalText}`;
         }
         return `${label} ${baseText} → ${finalText}`;
+    }
+
+    formatPayback(seconds) {
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+            return '';
+        }
+        if (seconds < 1) {
+            return `${Math.max(1, Math.round(seconds * 1000))}ms`;
+        }
+        if (seconds < 60) {
+            return `${seconds.toFixed(1)}초`;
+        }
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        if (minutes >= 60) {
+            const hours = Math.floor(minutes / 60);
+            const minutesRemainder = minutes % 60;
+            if (minutesRemainder === 0) {
+                return `${hours}시간`;
+            }
+            return `${hours}시간 ${minutesRemainder}분`;
+        }
+        if (remainingSeconds === 0) {
+            return `${minutes}분`;
+        }
+        return `${minutes}분 ${remainingSeconds}초`;
     }
 
     updateRebirthUI() {
@@ -3169,8 +3287,27 @@ class GameUI {
         UI.clickDamage.textContent = formatNumber(this.state.effectiveClickDamage);
         UI.totalDps.textContent = formatNumber(this.state.totalDps);
         if (UI.upgradeClick) {
-            const clickCost = Math.ceil(10 * Math.pow(1.2, this.state.clickLevel - 1));
-            UI.upgradeClick.textContent = `전술 교육 (${formatNumber(clickCost)} 골드)`;
+            const context = this.state.getClickUpgradeContext();
+            UI.upgradeClick.textContent = `전술 교육 (${formatNumber(context.cost)} 골드)`;
+            if (UI.upgradeClickInfo) {
+                const infoParts = [];
+                if (context.damageGain > 0) {
+                    infoParts.push(`추가 피해 +${formatNumber(context.damageGain)}`);
+                } else {
+                    infoParts.push('추가 피해 없음');
+                }
+                if (context.goldGainPerSecond > 0) {
+                    infoParts.push(`골드/초 +${formatNumber(context.goldGainPerSecond)}`);
+                    const paybackText = this.formatPayback(context.paybackSeconds);
+                    if (paybackText) {
+                        infoParts.push(`예상 회수 ${paybackText}`);
+                    }
+                } else {
+                    infoParts.push('ROI 계산 불가');
+                }
+                infoParts.push(`기준 ${context.assumedClicks}회/초 클릭`);
+                UI.upgradeClickInfo.textContent = infoParts.join(' · ');
+            }
         }
         this.updateEquipmentSummary();
         this.updateRebirthUI();
@@ -3325,12 +3462,24 @@ class GameUI {
     }
 
     handleClickUpgrade() {
+        const context = this.state.getClickUpgradeContext();
         const result = this.state.levelUpClick();
         if (!result.success) {
             this.addLog(result.message, 'warning');
             return;
         }
-        this.addLog(`전술 교육 프로그램 레벨이 ${this.state.clickLevel}이 되었습니다!`);
+        const detailParts = [];
+        if (context.damageGain > 0) {
+            detailParts.push(`추가 피해 +${formatNumber(context.damageGain)}`);
+        }
+        if (context.goldGainPerSecond > 0) {
+            const paybackText = this.formatPayback(context.paybackSeconds);
+            if (paybackText) {
+                detailParts.push(`ROI ${paybackText}`);
+            }
+        }
+        const detailText = detailParts.length > 0 ? ` (${detailParts.join(' · ')})` : '';
+        this.addLog(`전술 교육 프로그램 레벨이 ${this.state.clickLevel}이 되었습니다!${detailText}`, 'success');
         this.updateStats();
     }
 

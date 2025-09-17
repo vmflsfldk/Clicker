@@ -1726,10 +1726,19 @@ body.modal-open {
 
 .upgrade {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.upgrade__info {
+    flex: 1 1 100%;
+    font-size: 0.9rem;
+    color: var(--subtext-color);
+    margin-top: 0.25rem;
+    line-height: 1.4;
 }
 
 .cooldown {
