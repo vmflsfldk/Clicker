@@ -137,6 +137,43 @@ const GACHA_MULTI_COUNT = 10;
 const GACHA_MULTI_COST = 9;
 const GACHA_TOKEN_DROP_CHANCE = 0.35;
 
+const MISSIONS = [
+    {
+        id: 'defeat_50',
+        name: '전술 훈련 I',
+        description: '적 50명을 처치하세요.',
+        trigger: 'enemyDefeat',
+        goal: 50,
+        reward: { type: 'gold', amount: 500 },
+    },
+    {
+        id: 'defeat_250',
+        name: '전술 훈련 II',
+        description: '적 250명을 처치하세요.',
+        trigger: 'enemyDefeat',
+        goal: 250,
+        reward: { type: 'gachaTokens', amount: 3 },
+    },
+    {
+        id: 'gacha_30',
+        name: '모집 전문가',
+        description: '학생 모집을 30회 진행하세요.',
+        trigger: 'gachaRoll',
+        goal: 30,
+        reward: { type: 'gold', amount: 1200 },
+    },
+    {
+        id: 'rebirth_1',
+        name: '새로운 출발',
+        description: '환생을 1회 진행하세요.',
+        trigger: 'rebirth',
+        goal: 1,
+        reward: { type: 'gachaTokens', amount: 5 },
+    },
+];
+
+const MISSION_MAP = new Map(MISSIONS.map((mission) => [mission.id, mission]));
+
 const BOSS_STAGE_INTERVAL = 5;
 const BOSS_TIME_LIMIT = 30000;
 const BOSS_TIME_LIMIT_SECONDS = Math.floor(BOSS_TIME_LIMIT / 1000);
@@ -374,6 +411,7 @@ class GameState {
         const loadedRebirths = Number(saved?.totalRebirths ?? 0);
         this.totalRebirths = Number.isFinite(loadedRebirths) ? Math.max(0, Math.floor(loadedRebirths)) : 0;
         this.initializeRebirthSkills(saved?.rebirthSkills);
+        this.initializeMissions(saved?.missions);
         this.normalizeEquippedState();
         const savedBossDeadline = Number(saved?.bossDeadline ?? 0);
         this.bossDeadline = Number.isFinite(savedBossDeadline)
@@ -654,6 +692,7 @@ class GameState {
         this.rebirthPoints = 0;
         this.totalRebirths = 0;
         this.initializeRebirthSkills({});
+        this.initializeMissions({});
     }
 
     toJSON() {
@@ -676,6 +715,7 @@ class GameState {
             rebirthPoints: this.rebirthPoints,
             totalRebirths: this.totalRebirths,
             rebirthSkills: this.rebirthSkills,
+            missions: this.serializeMissions(),
         };
     }
 
@@ -687,6 +727,108 @@ class GameState {
                 ? Math.max(0, Math.floor(savedLevel))
                 : 0;
         });
+    }
+
+    initializeMissions(savedMissions) {
+        this.missionProgress = {};
+        MISSIONS.forEach((mission) => {
+            const saved = savedMissions?.[mission.id];
+            const rawProgress = Number(saved?.progress ?? 0);
+            const progress = Number.isFinite(rawProgress) ? Math.max(0, Math.floor(rawProgress)) : 0;
+            const completed = saved?.completed ?? progress >= mission.goal;
+            const claimed = saved?.claimed ?? false;
+            this.missionProgress[mission.id] = {
+                progress: Math.min(mission.goal, progress),
+                completed: Boolean(completed),
+                claimed: Boolean(claimed),
+            };
+            if (this.missionProgress[mission.id].completed) {
+                this.missionProgress[mission.id].progress = Math.max(
+                    this.missionProgress[mission.id].progress,
+                    mission.goal,
+                );
+            }
+        });
+    }
+
+    serializeMissions() {
+        return MISSIONS.reduce((acc, mission) => {
+            const state = this.missionProgress[mission.id];
+            if (state) {
+                acc[mission.id] = {
+                    progress: state.progress,
+                    completed: state.completed,
+                    claimed: state.claimed,
+                };
+            }
+            return acc;
+        }, {});
+    }
+
+    getMissionState(missionId) {
+        return this.missionProgress[missionId] ?? { progress: 0, completed: false, claimed: false };
+    }
+
+    progressMissions(trigger, amount = 1) {
+        const normalizedAmount = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
+        if (normalizedAmount <= 0) {
+            return [];
+        }
+        const completed = [];
+        MISSIONS.forEach((mission) => {
+            if (mission.trigger !== trigger) return;
+            const state = this.missionProgress[mission.id];
+            if (!state || state.claimed) return;
+            if (state.completed && state.progress >= mission.goal) return;
+            const previousProgress = state.progress;
+            state.progress = Math.min(mission.goal, previousProgress + normalizedAmount);
+            if (state.progress >= mission.goal) {
+                state.completed = true;
+                completed.push({ mission, state });
+            }
+        });
+        if (completed.length > 0) {
+            this.lastSave = Date.now();
+        }
+        return completed;
+    }
+
+    claimMissionReward(missionId) {
+        const mission = MISSION_MAP.get(missionId);
+        if (!mission) {
+            return { success: false, message: '알 수 없는 임무입니다.' };
+        }
+        const state = this.missionProgress[missionId];
+        if (!state || !state.completed) {
+            return { success: false, message: '아직 임무가 완료되지 않았습니다.' };
+        }
+        if (state.claimed) {
+            return { success: false, message: '이미 보상을 수령했습니다.' };
+        }
+        const rewardResult = this.applyMissionReward(mission.reward);
+        state.claimed = true;
+        this.lastSave = Date.now();
+        return { success: true, mission, reward: mission.reward, rewardResult };
+    }
+
+    applyMissionReward(reward) {
+        if (!reward) {
+            return null;
+        }
+        const amount = Number.isFinite(reward.amount) ? Math.max(0, Math.floor(reward.amount)) : 0;
+        switch (reward.type) {
+            case 'gold':
+                this.gold += amount;
+                return { type: reward.type, amount };
+            case 'gachaTokens':
+                this.gachaTokens += amount;
+                return { type: reward.type, amount };
+            case 'rebirthPoints':
+                this.rebirthPoints += amount;
+                return { type: reward.type, amount };
+            default:
+                return null;
+        }
     }
 
     normalizeEquipmentItem(item) {
@@ -892,6 +1034,9 @@ const UI = {
     equipmentSlots: document.getElementById('equipmentSlots'),
     equipmentInventory: document.getElementById('equipmentInventory'),
     equipmentEmpty: document.getElementById('equipmentEmpty'),
+    missionSummary: document.getElementById('missionSummary'),
+    missionList: document.getElementById('missionList'),
+    missionEmpty: document.getElementById('missionEmpty'),
     panelTabButtons: document.querySelectorAll('[data-tab-target]'),
     panelViews: document.querySelectorAll('[data-tab]'),
 };
@@ -902,6 +1047,7 @@ class GameUI {
         this.heroTemplate = document.getElementById('heroTemplate');
         this.heroElements = new Map();
         this.rebirthSkillElements = new Map();
+        this.missionElements = new Map();
         this.sortState = state.sortOrder === 'dps' ? 'dps' : 'level';
         this.tabButtons = [];
         this.tabPanels = new Map();
@@ -910,6 +1056,7 @@ class GameUI {
         this.updateGachaHistoryVisibility();
         this.renderHeroes();
         this.renderEquipmentUI();
+        this.renderMissionUI();
         this.renderRebirthUI();
         this.updateSortButton();
         this.updateUI();
@@ -984,6 +1131,9 @@ class GameUI {
         }
         if (UI.equipmentInventory) {
             UI.equipmentInventory.addEventListener('click', (event) => this.handleEquipmentInventoryClick(event));
+        }
+        if (UI.missionList) {
+            UI.missionList.addEventListener('click', (event) => this.handleMissionListClick(event));
         }
     }
 
@@ -1345,6 +1495,138 @@ class GameUI {
         });
     }
 
+
+    renderMissionUI() {
+        if (!UI.missionList) return;
+        UI.missionList.innerHTML = '';
+        this.missionElements.clear();
+        MISSIONS.forEach((mission) => {
+            const entry = document.createElement('li');
+            entry.className = 'mission';
+            entry.dataset.missionId = mission.id;
+
+            const header = document.createElement('div');
+            header.className = 'mission__header';
+
+            const title = document.createElement('h3');
+            title.className = 'mission__title';
+            title.textContent = mission.name;
+
+            const status = document.createElement('span');
+            status.className = 'mission__status';
+
+            header.append(title, status);
+
+            const desc = document.createElement('p');
+            desc.className = 'mission__desc';
+            desc.textContent = mission.description;
+
+            const reward = document.createElement('div');
+            reward.className = 'mission__reward';
+            reward.textContent = `보상: ${this.formatMissionReward(mission.reward)}`;
+
+            const progressWrapper = document.createElement('div');
+            progressWrapper.className = 'mission__progress';
+
+            const progressLabel = document.createElement('span');
+            progressLabel.className = 'mission__progress-label';
+
+            const progressBar = document.createElement('div');
+            progressBar.className = 'mission__progress-bar';
+
+            const progressFill = document.createElement('div');
+            progressFill.className = 'mission__progress-fill';
+            progressBar.appendChild(progressFill);
+
+            progressWrapper.append(progressLabel, progressBar);
+
+            const actions = document.createElement('div');
+            actions.className = 'mission__actions';
+
+            const button = document.createElement('button');
+            button.className = 'btn btn-secondary mission__claim';
+            button.type = 'button';
+            button.dataset.missionId = mission.id;
+            button.textContent = '보상 수령';
+
+            actions.appendChild(button);
+
+            entry.append(header, desc, reward, progressWrapper, actions);
+            UI.missionList.appendChild(entry);
+
+            this.missionElements.set(mission.id, {
+                entry,
+                status,
+                progressLabel,
+                progressFill,
+                button,
+            });
+        });
+        this.updateMissionUI();
+    }
+
+    updateMissionUI() {
+        this.updateMissionSummary();
+        MISSIONS.forEach((mission) => this.updateMissionEntry(mission));
+        this.updateMissionEmptyState();
+    }
+
+    updateMissionSummary() {
+        if (!UI.missionSummary) return;
+        const total = MISSIONS.length;
+        const completed = MISSIONS.filter((mission) => this.state.getMissionState(mission.id).completed).length;
+        const claimed = MISSIONS.filter((mission) => this.state.getMissionState(mission.id).claimed).length;
+        if (claimed >= total && total > 0) {
+            UI.missionSummary.textContent = '모든 임무를 완료했습니다! 새로운 임무를 기다려 주세요.';
+        } else {
+            UI.missionSummary.textContent = `진행 중인 임무 ${formatNumber(total - claimed)}개 · 완료 ${formatNumber(
+                completed,
+            )}/${formatNumber(total)}`;
+        }
+    }
+
+    updateMissionEntry(mission) {
+        const elements = this.missionElements.get(mission.id);
+        if (!elements) return;
+        const state = this.state.getMissionState(mission.id);
+        const progress = Math.min(mission.goal, state.progress ?? 0);
+        const percent = mission.goal > 0 ? Math.min(100, (progress / mission.goal) * 100) : 0;
+        elements.progressLabel.textContent = `${formatNumber(progress)}/${formatNumber(mission.goal)}`;
+        elements.progressFill.style.width = `${percent}%`;
+        const completed = Boolean(state.completed) || progress >= mission.goal;
+        const claimed = Boolean(state.claimed);
+        elements.entry.dataset.state = claimed ? 'claimed' : completed ? 'completed' : 'active';
+        elements.status.textContent = claimed ? '수령 완료' : completed ? '보상 수령 가능' : '진행 중';
+        elements.button.disabled = !completed || claimed;
+        elements.button.textContent = claimed ? '수령 완료' : '보상 수령';
+        elements.button.title = claimed
+            ? '이미 보상을 수령했습니다.'
+            : completed
+            ? `보상: ${this.formatMissionReward(mission.reward)}`
+            : '임무를 먼저 완료하세요.';
+    }
+
+    updateMissionEmptyState() {
+        if (!UI.missionEmpty) return;
+        const remaining = MISSIONS.some((mission) => !this.state.getMissionState(mission.id).claimed);
+        UI.missionEmpty.style.display = remaining ? 'none' : 'block';
+    }
+
+    formatMissionReward(reward) {
+        if (!reward) return '없음';
+        const amountText = formatNumber(reward.amount ?? 0);
+        switch (reward.type) {
+            case 'gold':
+                return `${amountText} 골드`;
+            case 'gachaTokens':
+                return `모집권 ${amountText}개`;
+            case 'rebirthPoints':
+                return `환생 포인트 ${amountText}P`;
+            default:
+                return '알 수 없는 보상';
+        }
+    }
+
     handleEquipmentInventoryClick(event) {
         const upgradeButton = event.target.closest('[data-upgrade-id]');
         if (upgradeButton) {
@@ -1409,6 +1691,38 @@ class GameUI {
         this.updateHeroes();
     }
 
+    handleMissionListClick(event) {
+        const button = event.target.closest('.mission__claim');
+        if (!button) return;
+        const missionId = button.dataset.missionId;
+        if (!missionId) return;
+        this.handleMissionClaim(missionId);
+    }
+
+    handleMissionClaim(missionId) {
+        const result = this.state.claimMissionReward(missionId);
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const rewardText = this.formatMissionReward(result.reward);
+        this.addLog(`임무 보상 수령: ${result.mission.name}! (${rewardText})`, 'success');
+        this.updateMissionUI();
+        this.updateStats();
+        this.updateGachaUI();
+        saveGame(this.state);
+    }
+
+    handleMissionProgress(trigger, amount = 1) {
+        const completed = this.state.progressMissions(trigger, amount);
+        this.updateMissionUI();
+        if (completed.length === 0) return;
+        completed.forEach(({ mission }) => {
+            this.addLog(`임무 완료: ${mission.name}! 보상을 수령하세요.`, 'success');
+        });
+        saveGame(this.state);
+    }
+
     handleRebirthSkillClick(event) {
         const button = event.target.closest('[data-skill-id]');
         if (!button) return;
@@ -1440,6 +1754,7 @@ class GameUI {
         );
         this.renderHeroes();
         this.updateUI();
+        this.handleMissionProgress('rebirth', 1);
         saveGame(this.state);
     }
 
@@ -1534,6 +1849,7 @@ class GameUI {
 
     updateUI() {
         this.updateStats();
+        this.updateMissionUI();
         this.updateGachaUI();
         this.updateHeroes();
         this.updateEnemy();
@@ -1584,6 +1900,7 @@ class GameUI {
         if (previousBest < REBIRTH_STAGE_REQUIREMENT && defeatedStage >= REBIRTH_STAGE_REQUIREMENT) {
             this.addLog('환생의 기운이 깨어났습니다! 환생 메뉴에서 포인트를 획득하세요.', 'success');
         }
+        this.handleMissionProgress('enemyDefeat', 1);
     }
 
     handleClickUpgrade() {
@@ -1622,6 +1939,7 @@ class GameUI {
         this.renderHeroes();
         this.updateStats();
         this.updateGachaUI();
+        this.handleMissionProgress('gachaRoll', result.count);
         saveGame(this.state);
     }
 
@@ -1767,6 +2085,7 @@ class GameUI {
         this.clearGachaResults();
         this.renderHeroes();
         this.renderEquipmentUI();
+        this.renderMissionUI();
         this.renderRebirthUI();
         this.updateUI();
         saveGame(this.state);
