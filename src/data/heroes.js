@@ -292,8 +292,8 @@ export const HERO_TRAIT_TYPES = ['school', 'weapon', 'position'];
 export const defaultHeroes = [
     {
         id: 'shiroko',
-        name: '시로코 - 아비도스 라이더',
-        description: '아비도스 대책위원회의 라이딩 에이스로 꾸준한 사격 지원을 제공합니다.',
+        name: '시로코 - 아비도스 대책위원회',
+        description: '사이클링 파티 모집 중⋯ (1/5)',
         baseCost: 25,
         costMultiplier: 1.08,
         baseDamage: 5,
@@ -305,8 +305,8 @@ export const defaultHeroes = [
     },
     {
         id: 'hoshino',
-        name: '호시노 - 방과후 지휘',
-        description: '방과후 대책위원회의 부장. 여유로운 모습과 달리 안정적인 탄막을 유지합니다.',
+        name: '호시노 - 아비도스 대책위원회',
+        description: '낮잠 시간은 한참 지났는데 말이지. 뭐, 어쩔 수 없나.',
         baseCost: 120,
         costMultiplier: 1.1,
         baseDamage: 18,
@@ -318,8 +318,8 @@ export const defaultHeroes = [
     },
     {
         id: 'aru',
-        name: '아루 - 청룡당 리더',
-        description: '게헨나 청룡당의 리더로 폭발적인 화력을 자랑합니다.',
+        name: '아루 - 게헨나 흥신소68',
+        description: '무엇이든 해결해 드립니다',
         baseCost: 450,
         costMultiplier: 1.12,
         baseDamage: 75,
@@ -331,8 +331,8 @@ export const defaultHeroes = [
     },
     {
         id: 'hibiki',
-        name: '히비키 - 밀레니엄 포격',
-        description: '밀레니엄 사이언스 스쿨의 폭격 지원 담당. 정밀 포격으로 광역 피해를 입힙니다.',
+        name: '히비키 - 밀레니엄 엔지니어부',
+        description: '말보다는 행동으로.',
         baseCost: 1800,
         costMultiplier: 1.14,
         baseDamage: 220,
@@ -344,8 +344,8 @@ export const defaultHeroes = [
     },
     {
         id: 'iroha',
-        name: '이로하 - 코사카 특무대',
-        description: '코사카 특무대의 전차 지휘관으로 강력한 포격으로 보스를 제압합니다.',
+        name: '이로하 - 게헨나 만마전',
+        description: '독서 중입니다. 찾지 말아주세요.',
         baseCost: 5200,
         costMultiplier: 1.15,
         baseDamage: 620,
@@ -357,8 +357,8 @@ export const defaultHeroes = [
     },
     {
         id: 'yuuka',
-        name: '유우카 - 밀레니엄 회계',
-        description: '밀레니엄 재무국의 회계 담당. 냉철한 판단으로 자원을 효율적으로 운용합니다.',
+        name: '유우카 - 밀레니엄 세미나',
+        description: '계산대로야.',
         baseCost: 2300,
         costMultiplier: 1.13,
         baseDamage: 360,
