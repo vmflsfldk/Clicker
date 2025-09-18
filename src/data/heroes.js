@@ -143,6 +143,54 @@ export const HERO_SKIN_LIBRARY = {
             image: 'assets/images/students/yuuka/resort.png',
         },
     ],
+    serina: [
+        {
+            id: 'standard',
+            name: '세리나(교복)',
+            description: '부상자는 없나요? 잠깐, 체온부터 측정할게요.',
+            requiredLevel: 1,
+            theme: 'serina-standard',
+            preview: 'linear-gradient(135deg, #bfdbfe 0%, #60a5fa 45%, #1d4ed8 100%)',
+            accentColor: '#bfdbfe',
+            shadowColor: 'rgba(191, 219, 254, 0.35)',
+            image: 'assets/images/students/serina/standard.png',
+        },
+        {
+            id: 'aid',
+            name: '세리나(긴급의료)',
+            description: '긴급 의료 키트를 들고 어디서든 달려갑니다.',
+            requiredLevel: 20,
+            theme: 'serina-aid',
+            preview: 'linear-gradient(135deg, #34d399 0%, #10b981 45%, #0f172a 100%)',
+            accentColor: '#34d399',
+            shadowColor: 'rgba(52, 211, 153, 0.35)',
+            image: 'assets/images/students/serina/aid.png',
+        },
+    ],
+    mika: [
+        {
+            id: 'standard',
+            name: '미카(교복)',
+            description: '빛나는 성좌가 선생님을 인도해 드릴게요.',
+            requiredLevel: 1,
+            theme: 'mika-standard',
+            preview: 'linear-gradient(135deg, #fda4af 0%, #fb7185 45%, #7c2d12 100%)',
+            accentColor: '#fda4af',
+            shadowColor: 'rgba(253, 164, 175, 0.35)',
+            image: 'assets/images/students/mika/standard.png',
+        },
+        {
+            id: 'seraph',
+            name: '미카(세라프)',
+            description: '성스러운 빛으로 전장을 정화합니다.',
+            requiredLevel: 45,
+            theme: 'mika-seraph',
+            preview: 'linear-gradient(135deg, #facc15 0%, #f97316 45%, #7c2d12 100%)',
+            accentColor: '#facc15',
+            shadowColor: 'rgba(250, 204, 21, 0.35)',
+            image: 'assets/images/students/mika/seraph.png',
+        },
+    ],
 };
 
 export const HERO_BOND_EXP_REQUIREMENTS = [0, 60, 140, 260, 420, 620];
@@ -202,6 +250,33 @@ export const HERO_BOND_REWARDS = {
             level: 5,
             description: '호시노의 절대 충성! 개인 화력이 18% 상승합니다.',
             effects: { heroSelf: 0.18 },
+        },
+    ],
+    serina: [
+        {
+            level: 1,
+            description: '세리나의 응급 처치로 개인 화력이 8% 상승합니다.',
+            effects: { heroSelf: 0.08 },
+        },
+        {
+            level: 2,
+            description: '긴급 의료팀의 지원으로 전체 학생 지원 화력이 3% 증가합니다.',
+            effects: { hero: 0.03 },
+        },
+        {
+            level: 3,
+            description: '구급 훈련 덕분에 전술 스킬 효율이 5% 상승합니다.',
+            effects: { skill: 0.05 },
+        },
+        {
+            level: 4,
+            description: '치료 물자 확충으로 학생 치명타 확률이 1% 증가합니다.',
+            effects: { heroCritChance: 0.01 },
+        },
+        {
+            level: 5,
+            description: '세리나의 절대적 신뢰! 개인 화력이 15% 증가합니다.',
+            effects: { heroSelf: 0.15 },
         },
     ],
     aru: [
@@ -312,6 +387,33 @@ export const HERO_BOND_REWARDS = {
             effects: { heroSelf: 0.16 },
         },
     ],
+    mika: [
+        {
+            level: 1,
+            description: '미카의 축복으로 개인 화력이 12% 증가합니다.',
+            effects: { heroSelf: 0.12 },
+        },
+        {
+            level: 2,
+            description: '성좌의 인도로 전체 학생 지원 화력이 4% 증가합니다.',
+            effects: { hero: 0.04 },
+        },
+        {
+            level: 3,
+            description: '천상의 기도로 학생 치명타 피해 배율이 7% 증가합니다.',
+            effects: { heroCritDamage: 0.07 },
+        },
+        {
+            level: 4,
+            description: '빛나는 전술로 전술 스킬 효율이 6% 상승합니다.',
+            effects: { skill: 0.06 },
+        },
+        {
+            level: 5,
+            description: '미카의 절대 신뢰! 개인 화력이 18% 증가합니다.',
+            effects: { heroSelf: 0.18 },
+        },
+    ],
 };
 
 export const HERO_TRAIT_GROUPS = [
@@ -341,6 +443,13 @@ export const HERO_TRAIT_GROUPS = [
                 shortName: '밀레니엄',
                 description: '첨단 장비로 전장을 지휘하는 밀레니엄 학생들입니다.',
                 accentColor: '#22d3ee',
+            },
+            {
+                id: 'trinity',
+                name: '트리니티 종합학원',
+                shortName: '트리니티',
+                description: '신성한 규율로 전장을 수호하는 트리니티 학생들입니다.',
+                accentColor: '#facc15',
             },
         ],
     },
@@ -391,6 +500,13 @@ export const HERO_TRAIT_GROUPS = [
                 shortName: 'SG',
                 description: '근접전에서 뛰어난 학생입니다.',
                 accentColor: '#e7fa15',
+            },
+            {
+                id: 'hg',
+                name: '권총',
+                shortName: 'HG',
+                description: '정교한 컨트롤과 빠른 대응력을 가진 권총 사용 학생입니다.',
+                accentColor: '#fbbf24',
             },
         ],
     },
@@ -468,6 +584,20 @@ export const HERO_SET_BONUSES = [
         requirement: { type: 'position', trait: 'special', count: 2 },
         effects: { skill: 0.05, critDamage: 0.1 },
     },
+    {
+        id: 'trinity-liturgy',
+        name: '트리니티 기도회',
+        description: '트리니티 학생들의 신성한 응원이 부대를 고양시킵니다.',
+        requirement: { type: 'school', trait: 'trinity', count: 2 },
+        effects: { hero: 0.05, critDamage: 0.08 },
+    },
+    {
+        id: 'handgun-support',
+        name: '권총 전술 지원',
+        description: '권총 전술 교범이 정확한 사격과 지휘력을 제공합니다.',
+        requirement: { type: 'weapon', trait: 'hg', count: 2 },
+        effects: { tap: 0.03, skill: 0.06 },
+    },
 ];
 
 export const HERO_TRAIT_TYPES = ['school', 'weapon', 'position'];
@@ -498,6 +628,19 @@ export const defaultHeroes = [
         school: 'abydos',
         weapon: 'sg',
         position: 'striker',
+    },
+    {
+        id: 'serina',
+        name: '세리나 - 트리니티 보충수업부',
+        description: '선생님의 곁이라면 어디든 의료 지원을 담당하겠습니다.',
+        baseCost: 320,
+        costMultiplier: 1.09,
+        baseDamage: 32,
+        rarity: 'rare',
+        skins: HERO_SKIN_LIBRARY.serina,
+        school: 'trinity',
+        weapon: 'hg',
+        position: 'special',
     },
     {
         id: 'aru',
@@ -549,6 +692,19 @@ export const defaultHeroes = [
         skins: HERO_SKIN_LIBRARY.yuuka,
         school: 'millennium',
         weapon: 'smg',
+        position: 'striker',
+    },
+    {
+        id: 'mika',
+        name: '미카 - 트리니티 보충수업부',
+        description: '성좌의 빛으로 전장을 비추는 미카입니다.',
+        baseCost: 7600,
+        costMultiplier: 1.16,
+        baseDamage: 820,
+        rarity: 'legendary',
+        skins: HERO_SKIN_LIBRARY.mika,
+        school: 'trinity',
+        weapon: 'sr',
         position: 'striker',
     },
 ];
