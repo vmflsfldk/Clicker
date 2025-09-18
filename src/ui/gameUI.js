@@ -2103,6 +2103,17 @@ export class GameUI {
         const columnValues = nodes.map((node) => Number(node.position?.column ?? 0));
         const maxRow = Math.max(...rowValues, 0);
         const maxColumn = Math.max(...columnValues, 0);
+        const rowCount = Number.isFinite(maxRow) ? maxRow + 1 : 1;
+        const columnCount = Number.isFinite(maxColumn) ? maxColumn + 1 : 1;
+        const verticalStep = rowCount > 0 ? 100 / rowCount : 100;
+        const horizontalStep = columnCount > 0 ? 100 / columnCount : 100;
+        const dynamicHeight = Math.max(320, rowCount * 160);
+
+        if (UI.rebirthTree) {
+            UI.rebirthTree.style.setProperty('--rebirth-tree-min-height', `${dynamicHeight}px`);
+        }
+        UI.rebirthTreeNodes.style.minHeight = `${dynamicHeight}px`;
+        UI.rebirthTreeConnections.style.minHeight = `${dynamicHeight}px`;
 
         nodes.forEach((node) => {
             const wrapper = document.createElement('button');
@@ -2129,12 +2140,12 @@ export class GameUI {
             UI.rebirthTreeNodes.appendChild(wrapper);
 
             const position = node.position ?? { row: 0, column: 0 };
-            const rowRatio = maxRow > 0 ? position.row / maxRow : 0.5;
-            const columnRatio = maxColumn > 0 ? position.column / maxColumn : 0.5;
-            const topPercent = maxRow > 0 ? 25 + rowRatio * 50 : 50;
-            const leftPercent = maxColumn > 0 ? 15 + columnRatio * 70 : 50;
-            wrapper.style.top = `${Math.min(100, Math.max(0, topPercent))}%`;
-            wrapper.style.left = `${Math.min(100, Math.max(0, leftPercent))}%`;
+            const rowIndex = Number.isFinite(position.row) ? position.row : 0;
+            const columnIndex = Number.isFinite(position.column) ? position.column : 0;
+            const topPercent = verticalStep * (rowIndex + 0.5);
+            const leftPercent = horizontalStep * (columnIndex + 0.5);
+            wrapper.style.top = `${Math.min(95, Math.max(5, topPercent))}%`;
+            wrapper.style.left = `${Math.min(95, Math.max(5, leftPercent))}%`;
 
             wrapper.addEventListener('click', () => this.handleRebirthNodeClick(node.id));
             wrapper.addEventListener('mouseenter', () => this.handleRebirthNodeFocus(node.id));
