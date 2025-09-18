@@ -465,6 +465,12 @@ h1,
     backdrop-filter: blur(18px);
 }
 
+@supports (height: 100dvh) {
+    .panel-views {
+        max-height: min(clamp(0px, 75dvh, 75vh), 760px);
+    }
+}
+
 .game__panel.is-overlay-open .panel-views {
     transform: translate(-50%, 0);
     pointer-events: auto;
@@ -1205,6 +1211,16 @@ h1,
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+}
+
+@supports (height: 100dvh) {
+    .hero-detail-overlay__dialog {
+        max-height: min(clamp(0px, 90dvh, 90vh), 720px);
+    }
+
+    .equipment-detail-overlay__dialog {
+        max-height: min(clamp(0px, 90dvh, 90vh), 620px);
+    }
 }
 
 .equipment-detail-overlay__close {
@@ -2849,6 +2865,12 @@ body.modal-open {
         border-radius: 24px 24px 0 0;
         box-shadow: 0 -18px 38px rgba(15, 23, 42, 0.55);
         transform: translate(-50%, calc(100% + 1.5rem));
+    }
+
+    @supports (height: 100dvh) {
+        .panel-views {
+            max-height: clamp(0px, 74dvh, 74vh);
+        }
     }
 
     .panel-view {
