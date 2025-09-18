@@ -102,6 +102,10 @@ const UI = {
     equipmentSalvageSelected: document.getElementById('equipmentSalvageSelected'),
     equipmentSalvageHint: document.getElementById('equipmentSalvageHint'),
     equipmentSelectionCount: document.getElementById('equipmentSelectionCount'),
+    equipmentDetailOverlay: document.getElementById('equipmentDetailOverlay'),
+    equipmentDetailBackdrop: document.getElementById('equipmentDetailBackdrop'),
+    equipmentDetailClose: document.getElementById('equipmentDetailClose'),
+    equipmentDetailContent: document.getElementById('equipmentDetailContent'),
     missionSummary: document.getElementById('missionSummary'),
     missionList: document.getElementById('missionList'),
     missionEmpty: document.getElementById('missionEmpty'),
@@ -118,6 +122,12 @@ const UI = {
     panelOverlayBackdrop: document.getElementById('panelOverlayBackdrop'),
     panelOverlayClose: document.getElementById('panelOverlayClose'),
 };
+
+const EQUIPMENT_TYPE_ICONS = new Map([
+    ['tap', '⚔️'],
+    ['hero', '🛡️'],
+    ['skill', '📡'],
+]);
 
 const describeEquipmentEffect = (effectId, value = 0) => {
     const effect = EQUIPMENT_EFFECT_MAP.get(effectId);
@@ -186,6 +196,17 @@ export class GameUI {
         if (this.heroDetailClose) {
             this.heroDetailClose.setAttribute('aria-hidden', 'true');
             this.heroDetailClose.setAttribute('tabindex', '-1');
+        }
+        this.equipmentDetailTemplate = document.getElementById('equipmentDetailTemplate');
+        this.equipmentDetailOverlay = UI.equipmentDetailOverlay ?? null;
+        this.equipmentDetailBackdrop = UI.equipmentDetailBackdrop ?? null;
+        this.equipmentDetailClose = UI.equipmentDetailClose ?? null;
+        this.equipmentDetailContent = UI.equipmentDetailContent ?? null;
+        this.equipmentDetailReturnFocus = null;
+        this.activeEquipmentDetail = null;
+        if (this.equipmentDetailClose) {
+            this.equipmentDetailClose.setAttribute('aria-hidden', 'true');
+            this.equipmentDetailClose.setAttribute('tabindex', '-1');
         }
         this.handleDoubleClick = (event) => {
             event.preventDefault();
@@ -350,6 +371,12 @@ export class GameUI {
                 this.handleHeroDetailContentClick(event),
             );
         }
+        if (this.equipmentDetailClose) {
+            this.equipmentDetailClose.addEventListener('click', () => this.closeEquipmentDetail());
+        }
+        if (this.equipmentDetailBackdrop) {
+            this.equipmentDetailBackdrop.addEventListener('click', () => this.closeEquipmentDetail());
+        }
         if (UI.bossRetreat) {
             UI.bossRetreat.addEventListener('click', () => this.handleBossRetreat());
         }
@@ -374,6 +401,9 @@ export class GameUI {
         if (UI.equipmentInventory) {
             UI.equipmentInventory.addEventListener('click', (event) => this.handleEquipmentInventoryClick(event));
             UI.equipmentInventory.addEventListener('change', (event) => this.handleEquipmentInventoryChange(event));
+        }
+        if (UI.equipmentSlots) {
+            UI.equipmentSlots.addEventListener('click', (event) => this.handleEquipmentSlotClick(event));
         }
         if (UI.equipmentFilterSalvageable) {
             UI.equipmentFilterSalvageable.addEventListener('change', (event) =>
@@ -1163,6 +1193,271 @@ export class GameUI {
         return Number.isFinite(item.value) ? item.value : 0;
     }
 
+    getEquipmentEffectSummary(item) {
+        if (!item) return '';
+        const effects = this.getEquipmentEffectDescriptions(item);
+        const primaryValue = this.getPrimaryEquipmentEffectValue(item);
+        const fallback = describeEquipmentEffect(item.type, primaryValue) ?? formatSignedPercent(primaryValue);
+        return effects.length > 0 ? effects.join(' · ') : fallback;
+    }
+
+    getEquipmentTypeIcon(typeId) {
+        if (!typeId) return '🎖️';
+        return EQUIPMENT_TYPE_ICONS.get(typeId) ?? '🎖️';
+    }
+
+    getEquipmentEffectDetails(item, type) {
+        if (!item) {
+            if (!type) return [];
+            const effectId = type.primaryEffect ?? type.id;
+            if (!effectId) return [];
+            const definition = EQUIPMENT_EFFECT_MAP.get(effectId);
+            if (!definition) {
+                return [];
+            }
+            return [
+                {
+                    id: effectId,
+                    label: definition.label ?? '주요 효과',
+                    value: null,
+                    description: definition.description ?? null,
+                },
+            ];
+        }
+        const order = Array.isArray(item.effectOrder) && item.effectOrder.length > 0
+            ? item.effectOrder
+            : Object.keys(item.effects ?? {});
+        return order
+            .map((effectId) => {
+                const effect = item.effects?.[effectId];
+                if (!effect) return null;
+                const definition = EQUIPMENT_EFFECT_MAP.get(effectId);
+                const label = definition?.label ?? effectId;
+                const rawValue = effect.value ?? 0;
+                const formattedValue = definition?.format === 'percent'
+                    ? formatSignedPercent(rawValue)
+                    : formatNumber(rawValue);
+                return {
+                    id: effectId,
+                    label,
+                    value: formattedValue,
+                    description: definition?.description ?? null,
+                };
+            })
+            .filter(Boolean);
+    }
+
+    getEquipmentStatusDetails(item) {
+        if (!item) return [];
+        const statuses = [];
+        const isEquipped = this.state.equipped?.[item.type] === item.id;
+        statuses.push(isEquipped ? '현재 장착 중입니다.' : '인벤토리에 보관 중입니다.');
+        statuses.push(item.locked ? '잠금 상태: 잠금됨' : '잠금 상태: 해제됨');
+        const upgradeContext = this.getEquipmentUpgradeContext(item);
+        if (item.level >= item.maxLevel) {
+            statuses.push('최대 강화 단계에 도달했습니다.');
+        } else if (upgradeContext.canUpgrade) {
+            const costText = upgradeContext.cost > 0 ? formatNumber(upgradeContext.cost) : '소모 없음';
+            statuses.push(`강화 가능 · 필요 재료 ${costText}개`);
+        } else if (!upgradeContext.hasMaterials && upgradeContext.cost > 0) {
+            statuses.push(`강화 재료 부족 · 필요 ${formatNumber(upgradeContext.cost)}개`);
+        }
+        const salvageable = this.state.canSalvageItem(item);
+        statuses.push(salvageable ? '분해 가능 상태입니다.' : '잠금 또는 장착 중이라 분해할 수 없습니다.');
+        return statuses;
+    }
+
+    handleEquipmentSlotClick(event) {
+        const button = event.target.closest('[data-equipment-slot]');
+        if (!button) return;
+        const typeId = button.dataset.equipmentSlot;
+        if (!typeId) return;
+        this.openEquipmentDetail({ typeId, trigger: button });
+    }
+
+    openEquipmentDetail({ itemId = null, typeId = null, trigger = null } = {}) {
+        if (!this.equipmentDetailTemplate || !this.equipmentDetailContent) {
+            return;
+        }
+        const normalizedTypeId = typeId ?? null;
+        let item = null;
+        if (itemId) {
+            item = this.state.inventory.find((entry) => entry.id === itemId) ?? null;
+        }
+        if (!item && normalizedTypeId) {
+            item = this.state.getEquippedItem(normalizedTypeId);
+        }
+        const resolvedTypeId = normalizedTypeId ?? item?.type ?? null;
+        const type = resolvedTypeId ? EQUIPMENT_TYPE_MAP.get(resolvedTypeId) ?? null : null;
+        const node = this.equipmentDetailTemplate.content.firstElementChild.cloneNode(true);
+        this.populateEquipmentDetail(node, item, type);
+        this.equipmentDetailContent.innerHTML = '';
+        this.equipmentDetailContent.appendChild(node);
+        if (trigger instanceof HTMLElement) {
+            this.equipmentDetailReturnFocus = trigger;
+        } else if (!this.equipmentDetailReturnFocus && document.activeElement instanceof HTMLElement) {
+            this.equipmentDetailReturnFocus = document.activeElement;
+        }
+        this.activeEquipmentDetail = {
+            itemId: item?.id ?? null,
+            typeId: resolvedTypeId,
+        };
+        if (this.equipmentDetailOverlay) {
+            this.equipmentDetailOverlay.classList.add('is-open');
+            this.equipmentDetailOverlay.setAttribute('aria-hidden', 'false');
+        }
+        if (this.equipmentDetailClose) {
+            this.equipmentDetailClose.setAttribute('aria-hidden', 'false');
+            this.equipmentDetailClose.setAttribute('tabindex', '0');
+            this.equipmentDetailClose.focus({ preventScroll: true });
+        }
+        document.body.classList.add('is-equipment-detail-open');
+    }
+
+    populateEquipmentDetail(node, item, type) {
+        if (!node) return;
+        const resolvedTypeId = type?.id ?? item?.type ?? null;
+        node.dataset.rarity = item?.rarity ?? 'none';
+        const icon = node.querySelector('.equipment-detail__icon');
+        if (icon) {
+            icon.textContent = this.getEquipmentTypeIcon(resolvedTypeId);
+        }
+        const typeLabel = node.querySelector('.equipment-detail__type');
+        if (typeLabel) {
+            typeLabel.textContent = type?.label ?? '전술 장비';
+        }
+        const nameEl = node.querySelector('.equipment-detail__name');
+        if (nameEl) {
+            const rarity = item ? EQUIPMENT_RARITY_MAP.get(item.rarity) : null;
+            nameEl.textContent = item
+                ? `${rarity ? `[${rarity.name}] ` : ''}${item.name}`
+                : '장착된 전술 장비 없음';
+        }
+        const metaEl = node.querySelector('.equipment-detail__meta');
+        if (metaEl) {
+            if (item) {
+                const metaParts = [`Lv. ${item.level}/${item.maxLevel}`];
+                if (Number.isFinite(item.stage)) {
+                    metaParts.push(`${formatNumber(item.stage)}층 획득`);
+                }
+                metaEl.textContent = metaParts.join(' · ');
+            } else {
+                metaEl.textContent = type?.description ?? '장비를 장착해 전술 지원을 강화하세요.';
+            }
+        }
+        const descriptionEl = node.querySelector('.equipment-detail__description');
+        if (descriptionEl) {
+            if (item) {
+                const summary = this.getEquipmentEffectSummary(item);
+                descriptionEl.textContent = summary || type?.description || '장비 효과 정보가 없습니다.';
+            } else {
+                descriptionEl.textContent = type?.description ?? '장비를 장착하면 효과가 적용됩니다.';
+            }
+        }
+        const effectList = node.querySelector('.equipment-detail__effect-list');
+        if (effectList) {
+            effectList.innerHTML = '';
+            const effects = this.getEquipmentEffectDetails(item, type);
+            if (effects.length > 0) {
+                effects.forEach(({ label, value, description }) => {
+                    const li = document.createElement('li');
+                    if (label) {
+                        const labelSpan = document.createElement('span');
+                        labelSpan.className = 'equipment-detail__effect-label';
+                        labelSpan.textContent = label;
+                        li.appendChild(labelSpan);
+                    }
+                    if (value) {
+                        const valueStrong = document.createElement('strong');
+                        valueStrong.textContent = value;
+                        li.appendChild(valueStrong);
+                    }
+                    if (description) {
+                        const desc = document.createElement('span');
+                        desc.className = 'equipment-detail__effect-desc';
+                        desc.textContent = description;
+                        li.appendChild(desc);
+                    }
+                    effectList.appendChild(li);
+                });
+            } else {
+                const empty = document.createElement('li');
+                empty.textContent = item ? '추가 효과 없음' : '장비를 장착하면 상세 효과가 표시됩니다.';
+                effectList.appendChild(empty);
+            }
+        }
+        const statusSection = node.querySelector('.equipment-detail__section--status');
+        const statusList = node.querySelector('.equipment-detail__status-list');
+        if (statusSection && statusList) {
+            statusList.innerHTML = '';
+            const statuses = this.getEquipmentStatusDetails(item);
+            if (statuses.length > 0) {
+                statuses.forEach((status) => {
+                    const li = document.createElement('li');
+                    li.textContent = status;
+                    statusList.appendChild(li);
+                });
+                statusSection.hidden = false;
+            } else {
+                statusSection.hidden = true;
+            }
+        }
+    }
+
+    closeEquipmentDetail() {
+        const returnFocus = this.equipmentDetailReturnFocus;
+        if (this.equipmentDetailOverlay) {
+            this.equipmentDetailOverlay.classList.remove('is-open');
+            this.equipmentDetailOverlay.setAttribute('aria-hidden', 'true');
+        }
+        if (this.equipmentDetailContent) {
+            this.equipmentDetailContent.innerHTML = '';
+        }
+        if (this.equipmentDetailClose) {
+            this.equipmentDetailClose.setAttribute('aria-hidden', 'true');
+            this.equipmentDetailClose.setAttribute('tabindex', '-1');
+        }
+        document.body.classList.remove('is-equipment-detail-open');
+        this.activeEquipmentDetail = null;
+        if (returnFocus && typeof returnFocus.focus === 'function' && document.contains(returnFocus)) {
+            returnFocus.focus({ preventScroll: true });
+        }
+        this.equipmentDetailReturnFocus = null;
+    }
+
+    isEquipmentDetailOpen() {
+        return Boolean(this.equipmentDetailOverlay?.classList.contains('is-open'));
+    }
+
+    refreshEquipmentDetail() {
+        if (!this.isEquipmentDetailOpen() || !this.activeEquipmentDetail) {
+            return;
+        }
+        const { itemId, typeId } = this.activeEquipmentDetail;
+        let item = null;
+        if (itemId) {
+            item = this.state.inventory.find((entry) => entry.id === itemId) ?? null;
+        }
+        let type = null;
+        if (item) {
+            type = EQUIPMENT_TYPE_MAP.get(item.type) ?? null;
+        }
+        if (!item && typeId) {
+            item = this.state.getEquippedItem(typeId);
+            type = EQUIPMENT_TYPE_MAP.get(typeId) ?? null;
+        }
+        if (!type && (item?.type)) {
+            type = EQUIPMENT_TYPE_MAP.get(item.type) ?? null;
+        }
+        if (!this.equipmentDetailTemplate || !this.equipmentDetailContent) {
+            return;
+        }
+        const node = this.equipmentDetailTemplate.content.firstElementChild.cloneNode(true);
+        this.populateEquipmentDetail(node, item, type);
+        this.equipmentDetailContent.innerHTML = '';
+        this.equipmentDetailContent.appendChild(node);
+    }
+
     renderRebirthUI() {
         if (!UI.rebirthSkillList) return;
         UI.rebirthSkillList.innerHTML = '';
@@ -1391,49 +1686,72 @@ export class GameUI {
             const item = this.state.getEquippedItem(type.id);
             const slot = document.createElement('li');
             slot.className = 'equipment-slot';
-            slot.dataset.rarity = item?.rarity ?? 'none';
-            slot.dataset.equipped = item ? 'true' : 'false';
 
-            const label = document.createElement('div');
-            label.className = 'equipment-slot__label';
-            label.textContent = type.label;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'equipment-slot__button';
+            button.dataset.equipmentSlot = type.id;
+            button.dataset.rarity = item?.rarity ?? 'none';
+            button.dataset.equipped = item ? 'true' : 'false';
 
-            const content = document.createElement('div');
-            content.className = 'equipment-slot__content';
+            const icon = document.createElement('span');
+            icon.className = 'equipment-slot__icon';
+            icon.textContent = this.getEquipmentTypeIcon(type.id);
 
+            const typeLabel = document.createElement('span');
+            typeLabel.className = 'equipment-slot__type';
+            typeLabel.textContent = type.label;
+
+            const name = document.createElement('span');
+            name.className = 'equipment-slot__name';
+            const rarity = item ? EQUIPMENT_RARITY_MAP.get(item.rarity) : null;
             if (item) {
-                const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
-                const header = document.createElement('div');
-                header.className = 'equipment-slot__header';
-
-                const name = document.createElement('span');
-                name.className = 'equipment-slot__name';
                 const rarityTag = rarity ? `[${rarity.name}] ` : '';
                 name.textContent = `${rarityTag}${item.name}`;
-
-                const level = document.createElement('span');
-                level.className = 'equipment-slot__level';
-                level.textContent = `Lv. ${item.level}/${item.maxLevel}`;
-
-                header.append(name, level);
-
-                const value = document.createElement('span');
-                value.className = 'equipment-slot__value';
-                const effects = this.getEquipmentEffectDescriptions(item);
-                const primaryValue = this.getPrimaryEquipmentEffectValue(item);
-                const fallback = describeEquipmentEffect(item.type, primaryValue) ?? formatSignedPercent(primaryValue);
-                value.textContent = effects.length > 0 ? effects.join(' · ') : fallback;
-                content.append(header, value);
             } else {
-                const empty = document.createElement('span');
-                empty.className = 'equipment-slot__empty';
-                empty.textContent = '미장착';
-                content.appendChild(empty);
+                name.textContent = '미장착';
+                name.classList.add('equipment-slot__empty');
             }
 
-            slot.append(label, content);
+            const meta = document.createElement('span');
+            meta.className = 'equipment-slot__meta';
+            if (item) {
+                const metaParts = [`Lv. ${item.level}/${item.maxLevel}`];
+                if (Number.isFinite(item.stage)) {
+                    metaParts.push(`${formatNumber(item.stage)}층 획득`);
+                }
+                meta.textContent = metaParts.join(' · ');
+            } else {
+                meta.textContent = type.description ?? '장비를 장착해 효과를 활성화하세요.';
+                meta.classList.add('equipment-slot__empty');
+            }
+
+            const value = document.createElement('span');
+            value.className = 'equipment-slot__value';
+            if (item) {
+                const summary = this.getEquipmentEffectSummary(item);
+                value.textContent = summary || '효과 정보 없음';
+                if (!summary) {
+                    value.classList.add('equipment-slot__empty');
+                }
+            } else {
+                const effectId = type.primaryEffect ?? type.id;
+                const effect = EQUIPMENT_EFFECT_MAP.get(effectId);
+                const label = effect?.shortLabel ?? effect?.label ?? '전술 지원';
+                value.textContent = `${label} 특화`;
+                value.classList.add('equipment-slot__empty');
+            }
+
+            const labelText = item
+                ? `${type.label} 슬롯 - ${name.textContent} (${value.textContent})`
+                : `${type.label} 슬롯 - 장비 없음`;
+            button.setAttribute('aria-label', labelText);
+
+            button.append(icon, typeLabel, name, meta, value);
+            slot.appendChild(button);
             UI.equipmentSlots.appendChild(slot);
         });
+        this.refreshEquipmentDetail();
     }
 
     getEquipmentUpgradeContext(item) {
@@ -1497,6 +1815,7 @@ export class GameUI {
             entry.dataset.rarity = item.rarity;
             entry.dataset.equipped = equipped ? 'true' : 'false';
             entry.dataset.salvageable = salvageable ? 'true' : 'false';
+            entry.dataset.itemId = item.id;
 
             const selectWrapper = document.createElement('label');
             selectWrapper.className = 'equipment-item__select';
@@ -1521,8 +1840,10 @@ export class GameUI {
 
             selectWrapper.append(checkbox, checkboxLabel);
 
-            const info = document.createElement('div');
+            const info = document.createElement('button');
+            info.type = 'button';
             info.className = 'equipment-item__info';
+            info.dataset.detailId = item.id;
 
             const name = document.createElement('span');
             name.className = 'equipment-item__name';
@@ -1537,6 +1858,9 @@ export class GameUI {
             const fallbackEffect = describeEquipmentEffect(item.type, primary) ?? formatSignedPercent(primary);
             const effectText = effects.length > 0 ? effects.join(' / ') : fallbackEffect;
             details.textContent = `${typeLabel} · ${effectText} · Lv. ${item.level}/${item.maxLevel} · 스테이지 ${item.stage}`;
+
+            info.title = '전술 장비 상세 정보 보기';
+            info.setAttribute('aria-label', `${name.textContent} 상세 정보 보기`);
 
             const status = document.createElement('span');
             status.className = 'equipment-item__status';
@@ -1632,6 +1956,7 @@ export class GameUI {
         });
 
         this.updateEquipmentControls();
+        this.refreshEquipmentDetail();
     }
 
 
@@ -1863,6 +2188,11 @@ export class GameUI {
             this.closeSalvageModal();
             return;
         }
+        if (this.isEquipmentDetailOpen()) {
+            event.preventDefault();
+            this.closeEquipmentDetail();
+            return;
+        }
         if (this.isHeroDetailOpen()) {
             event.preventDefault();
             this.closeHeroDetail();
@@ -2033,6 +2363,14 @@ export class GameUI {
             const itemId = salvageButton.dataset.salvageId;
             if (!itemId) return;
             this.openSalvageModal([itemId]);
+            return;
+        }
+
+        const detailButton = event.target.closest('[data-detail-id]');
+        if (detailButton) {
+            const itemId = detailButton.dataset.detailId;
+            if (!itemId) return;
+            this.openEquipmentDetail({ itemId, trigger: detailButton });
             return;
         }
 

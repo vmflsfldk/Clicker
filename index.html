@@ -548,6 +548,26 @@
         </div>
     </div>
 
+    <div id="equipmentDetailOverlay" class="equipment-detail-overlay" aria-hidden="true">
+        <div id="equipmentDetailBackdrop" class="equipment-detail-overlay__backdrop" data-dismiss="true"></div>
+        <div
+            class="equipment-detail-overlay__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="equipmentDetailTitle"
+        >
+            <button
+                type="button"
+                id="equipmentDetailClose"
+                class="equipment-detail-overlay__close"
+                aria-label="전술 장비 정보 닫기"
+            >
+                ✕
+            </button>
+            <div id="equipmentDetailContent" class="equipment-detail-overlay__content"></div>
+        </div>
+    </div>
+
     <template id="heroIconTemplate">
         <li class="hero-icon" data-recruited="false" data-rarity="common">
             <button type="button" class="hero-icon__button">
@@ -597,6 +617,28 @@
                 <span class="hero__status-state"></span>
                 <span class="hero__status-detail"></span>
             </div>
+        </article>
+    </template>
+
+    <template id="equipmentDetailTemplate">
+        <article class="equipment-detail" data-rarity="none">
+            <header class="equipment-detail__header">
+                <div class="equipment-detail__icon" aria-hidden="true"></div>
+                <div class="equipment-detail__header-info">
+                    <p class="equipment-detail__type"></p>
+                    <h3 id="equipmentDetailTitle" class="equipment-detail__name"></h3>
+                    <p class="equipment-detail__meta"></p>
+                </div>
+            </header>
+            <p class="equipment-detail__description"></p>
+            <section class="equipment-detail__section" aria-label="장비 효과">
+                <h4 class="equipment-detail__section-title">효과 요약</h4>
+                <ul class="equipment-detail__effect-list"></ul>
+            </section>
+            <section class="equipment-detail__section equipment-detail__section--status" hidden>
+                <h4 class="equipment-detail__section-title">장비 상태</h4>
+                <ul class="equipment-detail__status-list"></ul>
+            </section>
         </article>
     </template>
 
