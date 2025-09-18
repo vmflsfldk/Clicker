@@ -13,7 +13,19 @@ export const loadGame = () => {
     try {
         const data = localStorage.getItem(STORAGE_KEY);
         if (!data) return null;
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        if (parsed && typeof parsed === 'object') {
+            if (!parsed.rebirthNodes && parsed.rebirthSkills) {
+                parsed.rebirthNodes = { ...parsed.rebirthSkills };
+            }
+            if (!Number.isFinite(parsed.rebirthCores)) {
+                parsed.rebirthCores = 0;
+            }
+            if (parsed.rebirthBranchFocus && typeof parsed.rebirthBranchFocus !== 'string') {
+                parsed.rebirthBranchFocus = null;
+            }
+        }
+        return parsed;
     } catch (error) {
         console.error('저장 데이터를 불러올 수 없습니다.', error);
         return null;

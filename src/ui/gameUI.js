@@ -20,7 +20,13 @@ import {
 } from '../state/gameState.js';
 import { HERO_SET_BONUSES } from '../data/heroes.js';
 import { EQUIPMENT_TYPES, EQUIPMENT_DROP_CHANCE, EQUIPMENT_BOSS_DROP_CHANCE } from '../data/equipment.js';
-import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
+import {
+    REBIRTH_EFFECT_LABELS,
+    REBIRTH_TREE,
+    REBIRTH_NODES,
+    REBIRTH_NODE_MAP,
+    REBIRTH_BRANCH_MAP,
+} from '../data/rebirth.js';
 import { SKILLS, SKILL_EFFECT_TYPES, SKILL_MAP } from '../data/skills.js';
 import { saveGame } from '../storage/save.js';
 import { formatNumber, formatPercent, formatSignedPercent, formatCountdown } from '../utils/format.js';
@@ -90,11 +96,27 @@ const UI = {
     rebirthPanel: document.getElementById('rebirthPanel'),
     rebirthButton: document.getElementById('rebirthButton'),
     rebirthRequirement: document.getElementById('rebirthRequirement'),
-    rebirthSkillList: document.getElementById('rebirthSkillList'),
     rebirthPoints: document.getElementById('rebirthPoints'),
     rebirthPotential: document.getElementById('rebirthPotential'),
     rebirthHighestStage: document.getElementById('rebirthHighestStage'),
     rebirthCount: document.getElementById('rebirthCount'),
+    rebirthTree: document.getElementById('rebirthTree'),
+    rebirthTreeNodes: document.getElementById('rebirthTreeNodes'),
+    rebirthTreeConnections: document.getElementById('rebirthTreeConnections'),
+    rebirthCores: document.getElementById('rebirthCores'),
+    rebirthRespecButton: document.getElementById('rebirthRespecButton'),
+    rebirthDetail: document.getElementById('rebirthDetail'),
+    rebirthDetailTitle: document.getElementById('rebirthDetailTitle'),
+    rebirthDetailBranch: document.getElementById('rebirthDetailBranch'),
+    rebirthDetailDescription: document.getElementById('rebirthDetailDescription'),
+    rebirthDetailCurrent: document.getElementById('rebirthDetailCurrent'),
+    rebirthDetailNext: document.getElementById('rebirthDetailNext'),
+    rebirthDetailCost: document.getElementById('rebirthDetailCost'),
+    rebirthDetailStatus: document.getElementById('rebirthDetailStatus'),
+    rebirthDetailUpgrade: document.getElementById('rebirthDetailUpgrade'),
+    rebirthBranchTitle: document.getElementById('rebirthBranchTitle'),
+    rebirthBranchDescription: document.getElementById('rebirthBranchDescription'),
+    rebirthBranchTotals: document.getElementById('rebirthBranchTotals'),
     equipmentSummary: document.getElementById('equipmentSummary'),
     equipmentTapBonus: document.getElementById('equipmentTapBonus'),
     equipmentHeroBonus: document.getElementById('equipmentHeroBonus'),
@@ -187,7 +209,12 @@ export class GameUI {
         this.activeHeroDetailId = null;
         this.heroDetailReturnFocus = null;
         this.setBonusElements = new Map();
-        this.rebirthSkillElements = new Map();
+        this.rebirthNodeElements = new Map();
+        this.rebirthConnections = [];
+        this.rebirthActiveNodeId = null;
+        this.rebirthPreviewNodeId = null;
+        this.rebirthResizeObserver = null;
+        this.rebirthResizeHandler = null;
         this.missionElements = new Map();
         this.missionGroupElements = new Map();
         this.missionGroupMissions = new Map();
@@ -415,8 +442,11 @@ export class GameUI {
         if (UI.rebirthButton) {
             UI.rebirthButton.addEventListener('click', () => this.handleRebirth());
         }
-        if (UI.rebirthSkillList) {
-            UI.rebirthSkillList.addEventListener('click', (event) => this.handleRebirthSkillClick(event));
+        if (UI.rebirthDetailUpgrade) {
+            UI.rebirthDetailUpgrade.addEventListener('click', () => this.handleRebirthNodeUpgrade());
+        }
+        if (UI.rebirthRespecButton) {
+            UI.rebirthRespecButton.addEventListener('click', () => this.handleRebirthRespec());
         }
         if (UI.equipmentInventory) {
             UI.equipmentInventory.addEventListener('click', (event) => this.handleEquipmentInventoryClick(event));
@@ -2055,52 +2085,98 @@ export class GameUI {
     }
 
     renderRebirthUI() {
-        if (!UI.rebirthSkillList) return;
-        UI.rebirthSkillList.innerHTML = '';
-        this.rebirthSkillElements.clear();
-        REBIRTH_SKILLS.forEach((skill) => {
-            const entry = document.createElement('li');
-            entry.className = 'rebirth-skill';
-            entry.dataset.skillId = skill.id;
+        if (!UI.rebirthTreeNodes || !UI.rebirthTreeConnections) {
+            return;
+        }
+        this.disconnectRebirthResizeObserver();
+        this.rebirthNodeElements.clear();
+        this.rebirthConnections = [];
+        UI.rebirthTreeNodes.innerHTML = '';
+        UI.rebirthTreeConnections.innerHTML = '';
 
-            const header = document.createElement('div');
-            header.className = 'rebirth-skill__header';
+        const nodes = Array.from(REBIRTH_NODES);
+        if (nodes.length === 0) {
+            return;
+        }
+
+        const rowValues = nodes.map((node) => Number(node.position?.row ?? 0));
+        const columnValues = nodes.map((node) => Number(node.position?.column ?? 0));
+        const maxRow = Math.max(...rowValues, 0);
+        const maxColumn = Math.max(...columnValues, 0);
+        const rowCount = Math.max(maxRow + 1, 1);
+        const estimatedRowHeight = 150;
+        const estimatedPadding = 140;
+        const treeHeight = Math.max(estimatedPadding + rowCount * estimatedRowHeight, 360);
+
+        if (UI.rebirthTree) {
+            UI.rebirthTree.style.minHeight = `${treeHeight}px`;
+        }
+        UI.rebirthTreeNodes.style.minHeight = `${treeHeight}px`;
+        UI.rebirthTreeNodes.style.height = `${treeHeight}px`;
+
+        nodes.forEach((node) => {
+            const wrapper = document.createElement('button');
+            wrapper.type = 'button';
+            wrapper.className = 'rebirth-node';
+            wrapper.dataset.nodeId = node.id;
+            wrapper.dataset.branch = node.branch ?? 'core';
+            wrapper.setAttribute('role', 'listitem');
 
             const name = document.createElement('span');
-            name.className = 'rebirth-skill__name';
-            name.textContent = skill.name;
+            name.className = 'rebirth-node__name';
+            name.textContent = node.name;
 
             const level = document.createElement('span');
-            level.className = 'rebirth-skill__level';
+            level.className = 'rebirth-node__level';
 
-            header.append(name, level);
+            const effect = document.createElement('span');
+            effect.className = 'rebirth-node__effect';
 
-            const desc = document.createElement('p');
-            desc.className = 'rebirth-skill__desc';
-            desc.textContent = skill.description;
+            const cost = document.createElement('span');
+            cost.className = 'rebirth-node__cost';
 
-            const bonus = document.createElement('span');
-            bonus.className = 'rebirth-skill__bonus';
-            bonus.textContent = skill.effectDescription;
+            wrapper.append(name, level, effect, cost);
+            UI.rebirthTreeNodes.appendChild(wrapper);
 
-            const actions = document.createElement('div');
-            actions.className = 'rebirth-skill__actions';
+            const position = node.position ?? { row: 0, column: 0 };
+            const rowRatio = maxRow > 0 ? position.row / maxRow : 0.5;
+            const columnRatio = maxColumn > 0 ? position.column / maxColumn : 0.5;
+            const topPercent = maxRow > 0 ? 10 + rowRatio * 80 : 50;
+            const leftPercent = maxColumn > 0 ? 10 + columnRatio * 80 : 50;
+            wrapper.style.top = `${Math.min(100, Math.max(0, topPercent))}%`;
+            wrapper.style.left = `${Math.min(100, Math.max(0, leftPercent))}%`;
 
-            const total = document.createElement('span');
-            total.className = 'rebirth-skill__total';
+            wrapper.addEventListener('click', () => this.handleRebirthNodeClick(node.id));
+            wrapper.addEventListener('mouseenter', () => this.handleRebirthNodeFocus(node.id));
+            wrapper.addEventListener('mouseleave', () => this.handleRebirthNodeBlur(node.id));
+            wrapper.addEventListener('focus', () => this.handleRebirthNodeFocus(node.id));
+            wrapper.addEventListener('blur', () => this.handleRebirthNodeBlur(node.id));
 
-            const button = document.createElement('button');
-            button.className = 'btn btn-secondary rebirth-skill__button';
-            button.dataset.skillId = skill.id;
-            button.type = 'button';
-
-            actions.append(total, button);
-
-            entry.append(header, desc, bonus, actions);
-            UI.rebirthSkillList.appendChild(entry);
-
-            this.rebirthSkillElements.set(skill.id, { level, total, button });
+            this.rebirthNodeElements.set(node.id, {
+                element: wrapper,
+                level,
+                effect,
+                cost,
+            });
         });
+
+        nodes.forEach((node) => {
+            const requirements = Array.isArray(node.prerequisites) ? node.prerequisites : [];
+            requirements.forEach((requirement) => {
+                const sourceId = requirement?.node;
+                if (!sourceId || !this.rebirthNodeElements.has(sourceId)) {
+                    return;
+                }
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.dataset.source = sourceId;
+                line.dataset.target = node.id;
+                UI.rebirthTreeConnections.appendChild(line);
+                this.rebirthConnections.push({ element: line, sourceId, targetId: node.id });
+            });
+        });
+
+        this.selectInitialRebirthNode();
+        this.observeRebirthTree();
         this.updateRebirthUI();
     }
 
@@ -2219,6 +2295,9 @@ export class GameUI {
         if (UI.rebirthPoints) {
             UI.rebirthPoints.textContent = formatNumber(this.state.rebirthPoints);
         }
+        if (UI.rebirthCores) {
+            UI.rebirthCores.textContent = formatNumber(this.state.rebirthCores);
+        }
         if (UI.rebirthButton) {
             UI.rebirthButton.disabled = !this.state.canRebirth;
         }
@@ -2243,36 +2322,351 @@ export class GameUI {
         if (UI.rebirthPanel) {
             UI.rebirthPanel.dataset.unlocked = this.state.highestStage >= REBIRTH_STAGE_REQUIREMENT ? 'true' : 'false';
         }
-        this.updateRebirthSkills();
+        if (UI.rebirthRespecButton) {
+            const respecCost = Number(REBIRTH_TREE?.respecCost ?? 0);
+            UI.rebirthRespecButton.textContent =
+                respecCost > 0
+                    ? `트리 재분배 (-${formatNumber(respecCost)} 코어)`
+                    : '트리 재분배';
+            const hasInvestment = this.state.getRebirthTotalInvestment() > 0;
+            UI.rebirthRespecButton.disabled = !hasInvestment || this.state.rebirthCores < respecCost;
+        }
+        this.updateRebirthNodes();
+        this.updateRebirthDetail();
+        this.updateRebirthConnections();
     }
 
-    updateRebirthSkills() {
-        if (this.rebirthSkillElements.size === 0) return;
+    updateRebirthNodes() {
+        if (!UI.rebirthTree) return;
+        const focus = this.state.rebirthBranchFocus;
+        if (focus) {
+            UI.rebirthTree.dataset.branchFocus = focus;
+        } else {
+            UI.rebirthTree.removeAttribute('data-branch-focus');
+        }
         const availablePoints = this.state.rebirthPoints;
-        REBIRTH_SKILLS.forEach((skill) => {
-            const elements = this.rebirthSkillElements.get(skill.id);
-            if (!elements) return;
-            const level = this.state.getRebirthSkillLevel(skill.id);
-            elements.level.textContent = `Lv. ${level}/${skill.maxLevel}`;
-            elements.total.textContent = this.formatRebirthTotal(skill, level);
-            const cost = this.state.getRebirthSkillCost(skill.id);
-            if (skill.maxLevel && level >= skill.maxLevel) {
-                elements.button.textContent = '최대 레벨';
-                elements.button.disabled = true;
+        this.rebirthNodeElements.forEach(({ element, level, effect, cost }, nodeId) => {
+            const node = REBIRTH_NODE_MAP.get(nodeId);
+            if (!node) return;
+            const nodeLevel = this.state.getRebirthNodeLevel(nodeId);
+            const maxLevel = Number.isFinite(node.maxLevel) ? Math.floor(node.maxLevel) : null;
+            const unlocked = this.state.isRebirthNodeUnlocked(nodeId);
+            const upgradeCost = this.state.getRebirthNodeCost(nodeId);
+            const state = this.getRebirthNodeState({
+                level: nodeLevel,
+                maxLevel,
+                unlocked,
+                cost: upgradeCost,
+                available: availablePoints,
+            });
+            level.textContent =
+                maxLevel !== null ? `Lv. ${nodeLevel}/${maxLevel}` : `Lv. ${nodeLevel}`;
+            effect.textContent = node.effectDescription ?? '효과 정보 없음';
+            if (!unlocked) {
+                cost.textContent = '선행 노드 필요';
+            } else if (maxLevel !== null && nodeLevel >= maxLevel) {
+                cost.textContent = '최대 레벨';
             } else {
-                elements.button.textContent = `강화 (${cost}P)`;
-                elements.button.disabled = cost > availablePoints;
+                cost.textContent = `비용 ${formatNumber(upgradeCost)}P`;
             }
+            element.dataset.state = state;
+            element.dataset.selected = this.rebirthActiveNodeId === nodeId ? 'true' : 'false';
+            element.dataset.active = nodeLevel > 0 ? 'true' : 'false';
+            element.disabled = false;
+            element.title = this.buildRebirthNodeTooltip(
+                node,
+                nodeLevel,
+                maxLevel,
+                upgradeCost,
+                unlocked,
+                availablePoints,
+            );
         });
     }
 
-    formatRebirthTotal(skill, level) {
-        if (level <= 0) return '총 효과: 없음';
-        const parts = Object.entries(skill.effect).map(([type, value]) => {
-            const label = REBIRTH_EFFECT_LABELS[type] ?? type;
-            return `${label} +${formatPercent(value * level)}`;
+    updateRebirthDetail() {
+        const nodeId =
+            (this.rebirthPreviewNodeId && this.rebirthNodeElements.has(this.rebirthPreviewNodeId)
+                ? this.rebirthPreviewNodeId
+                : this.rebirthActiveNodeId) ?? null;
+        if (!nodeId || !REBIRTH_NODE_MAP.has(nodeId)) {
+            if (UI.rebirthDetailTitle) {
+                UI.rebirthDetailTitle.textContent = '노드를 선택하세요';
+            }
+            if (UI.rebirthDetailBranch) {
+                UI.rebirthDetailBranch.textContent = '';
+            }
+            if (UI.rebirthDetailDescription) {
+                UI.rebirthDetailDescription.textContent = '강화하거나 미리보기할 노드를 선택하세요.';
+            }
+            if (UI.rebirthDetailCurrent) {
+                UI.rebirthDetailCurrent.textContent = '-';
+            }
+            if (UI.rebirthDetailNext) {
+                UI.rebirthDetailNext.textContent = '-';
+            }
+            if (UI.rebirthDetailCost) {
+                UI.rebirthDetailCost.textContent = '-';
+            }
+            if (UI.rebirthDetailStatus) {
+                UI.rebirthDetailStatus.textContent = '';
+            }
+            if (UI.rebirthDetailUpgrade) {
+                UI.rebirthDetailUpgrade.disabled = true;
+                UI.rebirthDetailUpgrade.textContent = '강화';
+                delete UI.rebirthDetailUpgrade.dataset.nodeId;
+            }
+            if (UI.rebirthBranchTitle) {
+                UI.rebirthBranchTitle.textContent = '분기를 선택하세요';
+            }
+            if (UI.rebirthBranchDescription) {
+                UI.rebirthBranchDescription.textContent = '';
+            }
+            if (UI.rebirthBranchTotals) {
+                UI.rebirthBranchTotals.textContent = '';
+            }
+            return;
+        }
+
+        const node = REBIRTH_NODE_MAP.get(nodeId);
+        const level = this.state.getRebirthNodeLevel(nodeId);
+        const maxLevel = Number.isFinite(node.maxLevel) ? Math.floor(node.maxLevel) : null;
+        const unlocked = this.state.isRebirthNodeUnlocked(nodeId);
+        const cost = this.state.getRebirthNodeCost(nodeId);
+        const available = this.state.rebirthPoints;
+        const branchId = node.branch && node.branch !== 'core' ? node.branch : null;
+        const branch = branchId ? REBIRTH_BRANCH_MAP.get(branchId) ?? null : null;
+
+        if (UI.rebirthDetailTitle) {
+            UI.rebirthDetailTitle.textContent = node.name;
+        }
+        if (UI.rebirthDetailBranch) {
+            UI.rebirthDetailBranch.textContent = branch?.label ?? (node.branch === 'core' ? '중앙 코어' : '');
+        }
+        if (UI.rebirthDetailDescription) {
+            UI.rebirthDetailDescription.textContent = node.description ?? '';
+        }
+        if (UI.rebirthDetailCurrent) {
+            UI.rebirthDetailCurrent.textContent = this.describeRebirthEffect(node.effect, level);
+        }
+        if (UI.rebirthDetailNext) {
+            if (maxLevel !== null && level >= maxLevel) {
+                UI.rebirthDetailNext.textContent = '최대 레벨';
+            } else {
+                UI.rebirthDetailNext.textContent = this.describeRebirthEffect(node.effect, level + 1);
+            }
+        }
+        if (UI.rebirthDetailCost) {
+            if (!unlocked) {
+                UI.rebirthDetailCost.textContent = '선행 조건 미충족';
+            } else if (maxLevel !== null && level >= maxLevel) {
+                UI.rebirthDetailCost.textContent = '강화 완료';
+            } else {
+                UI.rebirthDetailCost.textContent = `${formatNumber(cost)}P 필요`;
+            }
+        }
+        if (UI.rebirthDetailStatus) {
+            let status = '';
+            if (!unlocked) {
+                status = '선행 노드를 먼저 강화해야 합니다.';
+            } else if (maxLevel !== null && level >= maxLevel) {
+                status = '최대 레벨에 도달했습니다.';
+            } else if (cost > available) {
+                status = `환생 포인트가 ${formatNumber(cost - available)}P 부족합니다.`;
+            } else {
+                status = '강화할 준비가 되었습니다!';
+            }
+            UI.rebirthDetailStatus.textContent = status;
+        }
+        if (UI.rebirthDetailUpgrade) {
+            UI.rebirthDetailUpgrade.dataset.nodeId = node.id;
+            if (!unlocked || (maxLevel !== null && level >= maxLevel)) {
+                UI.rebirthDetailUpgrade.disabled = true;
+                UI.rebirthDetailUpgrade.textContent = '강화 불가';
+            } else {
+                UI.rebirthDetailUpgrade.disabled = cost > available;
+                UI.rebirthDetailUpgrade.textContent = `강화 (${formatNumber(cost)}P)`;
+            }
+        }
+        if (UI.rebirthBranchTitle) {
+            UI.rebirthBranchTitle.textContent = branch ? `${branch.label} 라인 요약` : '코어 시스템';
+        }
+        if (UI.rebirthBranchDescription) {
+            UI.rebirthBranchDescription.textContent =
+                branch?.description ?? '모든 분기를 연결하는 중앙 관리 체계입니다.';
+        }
+        if (UI.rebirthBranchTotals) {
+            if (branchId) {
+                const totals = this.state.getRebirthBranchSummary(branchId);
+                UI.rebirthBranchTotals.textContent = this.formatRebirthBranchTotals(totals) || '효과 없음';
+            } else {
+                UI.rebirthBranchTotals.textContent = '분기 합산 효과 없음';
+            }
+        }
+    }
+
+    updateRebirthConnections() {
+        if (!UI.rebirthTreeConnections || !UI.rebirthTreeNodes) {
+            return;
+        }
+        const svg = UI.rebirthTreeConnections;
+        const containerRect = UI.rebirthTreeNodes.getBoundingClientRect();
+        const width = containerRect.width;
+        const height = containerRect.height;
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.setAttribute('width', width);
+        svg.setAttribute('height', height);
+
+        this.rebirthConnections.forEach((connection) => {
+            const source = this.rebirthNodeElements.get(connection.sourceId);
+            const target = this.rebirthNodeElements.get(connection.targetId);
+            if (!source || !target) return;
+            const sourceRect = source.element.getBoundingClientRect();
+            const targetRect = target.element.getBoundingClientRect();
+            const x1 = sourceRect.left + sourceRect.width / 2 - containerRect.left;
+            const y1 = sourceRect.top + sourceRect.height / 2 - containerRect.top;
+            const x2 = targetRect.left + targetRect.width / 2 - containerRect.left;
+            const y2 = targetRect.top + targetRect.height / 2 - containerRect.top;
+            connection.element.setAttribute('x1', x1);
+            connection.element.setAttribute('y1', y1);
+            connection.element.setAttribute('x2', x2);
+            connection.element.setAttribute('y2', y2);
+            const level = this.state.getRebirthNodeLevel(connection.targetId);
+            connection.element.dataset.active = level > 0 ? 'true' : 'false';
         });
-        return `총 효과: ${parts.join(' · ')}`;
+    }
+
+    getRebirthNodeState({ level = 0, maxLevel = null, unlocked = false, cost = 0, available = 0 }) {
+        if (!unlocked) {
+            return 'locked';
+        }
+        if (maxLevel !== null && level >= maxLevel) {
+            return 'maxed';
+        }
+        if (cost <= available) {
+            return 'available';
+        }
+        return 'blocked';
+    }
+
+    describeRebirthEffect(effect, level = 0) {
+        if (!effect || typeof effect !== 'object') {
+            return level > 0 ? '효과 없음' : '효과 없음';
+        }
+        if (!Number.isFinite(level) || level <= 0) {
+            return '효과 없음';
+        }
+        const parts = Object.entries(effect)
+            .map(([type, value]) => {
+                const label = REBIRTH_EFFECT_LABELS[type] ?? type;
+                const total = Number(value) * level;
+                if (!Number.isFinite(total) || total === 0) return null;
+                return `${label} +${formatPercent(total)}`;
+            })
+            .filter(Boolean);
+        return parts.length > 0 ? parts.join(' · ') : '효과 없음';
+    }
+
+    formatRebirthBranchTotals(totals = {}) {
+        if (!totals || typeof totals !== 'object') {
+            return '';
+        }
+        const parts = Object.entries(totals)
+            .map(([type, value]) => {
+                const total = Number(value);
+                if (!Number.isFinite(total) || total === 0) {
+                    return null;
+                }
+                const label = REBIRTH_EFFECT_LABELS[type] ?? type;
+                return `${label} +${formatPercent(total)}`;
+            })
+            .filter(Boolean);
+        return parts.join(' · ');
+    }
+
+    buildRebirthNodeTooltip(node, level, maxLevel, cost, unlocked, available) {
+        const lines = [];
+        if (node?.description) {
+            lines.push(node.description);
+        }
+        lines.push(`현재: ${this.describeRebirthEffect(node?.effect, level)}`);
+        if (maxLevel !== null && level >= maxLevel) {
+            lines.push('다음: 최대 레벨');
+        } else {
+            lines.push(`다음: ${this.describeRebirthEffect(node?.effect, level + 1)}`);
+        }
+        if (!unlocked) {
+            const requirements = Array.isArray(node?.prerequisites) ? node.prerequisites : [];
+            if (requirements.length > 0) {
+                const requirementText = requirements
+                    .map((req) => {
+                        const requirementNode = req?.node ? REBIRTH_NODE_MAP.get(req.node) : null;
+                        const requirementName = requirementNode?.name ?? req?.node ?? '선행 노드';
+                        const requirementLevel = Number.isFinite(req?.level) ? Math.floor(req.level) : 0;
+                        return `${requirementName} Lv.${requirementLevel}`;
+                    })
+                    .join(', ');
+                lines.push(`필요 조건: ${requirementText}`);
+            } else {
+                lines.push('필요 조건: 정보 없음');
+            }
+        } else if (maxLevel !== null && level >= maxLevel) {
+            lines.push('이미 최대 레벨입니다.');
+        } else {
+            const costText = `${formatNumber(cost)}P`;
+            const availability = cost > available ? '포인트 부족' : '강화 가능';
+            lines.push(`강화 비용: ${costText} (${availability})`);
+        }
+        return lines.join('\n');
+    }
+
+    selectInitialRebirthNode() {
+        if (this.rebirthActiveNodeId && this.rebirthNodeElements.has(this.rebirthActiveNodeId)) {
+            return;
+        }
+        const focusBranch = this.state.rebirthBranchFocus;
+        let candidate = null;
+        if (focusBranch) {
+            candidate = REBIRTH_NODES.find((node) => node.branch === focusBranch) ?? null;
+        }
+        if (!candidate) {
+            candidate = REBIRTH_NODES.find((node) => node.id === 'rebirthCore') ?? null;
+        }
+        if (!candidate) {
+            candidate = REBIRTH_NODES[0] ?? null;
+        }
+        this.rebirthActiveNodeId = candidate?.id ?? null;
+    }
+
+    observeRebirthTree() {
+        if (!UI.rebirthTreeNodes) {
+            return;
+        }
+        if (typeof ResizeObserver !== 'undefined') {
+            try {
+                this.rebirthResizeObserver = new ResizeObserver(() => this.updateRebirthConnections());
+                this.rebirthResizeObserver.observe(UI.rebirthTreeNodes);
+                return;
+            } catch (error) {
+                this.rebirthResizeObserver = null;
+            }
+        }
+        this.rebirthResizeHandler = () => this.updateRebirthConnections();
+        window.addEventListener('resize', this.rebirthResizeHandler);
+    }
+
+    disconnectRebirthResizeObserver() {
+        if (this.rebirthResizeObserver) {
+            this.rebirthResizeObserver.disconnect();
+            this.rebirthResizeObserver = null;
+        }
+        if (this.rebirthResizeHandler) {
+            window.removeEventListener('resize', this.rebirthResizeHandler);
+            this.rebirthResizeHandler = null;
+        }
     }
 
     renderEquipmentSlots() {
@@ -3329,18 +3723,83 @@ export class GameUI {
         saveGame(this.state);
     }
 
-    handleRebirthSkillClick(event) {
-        const button = event.target.closest('[data-skill-id]');
-        if (!button) return;
-        const skillId = button.dataset.skillId;
-        const result = this.state.upgradeRebirthSkill(skillId);
+    handleRebirthNodeClick(nodeId) {
+        if (!nodeId || !this.rebirthNodeElements.has(nodeId)) {
+            return;
+        }
+        const node = REBIRTH_NODE_MAP.get(nodeId);
+        const previous = this.rebirthActiveNodeId;
+        this.rebirthActiveNodeId = nodeId;
+        this.rebirthPreviewNodeId = null;
+        const focusChanged = node?.branch && node.branch !== 'core' ? this.state.setRebirthBranchFocus(node.branch) : false;
+        if (previous !== nodeId || focusChanged) {
+            this.updateRebirthNodes();
+        }
+        if (previous !== nodeId || focusChanged) {
+            this.updateRebirthDetail();
+        }
+        this.updateRebirthConnections();
+        if (focusChanged) {
+            saveGame(this.state);
+        }
+    }
+
+    handleRebirthNodeFocus(nodeId) {
+        if (!nodeId || !this.rebirthNodeElements.has(nodeId)) {
+            return;
+        }
+        if (this.rebirthPreviewNodeId === nodeId) {
+            return;
+        }
+        this.rebirthPreviewNodeId = nodeId;
+        this.updateRebirthDetail();
+    }
+
+    handleRebirthNodeBlur(nodeId) {
+        if (this.rebirthPreviewNodeId !== nodeId) {
+            return;
+        }
+        this.rebirthPreviewNodeId = null;
+        this.updateRebirthDetail();
+    }
+
+    handleRebirthNodeUpgrade() {
+        const nodeId = this.rebirthActiveNodeId;
+        if (!nodeId) {
+            return;
+        }
+        const result = this.state.upgradeRebirthNode(nodeId);
         if (!result.success) {
             this.addLog(result.message, 'warning');
             return;
         }
-        const totalText = this.formatRebirthTotal(result.skill, result.level);
-        this.addLog(`${result.skill.name} 레벨이 ${result.level}이 되었습니다! ${totalText}`, 'success');
+        const effectText = this.describeRebirthEffect(result.node?.effect, result.level);
+        this.addLog(
+            `${result.node?.name ?? '환생 노드'} 레벨이 ${formatNumber(result.level)}이 되었습니다! ${effectText}`,
+            'success',
+        );
         this.updateStats();
+        this.updateRebirthUI();
+        saveGame(this.state);
+    }
+
+    handleRebirthRespec() {
+        const result = this.state.respecRebirthTree();
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const refundedText = formatNumber(result.refunded ?? 0);
+        const costText = formatNumber(result.cost ?? 0);
+        this.addLog(
+            `환생 트리를 재분배했습니다! 환생 포인트 ${refundedText}P를 회수하고 코어 ${costText}개를 사용했습니다.`,
+            'success',
+        );
+        this.rebirthPreviewNodeId = null;
+        this.rebirthActiveNodeId = null;
+        this.selectInitialRebirthNode();
+        this.updateStats();
+        this.updateRebirthUI();
         saveGame(this.state);
     }
 
