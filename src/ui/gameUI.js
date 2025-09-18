@@ -556,6 +556,9 @@ export class GameUI {
         const image = node.querySelector('.hero-icon__image');
         const name = node.querySelector('.hero-icon__name');
         const media = node.querySelector('.hero-icon__media');
+        const bond = node.querySelector('.hero-icon__bond');
+        const bondFill = node.querySelector('.hero-icon__bond-fill');
+        const bondLabel = node.querySelector('.hero-icon__bond-label');
 
         if (button) {
             button.dataset.heroId = hero.id;
@@ -586,6 +589,9 @@ export class GameUI {
             image,
             name,
             media,
+            bond,
+            bondFill,
+            bondLabel,
         });
         this.updateHero(hero);
 
@@ -626,6 +632,12 @@ export class GameUI {
             statusDetail: node.querySelector('.hero__status-detail'),
             rarity: node.querySelector('.hero__rarity'),
             traits: node.querySelector('.hero__traits'),
+            bondSection: node.querySelector('.hero__bond'),
+            bondLevel: node.querySelector('.hero__bond-level'),
+            bondFill: node.querySelector('.hero__bond-fill'),
+            bondValue: node.querySelector('.hero__bond-value'),
+            bondNext: node.querySelector('.hero__bond-next'),
+            bondButton: node.querySelector('.hero__bond-button'),
             skinPreview,
             skinPreviewImage,
             skinList: node.querySelector('.hero__skin-list'),
@@ -783,6 +795,33 @@ export class GameUI {
                 heroUI.node.dataset.hasImage = 'false';
             }
         }
+        this.updateHeroIconBond(hero, heroUI);
+    }
+
+    updateHeroIconBond(hero, heroUI) {
+        if (!heroUI) return;
+        const progress = typeof hero.getBondProgress === 'function' ? hero.getBondProgress() : null;
+        if (!progress) return;
+        const percent = Math.max(0, Math.min(100, Math.round((progress.progress ?? 0) * 100)));
+        if (heroUI.node) {
+            heroUI.node.dataset.bondLevel = progress.level ?? 0;
+            heroUI.node.dataset.bondMaxLevel = progress.maxLevel ?? 0;
+            heroUI.node.dataset.bondReady = progress.ready ? 'true' : 'false';
+        }
+        if (heroUI.bondFill) {
+            heroUI.bondFill.style.width = `${percent}%`;
+        }
+        if (heroUI.bondLabel) {
+            if (!hero.isUnlocked) {
+                heroUI.bondLabel.textContent = '호감도 잠금';
+            } else if (progress.atMax) {
+                heroUI.bondLabel.textContent = '호감도 MAX';
+            } else if (progress.ready) {
+                heroUI.bondLabel.textContent = `Lv.${progress.level} 해금 가능`;
+            } else {
+                heroUI.bondLabel.textContent = `Lv.${progress.level} ${percent}%`;
+            }
+        }
     }
 
     updateHeroDetail(hero) {
@@ -846,7 +885,160 @@ export class GameUI {
                 heroUI.statusDetail.textContent = detailParts.join(' · ');
             }
         }
+        this.updateHeroBondDetail(hero, heroUI);
         this.updateHeroSkinState(hero, heroUI);
+    }
+
+    updateHeroBondDetail(hero, heroUI) {
+        if (!heroUI?.bondSection) return;
+        const progress = typeof hero.getBondProgress === 'function' ? hero.getBondProgress() : null;
+        const section = heroUI.bondSection;
+        if (!hero.isUnlocked) {
+            section.dataset.state = 'locked';
+            if (heroUI.bondLevel) {
+                heroUI.bondLevel.textContent = '미합류';
+            }
+            if (heroUI.bondFill) {
+                heroUI.bondFill.style.width = '0%';
+            }
+            if (heroUI.bondValue) {
+                heroUI.bondValue.textContent = '0 / 0';
+            }
+            if (heroUI.bondNext) {
+                heroUI.bondNext.textContent = '학생을 모집하면 호감도를 올릴 수 있습니다.';
+            }
+            if (heroUI.bondButton) {
+                heroUI.bondButton.disabled = true;
+                heroUI.bondButton.textContent = '모집 필요';
+                heroUI.bondButton.dataset.heroId = hero.id;
+                heroUI.bondButton.dataset.heroBondAction = 'levelup';
+                heroUI.bondButton.setAttribute('aria-disabled', 'true');
+            }
+            return;
+        }
+        if (!progress) return;
+        section.dataset.state = progress.ready ? 'ready' : 'active';
+        if (heroUI.bondLevel) {
+            heroUI.bondLevel.textContent = `Lv. ${progress.level} / ${progress.maxLevel}`;
+        }
+        if (heroUI.bondFill) {
+            const percent = Math.max(0, Math.min(100, Math.round((progress.progress ?? 0) * 100)));
+            heroUI.bondFill.style.width = `${percent}%`;
+        }
+        if (heroUI.bondValue) {
+            if (progress.atMax) {
+                heroUI.bondValue.textContent = 'MAX';
+            } else {
+                heroUI.bondValue.textContent = `${formatNumber(progress.currentExp)} / ${formatNumber(
+                    progress.requiredExp,
+                )}`;
+            }
+        }
+        if (heroUI.bondNext) {
+            if (progress.atMax) {
+                heroUI.bondNext.textContent = '최대 호감도에 도달했습니다.';
+            } else {
+                const reward = typeof hero.getBondReward === 'function'
+                    ? hero.getBondReward(progress.level + 1)
+                    : hero.nextBondReward;
+                if (reward) {
+                    heroUI.bondNext.textContent = `다음 보상 Lv. ${reward.level}: ${reward.description}`;
+                } else {
+                    const remaining = Math.max(0, progress.requiredExp - progress.currentExp);
+                    heroUI.bondNext.textContent = `다음 레벨까지 ${formatNumber(remaining)} 경험치 필요`;
+                }
+            }
+        }
+        if (heroUI.bondButton) {
+            heroUI.bondButton.dataset.heroId = hero.id;
+            heroUI.bondButton.dataset.heroBondAction = 'levelup';
+            if (progress.atMax) {
+                heroUI.bondButton.disabled = true;
+                heroUI.bondButton.textContent = '최대 호감도';
+                heroUI.bondButton.setAttribute('aria-disabled', 'true');
+            } else if (progress.ready) {
+                heroUI.bondButton.disabled = false;
+                heroUI.bondButton.textContent = '호감도 레벨 업';
+                heroUI.bondButton.setAttribute('aria-disabled', 'false');
+            } else {
+                heroUI.bondButton.disabled = true;
+                heroUI.bondButton.textContent = '진행 중';
+                heroUI.bondButton.setAttribute('aria-disabled', 'true');
+            }
+        }
+    }
+
+    getBondSourceLabel(context = {}) {
+        const reason = context.reason ?? null;
+        switch (reason) {
+            case 'stage': {
+                const stage = context.stage ?? null;
+                if (Number.isFinite(stage) && stage > 0) {
+                    return `${formatNumber(stage)}층 전투`;
+                }
+                return '전투 승리';
+            }
+            case 'mission': {
+                switch (context.trigger) {
+                    case 'equipmentSalvage':
+                        return '장비 분해';
+                    case 'rebirth':
+                        return '환생 준비';
+                    default:
+                        return '임무 진행';
+                }
+            }
+            case 'gacha':
+                return context.mode === 'new' ? '신규 합류' : '모집 중복';
+            default:
+                return '';
+        }
+    }
+
+    processBondGainResult(result, context = {}) {
+        if (!result) return false;
+        const reason = context.reason ?? result.reason;
+        const stage = context.stage ?? result.stage;
+        const trigger = context.trigger ?? result.trigger;
+        const mode = context.mode ?? result.mode;
+        const mergedContext = { reason, stage, trigger, mode };
+        const entries = Array.isArray(result.entries) ? result.entries : [result];
+        if (!entries || entries.length === 0) {
+            return false;
+        }
+        let updated = false;
+        const touched = new Map();
+        const sourceLabel = this.getBondSourceLabel(mergedContext);
+        entries.forEach((entry) => {
+            if (!entry) return;
+            const hero = entry.hero ?? (entry.heroId ? this.state.getHeroById(entry.heroId) : null);
+            if (!hero) return;
+            touched.set(hero.id, hero);
+            const added = Number(entry.added ?? 0);
+            const shouldLogGain = added > 0 && mergedContext.reason !== 'stage';
+            if (shouldLogGain) {
+                const parts = [`${hero.name} 호감도 +${formatNumber(added)}`];
+                if (!entry.atMax && Number.isFinite(entry.requiredExp) && entry.requiredExp > 0) {
+                    const currentExp = Number(entry.currentExp ?? 0);
+                    parts.push(`(${formatNumber(currentExp)} / ${formatNumber(entry.requiredExp)})`);
+                }
+                if (sourceLabel) {
+                    parts.push(`- ${sourceLabel}`);
+                }
+                this.addLog(parts.join(' '), 'info');
+            }
+            if (entry.justReady) {
+                this.addLog(`${hero.name}과의 호감도가 가득 찼습니다! 레벨 업을 진행하세요.`, 'success');
+            }
+        });
+        if (touched.size > 0) {
+            const shouldUpdateImmediately = mergedContext.reason !== 'stage';
+            if (shouldUpdateImmediately) {
+                touched.forEach((hero) => this.updateHero(hero));
+            }
+            updated = true;
+        }
+        return updated;
     }
 
     renderHeroTraits(hero, container) {
@@ -1126,6 +1318,15 @@ export class GameUI {
     }
 
     handleHeroDetailContentClick(event) {
+        const bondButton = event.target.closest('[data-hero-bond-action]');
+        if (bondButton) {
+            const heroId = this.activeHeroDetailId;
+            const action = bondButton.dataset.heroBondAction;
+            if (heroId && action) {
+                this.handleHeroBondAction(heroId, action);
+            }
+            return;
+        }
         const button = event.target.closest('.hero-skin');
         if (!button) return;
         const heroId = this.activeHeroDetailId;
@@ -1158,6 +1359,34 @@ export class GameUI {
         const skinName = result.skin?.name ?? hero.getSkinPublicData(skinId)?.name ?? '스킨';
         this.addLog(`${hero.name}에게 ${skinName} 스킨을 적용했습니다!`, 'success');
         this.updateHero(hero);
+        saveGame(this.state);
+    }
+
+    handleHeroBondAction(heroId, action) {
+        if (!heroId || !action) return;
+        switch (action) {
+            case 'levelup':
+                this.handleHeroBondLevelUp(heroId);
+                break;
+            default:
+                break;
+        }
+    }
+
+    handleHeroBondLevelUp(heroId) {
+        const result = this.state.levelUpBond(heroId);
+        if (!result.success) {
+            if (result.message) {
+                this.addLog(result.message, 'warning');
+            }
+            return;
+        }
+        const hero = result.hero ?? this.state.getHeroById(heroId);
+        if (!hero) return;
+        const rewardText = result.reward?.description ?? '추가 보너스 적용';
+        this.addLog(`${hero.name} 호감도 Lv. ${result.level} 달성! ${rewardText}`, 'success');
+        this.updateHero(hero);
+        this.updateStats();
         saveGame(this.state);
     }
 
@@ -2731,6 +2960,8 @@ export class GameUI {
     handleMissionProgress(trigger, amount = 1) {
         this.pollMissionResets();
         const completed = this.state.progressMissions(trigger, amount);
+        const bond = this.state.grantBondForMission(trigger, amount);
+        this.processBondGainResult(bond, { reason: 'mission', trigger, amount });
         this.updateMissionUI();
         if (completed.length === 0) return;
         completed.forEach(({ mission }) => {
@@ -3091,7 +3322,7 @@ export class GameUI {
 
     handleEnemyDefeat() {
         const previousBest = this.state.currentRunHighestStage;
-        const { reward, drop, gacha, defeatedStage } = this.state.goNextEnemy();
+        const { reward, drop, gacha, defeatedStage, bond } = this.state.goNextEnemy();
         this.addLog(`스테이지 ${defeatedStage}의 적을 처치하고 ${formatNumber(reward)} 골드를 획득했습니다!`);
         if (drop) {
             this.handleEquipmentDrop(drop);
@@ -3105,6 +3336,9 @@ export class GameUI {
                 'success',
             );
             this.updateGachaUI();
+        }
+        if (bond) {
+            this.processBondGainResult(bond, { reason: 'stage', stage: defeatedStage });
         }
         if (this.state.isBossStage()) {
             this.addLog(
@@ -3293,6 +3527,12 @@ export class GameUI {
         }
         this.addGachaResults(result.results);
         result.results.forEach((entry) => {
+            if (entry.bond) {
+                this.processBondGainResult(entry.bond, {
+                    reason: 'gacha',
+                    mode: entry.isNew ? 'new' : 'duplicate',
+                });
+            }
             const rarityLabel = `[${entry.hero.rarityName}]`;
             if (entry.isNew) {
                 this.addLog(
@@ -3353,6 +3593,30 @@ export class GameUI {
             }
 
             item.append(header, detail);
+            const bondResult = entry.bond ?? null;
+            if (bondResult) {
+                const added = Number(bondResult.added ?? 0);
+                const bondLine = document.createElement('span');
+                bondLine.className = 'gacha-result__bond';
+                if (added > 0) {
+                    const segments = [`호감도 +${formatNumber(added)}`];
+                    if (!bondResult.atMax && Number.isFinite(bondResult.requiredExp) && bondResult.requiredExp > 0) {
+                        const current = Number(bondResult.currentExp ?? 0);
+                        segments.push(`(${formatNumber(current)} / ${formatNumber(bondResult.requiredExp)})`);
+                    } else if (bondResult.atMax) {
+                        segments.push('(MAX)');
+                    }
+                    if (bondResult.justReady) {
+                        segments.push('레벨 업 가능!');
+                    }
+                    bondLine.textContent = segments.join(' · ');
+                } else if (bondResult.justReady) {
+                    bondLine.textContent = '호감도 레벨 업 가능!';
+                }
+                if (bondLine.textContent) {
+                    item.appendChild(bondLine);
+                }
+            }
             if (Array.isArray(entry.unlockedSkins) && entry.unlockedSkins.length > 0) {
                 const skins = document.createElement('ul');
                 skins.className = 'gacha-result__skins';
