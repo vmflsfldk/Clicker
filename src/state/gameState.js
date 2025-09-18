@@ -3,6 +3,9 @@ import {
     HERO_TRAIT_GROUPS,
     HERO_TRAIT_TYPES,
     HERO_RARITIES,
+    HERO_BOND_EXP_REQUIREMENTS,
+    HERO_BOND_MAX_LEVEL,
+    HERO_BOND_REWARDS,
     defaultHeroes,
 } from '../data/heroes.js';
 import {
@@ -45,6 +48,13 @@ const GACHA_MULTI_COUNT = 10;
 const GACHA_MULTI_COST = 9;
 const GACHA_TOKEN_NORMAL_DROP_CHANCE = 0.02;
 const GACHA_TOKEN_BOSS_DROP_CHANCE = 0.35;
+
+const BOND_STAGE_GAIN = 1;
+const BOND_STAGE_BOSS_GAIN = 3;
+const BOND_DUPLICATE_GAIN_PER_LEVEL = 12;
+const BOND_NEW_HERO_GAIN = 20;
+const BOND_MISSION_SALVAGE_GAIN = 1;
+const BOND_MISSION_REBIRTH_GAIN = 15;
 
 const clampEquipmentValue = (value, effectId = null) => {
     const effect = effectId ? EQUIPMENT_EFFECT_MAP.get(effectId) : null;
@@ -344,7 +354,24 @@ export class Hero {
         this.schoolId = typeof school === 'string' ? school : null;
         this.weaponId = typeof weapon === 'string' ? weapon : null;
         this.positionId = typeof position === 'string' ? position : null;
+        const savedBondLevel = Number(savedState?.bondLevel ?? 0);
+        this.bondLevel = Number.isFinite(savedBondLevel)
+            ? Math.min(HERO_BOND_MAX_LEVEL, Math.max(0, Math.floor(savedBondLevel)))
+            : 0;
+        const savedBondExp = Number(savedState?.bondExp ?? 0);
+        const normalizedBondExp = Number.isFinite(savedBondExp) ? Math.max(0, Math.floor(savedBondExp)) : 0;
+        if (this.bondLevel >= this.bondMaxLevel) {
+            this.bondLevel = this.bondMaxLevel;
+            this.bondExp = 0;
+        } else {
+            const requirement = this.getBondRequirement(this.bondLevel + 1);
+            this.bondExp = Math.min(normalizedBondExp, requirement);
+        }
         this.refreshSkinUnlocks();
+        if (!this.isUnlocked) {
+            this.bondLevel = 0;
+            this.bondExp = 0;
+        }
     }
 
     get damagePerSecond() {
@@ -446,6 +473,146 @@ export class Hero {
         return normalizedId === traitId;
     }
 
+    get bondRequirements() {
+        return HERO_BOND_EXP_REQUIREMENTS;
+    }
+
+    get bondMaxLevel() {
+        return HERO_BOND_MAX_LEVEL;
+    }
+
+    get bondRewardDefinitions() {
+        return HERO_BOND_REWARDS[this.id] ?? [];
+    }
+
+    get activeBondRewards() {
+        return this.bondRewardDefinitions.filter((reward) => this.bondLevel >= reward.level);
+    }
+
+    get nextBondReward() {
+        return this.bondRewardDefinitions.find((reward) => reward.level === this.bondLevel + 1) ?? null;
+    }
+
+    getBondRequirement(level) {
+        if (!Number.isFinite(level) || level <= 0) return 0;
+        const index = Math.min(this.bondRequirements.length - 1, Math.max(0, Math.floor(level)));
+        return Math.max(0, Math.floor(this.bondRequirements[index] ?? 0));
+    }
+
+    getBondReward(level) {
+        return this.bondRewardDefinitions.find((reward) => reward.level === level) ?? null;
+    }
+
+    getBondEffects() {
+        if (!this.isUnlocked) return {};
+        return this.activeBondRewards.reduce((acc, reward) => {
+            Object.entries(reward.effects ?? {}).forEach(([effectId, value]) => {
+                const numeric = Number(value);
+                if (!Number.isFinite(numeric)) return;
+                acc[effectId] = (acc[effectId] ?? 0) + numeric;
+            });
+            return acc;
+        }, {});
+    }
+
+    get bondSelfBonus() {
+        const effects = this.getBondEffects();
+        const value = Number(effects.heroSelf ?? 0);
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    get bondSelfMultiplier() {
+        return 1 + this.bondSelfBonus;
+    }
+
+    getBondProgress() {
+        const level = this.bondLevel ?? 0;
+        const maxLevel = this.bondMaxLevel ?? 0;
+        if (level >= maxLevel) {
+            return {
+                level: maxLevel,
+                maxLevel,
+                currentExp: 0,
+                requiredExp: 0,
+                progress: 1,
+                ready: false,
+                atMax: true,
+            };
+        }
+        const requirement = this.getBondRequirement(level + 1);
+        const current = Math.min(Number(this.bondExp ?? 0), requirement);
+        const progress = requirement > 0 ? Math.min(1, current / requirement) : 0;
+        return {
+            level,
+            maxLevel,
+            currentExp: current,
+            requiredExp: requirement,
+            progress,
+            ready: requirement > 0 && current >= requirement,
+            atMax: false,
+        };
+    }
+
+    addBondExp(amount = 0) {
+        if (!this.isUnlocked) {
+            return { added: 0, currentExp: this.bondExp ?? 0, requiredExp: this.getBondRequirement(this.bondLevel + 1), ready: false, atMax: false, justReady: false };
+        }
+        if (this.bondLevel >= this.bondMaxLevel) {
+            this.bondLevel = this.bondMaxLevel;
+            this.bondExp = 0;
+            return { added: 0, currentExp: 0, requiredExp: 0, ready: false, atMax: true, justReady: false };
+        }
+        const normalized = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
+        if (normalized <= 0) {
+            const progress = this.getBondProgress();
+            return {
+                added: 0,
+                currentExp: progress.currentExp,
+                requiredExp: progress.requiredExp,
+                ready: progress.ready,
+                atMax: progress.atMax,
+                justReady: false,
+            };
+        }
+        const requirement = this.getBondRequirement(this.bondLevel + 1);
+        const previous = Math.min(Number(this.bondExp ?? 0), requirement);
+        const wasReady = requirement > 0 && previous >= requirement;
+        const updated = Math.min(requirement, previous + normalized);
+        const added = updated - previous;
+        this.bondExp = updated;
+        const ready = requirement > 0 && updated >= requirement;
+        return {
+            added,
+            currentExp: updated,
+            requiredExp: requirement,
+            ready,
+            atMax: false,
+            justReady: ready && !wasReady,
+        };
+    }
+
+    levelUpBond() {
+        if (!this.isUnlocked) {
+            return { success: false, message: '학생을 먼저 모집해야 합니다.' };
+        }
+        if (this.bondLevel >= this.bondMaxLevel) {
+            return { success: false, message: '이미 호감도가 최대입니다.', level: this.bondLevel, atMax: true };
+        }
+        const requirement = this.getBondRequirement(this.bondLevel + 1);
+        if (this.bondExp < requirement) {
+            return {
+                success: false,
+                message: '호감도 경험치가 부족합니다.',
+                requiredExp: requirement,
+                currentExp: this.bondExp,
+            };
+        }
+        this.bondLevel += 1;
+        this.bondExp = 0;
+        const reward = this.getBondReward(this.bondLevel);
+        return { success: true, level: this.bondLevel, reward };
+    }
+
     increaseLevel(amount = 1) {
         const normalized = Number.isFinite(amount) ? Math.max(1, Math.floor(amount)) : 1;
         this.level += normalized;
@@ -506,6 +673,8 @@ export class Hero {
         });
         this.selectedSkinId = this.skins[0]?.id ?? null;
         this.refreshSkinUnlocks();
+        this.bondLevel = 0;
+        this.bondExp = 0;
     }
 
     refreshSkinUnlocks() {
@@ -577,6 +746,8 @@ export class Hero {
             level: this.level,
             selectedSkinId: this.selectedSkinId,
             skins: this.skins.map((skin) => ({ id: skin.id, unlocked: Boolean(skin.unlocked) })),
+            bondLevel: this.bondLevel,
+            bondExp: this.bondExp,
         };
     }
 }
@@ -754,7 +925,10 @@ export class GameState {
     }
 
     get totalDps() {
-        const heroDps = this.heroes.reduce((total, hero) => total + hero.damagePerSecond, 0);
+        const heroDps = this.heroes.reduce(
+            (total, hero) => total + hero.damagePerSecond * (hero.bondSelfMultiplier ?? 1),
+            0,
+        );
         const heroMultiplier = 1 + this.heroBonus;
         const heroCritMultiplier = this.heroCritAverageMultiplier;
         const frenzyMultiplier = this.isFrenzyActive ? this.frenzyMultiplier : 1;
@@ -773,7 +947,8 @@ export class GameState {
         const equipment = this.getTotalEquipmentEffect('tap');
         const rebirth = this.getRebirthBonusValue('tap');
         const setBonus = this.getSetBonusEffect('tap');
-        return equipment + rebirth + setBonus;
+        const bond = this.getBondEffect('tap');
+        return equipment + rebirth + setBonus + bond;
     }
 
     get heroTrainingBonus() {
@@ -788,33 +963,38 @@ export class GameState {
         const equipment = this.getTotalEquipmentEffect('hero');
         const rebirth = this.getRebirthBonusValue('hero');
         const setBonus = this.getSetBonusEffect('hero');
-        return equipment + rebirth + this.heroTrainingBonus + setBonus;
+        const bond = this.getBondEffect('hero');
+        return equipment + rebirth + this.heroTrainingBonus + setBonus + bond;
     }
 
     get skillBonus() {
         const equipment = this.getTotalEquipmentEffect('skill');
         const rebirth = this.getRebirthBonusValue('skill');
         const setBonus = this.getSetBonusEffect('skill');
-        return equipment + rebirth + setBonus;
+        const bond = this.getBondEffect('skill');
+        return equipment + rebirth + setBonus + bond;
     }
 
     get goldBonus() {
         const equipment = this.getTotalEquipmentEffect('gold');
         const rebirth = this.getRebirthBonusValue('gold');
         const setBonus = this.getSetBonusEffect('gold');
-        return equipment + rebirth + this.goldTrainingBonus + setBonus;
+        const bond = this.getBondEffect('gold');
+        return equipment + rebirth + this.goldTrainingBonus + setBonus + bond;
     }
 
     get equipmentDropBonus() {
         const rebirth = this.getRebirthBonusValue('equipmentDrop');
         const setBonus = this.getSetBonusEffect('equipmentDrop');
-        return rebirth + setBonus;
+        const bond = this.getBondEffect('equipmentDrop');
+        return rebirth + setBonus + bond;
     }
 
     get gachaDropBonus() {
         const rebirth = this.getRebirthBonusValue('gachaDrop');
         const setBonus = this.getSetBonusEffect('gachaDrop');
-        return rebirth + setBonus;
+        const bond = this.getBondEffect('gachaDrop');
+        return rebirth + setBonus + bond;
     }
 
     get pendingRebirthPoints() {
@@ -953,12 +1133,14 @@ export class GameState {
         const equipment = this.getTotalEquipmentEffect('heroCritChance');
         const rebirth = this.getRebirthBonusValue('heroCritChance');
         const setBonus = this.getSetBonusEffect('heroCritChance');
+        const bond = this.getBondEffect('heroCritChance');
         const total =
             base +
             normalizedLevel * HERO_CRIT_CHANCE_UPGRADE_CONFIG.increasePerLevel +
             equipment +
             rebirth +
-            setBonus;
+            setBonus +
+            bond;
         const clamped = Math.min(HERO_CRIT_CHANCE_UPGRADE_CONFIG.maxChance, total);
         return Math.max(0, clamped);
     }
@@ -973,12 +1155,14 @@ export class GameState {
         const equipment = this.getTotalEquipmentEffect('heroCritDamage');
         const rebirth = this.getRebirthBonusValue('heroCritDamage');
         const setBonus = this.getSetBonusEffect('heroCritDamage');
+        const bond = this.getBondEffect('heroCritDamage');
         const total =
             base +
             normalizedLevel * HERO_CRIT_DAMAGE_UPGRADE_CONFIG.increasePerLevel +
             equipment +
             rebirth +
-            setBonus;
+            setBonus +
+            bond;
         const clamped = Math.min(HERO_CRIT_DAMAGE_UPGRADE_CONFIG.maxMultiplier, total);
         return Math.max(1, clamped);
     }
@@ -1302,6 +1486,90 @@ export class GameState {
         return this.heroes.find((hero) => hero.id === heroId) ?? null;
     }
 
+    gainBond(heroId, amount = 0) {
+        const hero = this.getHeroById(heroId);
+        if (!hero) {
+            return { success: false, message: '학생을 찾을 수 없습니다.', hero: null, heroId };
+        }
+        const result = hero.addBondExp(amount);
+        if (result.added > 0) {
+            this.lastSave = Date.now();
+        }
+        return {
+            ...result,
+            hero,
+            heroId: hero.id,
+            success: result.added > 0 || result.justReady,
+            locked: !hero.isUnlocked,
+        };
+    }
+
+    grantBondToUnlocked(amount = 0, metadata = {}) {
+        const normalized = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
+        if (normalized <= 0) {
+            return { totalAdded: 0, affected: 0, entries: [], ...metadata };
+        }
+        const entries = [];
+        let totalAdded = 0;
+        this.heroes.forEach((hero) => {
+            if (!hero.isUnlocked) return;
+            const result = this.gainBond(hero.id, normalized);
+            if (!result) return;
+            if (result.added > 0 || result.justReady) {
+                entries.push(result);
+                totalAdded += result.added;
+            }
+        });
+        return { totalAdded, affected: entries.length, entries, ...metadata };
+    }
+
+    getStageBondGain(stage) {
+        if (!Number.isFinite(stage) || stage <= 0) return 0;
+        return stage % BOSS_STAGE_INTERVAL === 0 ? BOND_STAGE_BOSS_GAIN : BOND_STAGE_GAIN;
+    }
+
+    grantBondForStage(stage) {
+        const amount = this.getStageBondGain(stage);
+        return this.grantBondToUnlocked(amount, { reason: 'stage', stage });
+    }
+
+    grantBondForMission(trigger, amount = 1) {
+        const normalizedAmount = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
+        let perHero = 0;
+        switch (trigger) {
+            case 'equipmentSalvage':
+                perHero = normalizedAmount * BOND_MISSION_SALVAGE_GAIN;
+                break;
+            case 'rebirth':
+                perHero = normalizedAmount * BOND_MISSION_REBIRTH_GAIN;
+                break;
+            default:
+                perHero = 0;
+                break;
+        }
+        if (perHero <= 0) {
+            return { totalAdded: 0, affected: 0, entries: [], reason: 'mission', trigger, amount: normalizedAmount };
+        }
+        return this.grantBondToUnlocked(perHero, {
+            reason: 'mission',
+            trigger,
+            amount: normalizedAmount,
+        });
+    }
+
+    levelUpBond(heroId) {
+        const hero = this.getHeroById(heroId);
+        if (!hero) {
+            return { success: false, message: '학생을 찾을 수 없습니다.' };
+        }
+        const result = hero.levelUpBond();
+        if (!result.success) {
+            return { ...result, hero };
+        }
+        this.lastSave = Date.now();
+        return { ...result, hero };
+    }
+
     selectHeroSkin(heroId, skinId) {
         const hero = this.getHeroById(heroId);
         if (!hero) {
@@ -1339,6 +1607,13 @@ export class GameState {
             const previousLevel = hero.level;
             const levelGain = previousLevel === 0 ? hero.gachaInitialLevel : hero.gachaDuplicateGain;
             const unlockedSkins = hero.increaseLevel(levelGain);
+            let bond = null;
+            if (previousLevel === 0) {
+                bond = this.gainBond(hero.id, BOND_NEW_HERO_GAIN);
+            } else {
+                const bondGain = levelGain * BOND_DUPLICATE_GAIN_PER_LEVEL;
+                bond = this.gainBond(hero.id, bondGain);
+            }
             results.push({
                 hero,
                 isNew: previousLevel === 0,
@@ -1346,6 +1621,7 @@ export class GameState {
                 newLevel: hero.level,
                 levelGain,
                 unlockedSkins,
+                bond,
             });
         }
         this.lastSave = Date.now();
@@ -1434,6 +1710,7 @@ export class GameState {
         this.gold += reward;
         const drop = this.tryDropEquipment(defeatedStage);
         const gacha = this.tryDropGachaToken(defeatedStage);
+        const bond = this.grantBondForStage(defeatedStage);
         this.highestStage = Math.max(this.highestStage, defeatedStage);
         this.currentRunHighestStage = Math.max(this.currentRunHighestStage, defeatedStage);
         if (this.pendingBossEntry) {
@@ -1447,7 +1724,7 @@ export class GameState {
                 this.clearBossTimer();
             }
         }
-        return { reward, drop, gacha, defeatedStage };
+        return { reward, drop, gacha, defeatedStage, bond };
     }
 
     reset() {
@@ -2090,8 +2367,36 @@ export class GameState {
         }, 0);
     }
 
+    getBondSummary() {
+        return this.heroes.reduce((acc, hero) => {
+            if (!hero?.isUnlocked) return acc;
+            const effects = hero.getBondEffects();
+            Object.entries(effects).forEach(([effectId, value]) => {
+                const numeric = Number(value);
+                if (!Number.isFinite(numeric)) return;
+                acc[effectId] = (acc[effectId] ?? 0) + numeric;
+            });
+            return acc;
+        }, {});
+    }
+
+    getBondEffect(effectId) {
+        if (!effectId) return 0;
+        return this.heroes.reduce((total, hero) => {
+            if (!hero?.isUnlocked) return total;
+            const effects = hero.getBondEffects();
+            const value = Number(effects[effectId] ?? 0);
+            return total + (Number.isFinite(value) ? value : 0);
+        }, 0);
+    }
+
     getHeroEffectiveDps(hero) {
-        return hero.damagePerSecond * (1 + this.heroBonus) * this.heroCritAverageMultiplier;
+        if (!hero) return 0;
+        const base = hero.damagePerSecond;
+        if (base <= 0) return 0;
+        return (
+            base * (hero.bondSelfMultiplier ?? 1) * (1 + this.heroBonus) * this.heroCritAverageMultiplier
+        );
     }
 
     addEquipment(item) {

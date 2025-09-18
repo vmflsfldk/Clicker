@@ -145,6 +145,175 @@ export const HERO_SKIN_LIBRARY = {
     ],
 };
 
+export const HERO_BOND_EXP_REQUIREMENTS = [0, 60, 140, 260, 420, 620];
+
+export const HERO_BOND_MAX_LEVEL = HERO_BOND_EXP_REQUIREMENTS.length - 1;
+
+export const HERO_BOND_REWARDS = {
+    shiroko: [
+        {
+            level: 1,
+            description: '시로코와의 자전거 순찰 덕분에 개인 화력이 10% 증가합니다.',
+            effects: { heroSelf: 0.1 },
+        },
+        {
+            level: 2,
+            description: '아비도스 대책위원회가 단결해 전체 학생 지원 화력이 3% 상승합니다.',
+            effects: { hero: 0.03 },
+        },
+        {
+            level: 3,
+            description: '정밀 사격 연습으로 학생 치명타 확률이 1% 증가합니다.',
+            effects: { heroCritChance: 0.01 },
+        },
+        {
+            level: 4,
+            description: '기동 타격 경험으로 전술 스킬 효율이 4% 상승합니다.',
+            effects: { skill: 0.04 },
+        },
+        {
+            level: 5,
+            description: '시로코의 절대 신뢰! 개인 화력이 추가로 15% 증가합니다.',
+            effects: { heroSelf: 0.15 },
+        },
+    ],
+    hoshino: [
+        {
+            level: 1,
+            description: '호시노의 든든한 응원으로 개인 방어 화력이 8% 상승합니다.',
+            effects: { heroSelf: 0.08 },
+        },
+        {
+            level: 2,
+            description: '대책위원회 보급이 강화되어 골드 획득량이 4% 증가합니다.',
+            effects: { gold: 0.04 },
+        },
+        {
+            level: 3,
+            description: '적응 훈련으로 학생 치명타 피해 배율이 6% 증가합니다.',
+            effects: { heroCritDamage: 0.06 },
+        },
+        {
+            level: 4,
+            description: '야전 침착함으로 장비 드롭률이 3% 상승합니다.',
+            effects: { equipmentDrop: 0.03 },
+        },
+        {
+            level: 5,
+            description: '호시노의 절대 충성! 개인 화력이 18% 상승합니다.',
+            effects: { heroSelf: 0.18 },
+        },
+    ],
+    aru: [
+        {
+            level: 1,
+            description: '아루의 계약으로 개인 화력이 12% 증가합니다.',
+            effects: { heroSelf: 0.12 },
+        },
+        {
+            level: 2,
+            description: '게헨나 지원을 받아 전술 스킬 효율이 5% 상승합니다.',
+            effects: { skill: 0.05 },
+        },
+        {
+            level: 3,
+            description: '치밀한 작전으로 전체 학생 지원 화력이 4% 증가합니다.',
+            effects: { hero: 0.04 },
+        },
+        {
+            level: 4,
+            description: '비밀 거래로 모집권 드롭률이 3% 상승합니다.',
+            effects: { gachaDrop: 0.03 },
+        },
+        {
+            level: 5,
+            description: '아루의 깊은 신뢰! 개인 화력이 추가로 15% 증가합니다.',
+            effects: { heroSelf: 0.15 },
+        },
+    ],
+    hibiki: [
+        {
+            level: 1,
+            description: '히비키의 화력 조정으로 개인 화력이 9% 증가합니다.',
+            effects: { heroSelf: 0.09 },
+        },
+        {
+            level: 2,
+            description: '포격 교정 데이터로 학생 치명타 확률이 1.2% 상승합니다.',
+            effects: { heroCritChance: 0.012 },
+        },
+        {
+            level: 3,
+            description: '분석력 향상으로 전술 스킬 효율이 6% 증가합니다.',
+            effects: { skill: 0.06 },
+        },
+        {
+            level: 4,
+            description: '밀레니엄 공방의 도움으로 장비 드롭률이 4% 상승합니다.',
+            effects: { equipmentDrop: 0.04 },
+        },
+        {
+            level: 5,
+            description: '히비키의 완벽 지원! 개인 화력이 16% 증가합니다.',
+            effects: { heroSelf: 0.16 },
+        },
+    ],
+    iroha: [
+        {
+            level: 1,
+            description: '이로하의 지휘로 개인 화력이 11% 증가합니다.',
+            effects: { heroSelf: 0.11 },
+        },
+        {
+            level: 2,
+            description: '전술 시뮬레이션 덕에 전체 학생 지원 화력이 3% 상승합니다.',
+            effects: { hero: 0.03 },
+        },
+        {
+            level: 3,
+            description: '지휘 통제로 전술 스킬 효율이 5% 증가합니다.',
+            effects: { skill: 0.05 },
+        },
+        {
+            level: 4,
+            description: '밀레니엄 데이터 공유로 학생 치명타 피해가 5% 증가합니다.',
+            effects: { heroCritDamage: 0.05 },
+        },
+        {
+            level: 5,
+            description: '완벽한 지휘 신뢰! 개인 화력이 17% 증가합니다.',
+            effects: { heroSelf: 0.17 },
+        },
+    ],
+    yuuka: [
+        {
+            level: 1,
+            description: '유우카의 철저한 계획으로 개인 화력이 9% 증가합니다.',
+            effects: { heroSelf: 0.09 },
+        },
+        {
+            level: 2,
+            description: '재무 관리로 골드 획득량이 5% 상승합니다.',
+            effects: { gold: 0.05 },
+        },
+        {
+            level: 3,
+            description: '통계 분석 덕분에 학생 치명타 확률이 1.5% 증가합니다.',
+            effects: { heroCritChance: 0.015 },
+        },
+        {
+            level: 4,
+            description: '정비 예산 확보로 장비 드롭률이 3% 상승합니다.',
+            effects: { equipmentDrop: 0.03 },
+        },
+        {
+            level: 5,
+            description: '유우카의 확신 어린 신뢰! 개인 화력이 16% 증가합니다.',
+            effects: { heroSelf: 0.16 },
+        },
+    ],
+};
+
 export const HERO_TRAIT_GROUPS = [
     {
         id: 'school',

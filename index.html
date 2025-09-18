@@ -635,6 +635,12 @@
                     <span class="hero-icon__placeholder"></span>
                     <span class="hero-icon__lock" aria-hidden="true">🔒</span>
                 </span>
+                <span class="hero-icon__bond" aria-hidden="true">
+                    <span class="hero-icon__bond-bar">
+                        <span class="hero-icon__bond-fill"></span>
+                    </span>
+                    <span class="hero-icon__bond-label">호감도 Lv.0</span>
+                </span>
                 <span class="hero-icon__name"></span>
             </button>
         </li>
@@ -652,6 +658,26 @@
                     <span class="hero__level"></span>
                     <span class="hero__dps"></span>
                 </div>
+                <section class="hero__bond" aria-label="호감도 현황">
+                    <div class="hero__bond-header">
+                        <span class="hero__bond-title">호감도</span>
+                        <span class="hero__bond-level"></span>
+                    </div>
+                    <div class="hero__bond-progress">
+                        <div class="hero__bond-bar">
+                            <div class="hero__bond-fill"></div>
+                        </div>
+                        <span class="hero__bond-value"></span>
+                    </div>
+                    <p class="hero__bond-next"></p>
+                    <button
+                        type="button"
+                        class="btn btn-secondary hero__bond-button"
+                        data-hero-bond-action="levelup"
+                    >
+                        호감도 레벨 업
+                    </button>
+                </section>
                 <div class="hero__traits" role="list" aria-label="학생 특성"></div>
                 <div class="hero__appearance">
                     <div class="hero__skin-preview" data-locked="true" aria-hidden="true">
