@@ -21,6 +21,12 @@ import {
 import { MISSIONS, MISSION_GROUPS } from '../data/missions.js';
 import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
 import { SKILLS, SKILL_EFFECT_TYPES, SKILL_MAP } from '../data/skills.js';
+import {
+    ENEMY_STAGE_INTERVAL,
+    ENEMY_NAME_POOLS,
+    getEnemyStageGimmick,
+    getEnemyNameForStage,
+} from '../data/enemies.js';
 import { formatNumber } from '../utils/format.js';
 
 const HERO_TRAIT_GROUP_MAP = new Map(HERO_TRAIT_GROUPS.map((group) => [group.id, group]));
@@ -37,7 +43,7 @@ const EQUIPMENT_RARITY_MAP = new Map(EQUIPMENT_RARITIES.map((rarity) => [rarity.
 const MISSION_GROUP_MAP = new Map(MISSION_GROUPS.map((group) => [group.id, group]));
 const MISSION_MAP = new Map(MISSIONS.map((mission) => [mission.id, mission]));
 
-const BOSS_STAGE_INTERVAL = 5;
+const BOSS_STAGE_INTERVAL = ENEMY_STAGE_INTERVAL;
 const BOSS_TIME_LIMIT = 30000;
 const BOSS_TIME_LIMIT_SECONDS = Math.floor(BOSS_TIME_LIMIT / 1000);
 const BOSS_WARNING_THRESHOLD = 5000;
@@ -755,57 +761,91 @@ export class Hero {
 
 export class Enemy {
     constructor(stage = 1, savedState) {
-        this.stage = stage;
-        this.baseNames = [
-            '훈련용 타깃',
-            '전술 드론',
-            '모의 전차',
-            '연습용 자동포대',
-            '합동 훈련 장비',
-            '도시전 모의 적',
-            '방어전 모의 중계기',
-            '실시간 전술 분석기',
-            '교차 사격 훈련 장치',
-            '모의 합동 지원기',
-            '전술 네트워크 수신기',
-            '방해전 모의 포탑',
-        ];
-        this.bossNames = [
-            '하코네 전술 골렘',
-            '특수 자동포탑',
-            '모의 메카니카',
-            '연합 실전 검증기',
-            '고출력 전술 요새',
-            '절차 통제 프로토타입',
-            '네트워크 통합 지휘기',
-            '종합 전술 모의체',
-        ];
-        this.maxHp = savedState?.maxHp ?? this.calculateMaxHp(stage);
-        this.hp = savedState?.hp ?? this.maxHp;
-        this.defeated = savedState?.defeated ?? 0;
+        this.namePools = ENEMY_NAME_POOLS;
+        this.stage = Enemy.normalizeStage(stage);
+        this.refreshStageContext();
+        this.maxHp = this.calculateMaxHp(this.stage);
+        this.hp = this.resolveSavedHp(savedState);
+        this.defeated = this.normalizeDefeated(savedState?.defeated);
+    }
+
+    static normalizeStage(stage) {
+        const numeric = Number(stage);
+        if (!Number.isFinite(numeric)) return 1;
+        return Math.max(1, Math.floor(numeric));
+    }
+
+    refreshStageContext() {
+        const gimmick = getEnemyStageGimmick(this.stage);
+        this.stageGimmick = {
+            ...gimmick,
+            modifiers: { ...gimmick.modifiers },
+        };
+    }
+
+    normalizeDefeated(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return 0;
+        return Math.max(0, Math.floor(numeric));
+    }
+
+    resolveSavedHp(savedState) {
+        const savedHp = Number(savedState?.hp);
+        const savedMaxHp = Number(savedState?.maxHp);
+        if (Number.isFinite(savedHp) && Number.isFinite(savedMaxHp) && savedMaxHp > 0) {
+            const ratio = Math.min(1, Math.max(0, savedHp / savedMaxHp));
+            return Math.max(0, Math.floor(this.maxHp * ratio));
+        }
+        if (Number.isFinite(savedHp)) {
+            return Math.max(0, Math.min(this.maxHp, Math.floor(savedHp)));
+        }
+        return this.maxHp;
+    }
+
+    getStageGimmick(stage = this.stage) {
+        const normalized = Enemy.normalizeStage(stage);
+        if (normalized === this.stage) {
+            return {
+                ...this.stageGimmick,
+                modifiers: { ...this.stageGimmick.modifiers },
+            };
+        }
+        const gimmick = getEnemyStageGimmick(normalized);
+        return {
+            ...gimmick,
+            modifiers: { ...gimmick.modifiers },
+        };
+    }
+
+    getStageModifiers(stage = this.stage) {
+        const normalized = Enemy.normalizeStage(stage);
+        const source = normalized === this.stage ? this.stageGimmick : getEnemyStageGimmick(normalized);
+        const modifiers = source?.modifiers ?? {};
+        return {
+            hpMultiplier: Number.isFinite(modifiers.hpMultiplier) ? Math.max(0, modifiers.hpMultiplier) : 1,
+            rewardMultiplier: Number.isFinite(modifiers.rewardMultiplier)
+                ? Math.max(0, modifiers.rewardMultiplier)
+                : 1,
+            goldBonus: Number.isFinite(modifiers.goldBonus) ? modifiers.goldBonus : 0,
+            equipmentDropBonus: Number.isFinite(modifiers.equipmentDropBonus)
+                ? modifiers.equipmentDropBonus
+                : 0,
+            gachaDropBonus: Number.isFinite(modifiers.gachaDropBonus) ? modifiers.gachaDropBonus : 0,
+        };
     }
 
     calculateMaxHp(stage) {
-        const base = 10 + stage * 8;
-        const exponential = Math.pow(1.16, stage - 1);
-        return Math.floor(base * exponential);
+        const normalized = Enemy.normalizeStage(stage);
+        const base = 10 + normalized * 8;
+        const exponential = Math.pow(1.16, normalized - 1);
+        const baseHp = Math.floor(base * exponential);
+        const { hpMultiplier } = this.getStageModifiers(normalized);
+        const multiplier = Number.isFinite(hpMultiplier) ? Math.max(0, hpMultiplier) : 1;
+        return Math.max(1, Math.floor(baseHp * multiplier));
     }
 
     get name() {
-        const isBossStage = this.stage % BOSS_STAGE_INTERVAL === 0;
-        const useBossNames = isBossStage && this.bossNames.length > 0;
-        const names = useBossNames ? this.bossNames : this.baseNames;
-        if (names.length === 0) {
-            return isBossStage ? '미지의 적 (보스)' : '미지의 적';
-        }
-        if (useBossNames) {
-            const bossIndex = Math.max(0, Math.floor(this.stage / BOSS_STAGE_INTERVAL) - 1);
-            const index = bossIndex % names.length;
-            return `${names[index]} (보스)`;
-        }
-        const index = Math.floor((this.stage - 1) % names.length);
-        const suffix = isBossStage ? ' (보스)' : '';
-        return `${names[index]}${suffix}`;
+        return getEnemyNameForStage(this.stage, this.stageGimmick, this.namePools);
     }
 
     applyDamage(damage) {
@@ -817,6 +857,7 @@ export class Enemy {
 
     advanceStage() {
         this.stage += 1;
+        this.refreshStageContext();
         this.maxHp = this.calculateMaxHp(this.stage);
         this.hp = this.maxHp;
         this.defeated = 0;
@@ -828,14 +869,16 @@ export class Enemy {
             return;
         }
         this.stage -= 1;
+        this.refreshStageContext();
         this.maxHp = this.calculateMaxHp(this.stage);
         this.hp = this.maxHp;
         this.defeated = 0;
     }
 
     reset(stage = 1) {
-        this.stage = stage;
-        this.maxHp = this.calculateMaxHp(stage);
+        this.stage = Enemy.normalizeStage(stage);
+        this.refreshStageContext();
+        this.maxHp = this.calculateMaxHp(this.stage);
         this.hp = this.maxHp;
         this.defeated = 0;
     }
@@ -1436,11 +1479,25 @@ export class GameState {
     }
 
     getStageReward(stage = this.enemy.stage) {
-        return calculateStageReward(stage, this.isBossStage(stage), this.goldBonus);
+        const modifiers = this.enemy.getStageModifiers(stage);
+        const goldBonus = this.goldBonus + (modifiers.goldBonus ?? 0);
+        const baseReward = calculateStageReward(stage, this.isBossStage(stage), goldBonus);
+        const rewardMultiplier = Number.isFinite(modifiers.rewardMultiplier)
+            ? Math.max(0, modifiers.rewardMultiplier)
+            : 1;
+        return Math.ceil(baseReward * rewardMultiplier);
     }
 
     enemyReward(stage = this.enemy.stage) {
         return this.getStageReward(stage);
+    }
+
+    getStageGimmick(stage = this.enemy.stage) {
+        return this.enemy.getStageGimmick(stage);
+    }
+
+    getStageModifiers(stage = this.enemy.stage) {
+        return this.enemy.getStageModifiers(stage);
     }
 
     getClickUpgradeContext() {
@@ -2670,7 +2727,9 @@ export class GameState {
     tryDropGachaToken(stage) {
         const isBoss = this.isBossStage(stage);
         const baseChance = isBoss ? GACHA_TOKEN_BOSS_DROP_CHANCE : GACHA_TOKEN_NORMAL_DROP_CHANCE;
-        const bonus = this.gachaDropBonus;
+        const modifiers = this.enemy.getStageModifiers(stage);
+        const stageBonus = Number.isFinite(modifiers.gachaDropBonus) ? modifiers.gachaDropBonus : 0;
+        const bonus = this.gachaDropBonus + stageBonus;
         const finalChance = clampProbability(baseChance + bonus);
         if (Math.random() > finalChance) return null;
         this.gachaTokens += 1;
@@ -2681,7 +2740,9 @@ export class GameState {
     tryDropEquipment(stage) {
         const isBoss = stage % BOSS_STAGE_INTERVAL === 0;
         const baseChance = isBoss ? EQUIPMENT_BOSS_DROP_CHANCE : EQUIPMENT_DROP_CHANCE;
-        const bonusMultiplier = 1 + this.equipmentDropBonus;
+        const modifiers = this.enemy.getStageModifiers(stage);
+        const stageBonus = Number.isFinite(modifiers.equipmentDropBonus) ? modifiers.equipmentDropBonus : 0;
+        const bonusMultiplier = Math.max(0, 1 + this.equipmentDropBonus + stageBonus);
         const finalChance = clampProbability(baseChance * bonusMultiplier);
         if (Math.random() > finalChance) return null;
         const item = generateEquipmentItem(stage, isBoss);
