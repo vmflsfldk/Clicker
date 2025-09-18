@@ -44,6 +44,10 @@ const UI = {
     tapButton: document.getElementById('tapButton'),
     enemy: document.getElementById('enemy'),
     heroList: document.getElementById('heroList'),
+    heroDetailOverlay: document.getElementById('heroDetailOverlay'),
+    heroDetailBackdrop: document.getElementById('heroDetailBackdrop'),
+    heroDetailClose: document.getElementById('heroDetailClose'),
+    heroDetailContent: document.getElementById('heroDetailContent'),
     setBonusSummary: document.getElementById('setBonusSummary'),
     setBonusList: document.getElementById('setBonusList'),
     gachaTokens: document.getElementById('gachaTokens'),
@@ -156,8 +160,12 @@ const formatSetBonusEffects = (effects) => {
 export class GameUI {
     constructor(state) {
         this.state = state;
-        this.heroTemplate = document.getElementById('heroTemplate');
+        this.heroIconTemplate = document.getElementById('heroIconTemplate');
+        this.heroDetailTemplate = document.getElementById('heroDetailTemplate');
         this.heroElements = new Map();
+        this.heroDetailUI = null;
+        this.activeHeroDetailId = null;
+        this.heroDetailReturnFocus = null;
         this.setBonusElements = new Map();
         this.rebirthSkillElements = new Map();
         this.missionElements = new Map();
@@ -171,6 +179,14 @@ export class GameUI {
         this.panelOverlay = UI.panelOverlay ?? null;
         this.panelOverlayBackdrop = UI.panelOverlayBackdrop ?? null;
         this.panelOverlayClose = UI.panelOverlayClose ?? null;
+        this.heroDetailOverlay = UI.heroDetailOverlay ?? null;
+        this.heroDetailBackdrop = UI.heroDetailBackdrop ?? null;
+        this.heroDetailClose = UI.heroDetailClose ?? null;
+        this.heroDetailContent = UI.heroDetailContent ?? null;
+        if (this.heroDetailClose) {
+            this.heroDetailClose.setAttribute('aria-hidden', 'true');
+            this.heroDetailClose.setAttribute('tabindex', '-1');
+        }
         this.handleDoubleClick = (event) => {
             event.preventDefault();
         };
@@ -322,6 +338,17 @@ export class GameUI {
         UI.sortHeroes.addEventListener('click', () => this.toggleHeroSort());
         if (UI.heroList) {
             UI.heroList.addEventListener('click', (event) => this.handleHeroListClick(event));
+        }
+        if (this.heroDetailClose) {
+            this.heroDetailClose.addEventListener('click', () => this.closeHeroDetail());
+        }
+        if (this.heroDetailBackdrop) {
+            this.heroDetailBackdrop.addEventListener('click', () => this.closeHeroDetail());
+        }
+        if (this.heroDetailContent) {
+            this.heroDetailContent.addEventListener('click', (event) =>
+                this.handleHeroDetailContentClick(event),
+            );
         }
         if (UI.bossRetreat) {
             UI.bossRetreat.addEventListener('click', () => this.handleBossRetreat());
@@ -482,55 +509,53 @@ export class GameUI {
     }
 
     addHero(hero) {
-        const node = this.heroTemplate.content.firstElementChild.cloneNode(true);
+        if (!this.heroIconTemplate) return;
+        const node = this.heroIconTemplate.content.firstElementChild.cloneNode(true);
         node.dataset.heroId = hero.id;
-        const name = node.querySelector('.hero__name');
-        const desc = node.querySelector('.hero__desc');
-        const level = node.querySelector('.hero__level');
-        const dps = node.querySelector('.hero__dps');
-        const statusState = node.querySelector('.hero__status-state');
-        const statusDetail = node.querySelector('.hero__status-detail');
-        const rarity = node.querySelector('.hero__rarity');
-        const traits = node.querySelector('.hero__traits');
-        const skinPreview = node.querySelector('.hero__skin-preview');
-        const skinPreviewImage = node.querySelector('.hero__skin-preview-image');
-        const skinList = node.querySelector('.hero__skin-list');
-        const skinButtons = new Map();
+        const button = node.querySelector('.hero-icon__button');
+        const image = node.querySelector('.hero-icon__image');
+        const name = node.querySelector('.hero-icon__name');
+        const media = node.querySelector('.hero-icon__media');
 
-        if (rarity) {
-            rarity.classList.add('rarity-badge');
-            rarity.textContent = hero.rarityName;
-            rarity.title = hero.rarity?.description ?? '';
+        if (button) {
+            button.dataset.heroId = hero.id;
         }
-
-        name.textContent = hero.name;
-        desc.textContent = hero.description;
-        node.dataset.rarity = hero.rarityId;
-        if (skinList) {
-            skinList.innerHTML = '';
-            hero.skins.forEach((skin) => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'hero-skin';
-                button.dataset.heroSkinId = skin.id;
-                button.dataset.heroId = hero.id;
-
-                const skinName = document.createElement('span');
-                skinName.className = 'hero-skin__name';
-
-                const skinStatus = document.createElement('span');
-                skinStatus.className = 'hero-skin__status';
-
-                const skinDesc = document.createElement('span');
-                skinDesc.className = 'hero-skin__desc';
-                skinDesc.textContent = skin.description ?? '';
-
-                button.append(skinName, skinStatus, skinDesc);
-                skinList.appendChild(button);
-                skinButtons.set(skin.id, { button, name: skinName, status: skinStatus, desc: skinDesc });
+        if (image) {
+            image.dataset.loadError = 'false';
+            image.addEventListener('error', () => {
+                node.dataset.hasImage = 'false';
+                image.dataset.loadError = 'true';
+                image.dataset.failedSrc = image.dataset.currentSrc ?? image.src ?? '';
+                delete image.dataset.currentSrc;
+                if (image.hasAttribute('src')) {
+                    image.removeAttribute('src');
+                }
+                image.hidden = true;
+            });
+            image.addEventListener('load', () => {
+                image.dataset.loadError = 'false';
+                delete image.dataset.failedSrc;
+                node.dataset.hasImage = 'true';
+                image.hidden = false;
             });
         }
 
+        this.heroElements.set(hero.id, {
+            node,
+            button,
+            image,
+            name,
+            media,
+        });
+        this.updateHero(hero);
+
+        UI.heroList.appendChild(node);
+    }
+
+    createHeroDetailBindings(node) {
+        if (!node) return null;
+        const skinPreview = node.querySelector('.hero__skin-preview');
+        const skinPreviewImage = node.querySelector('.hero__skin-preview-image');
         if (skinPreview && skinPreviewImage) {
             skinPreviewImage.dataset.loadError = 'false';
             skinPreviewImage.addEventListener('error', () => {
@@ -551,80 +576,241 @@ export class GameUI {
                 skinPreview.setAttribute('aria-hidden', 'false');
             });
         }
-
-        this.heroElements.set(hero.id, {
+        return {
             node,
-            name,
-            desc,
-            level,
-            dps,
-            statusState,
-            statusDetail,
-            rarity,
-            traits,
+            name: node.querySelector('.hero__name'),
+            desc: node.querySelector('.hero__desc'),
+            level: node.querySelector('.hero__level'),
+            dps: node.querySelector('.hero__dps'),
+            statusState: node.querySelector('.hero__status-state'),
+            statusDetail: node.querySelector('.hero__status-detail'),
+            rarity: node.querySelector('.hero__rarity'),
+            traits: node.querySelector('.hero__traits'),
             skinPreview,
             skinPreviewImage,
-            skinList,
-            skinButtons,
-        });
-        this.updateHero(hero);
+            skinList: node.querySelector('.hero__skin-list'),
+            skinButtons: new Map(),
+        };
+    }
 
-        UI.heroList.appendChild(node);
+    buildHeroDetailSkinButtons(hero, heroUI) {
+        if (!heroUI?.skinList) return;
+        heroUI.skinList.innerHTML = '';
+        heroUI.skinButtons = new Map();
+        const skins = Array.isArray(hero.skins) ? hero.skins : [];
+        skins.forEach((skin) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'hero-skin';
+            button.dataset.heroSkinId = skin.id;
+            button.dataset.heroId = hero.id;
+
+            const skinName = document.createElement('span');
+            skinName.className = 'hero-skin__name';
+
+            const skinStatus = document.createElement('span');
+            skinStatus.className = 'hero-skin__status';
+
+            const skinDesc = document.createElement('span');
+            skinDesc.className = 'hero-skin__desc';
+            skinDesc.textContent = skin.description ?? '';
+
+            button.append(skinName, skinStatus, skinDesc);
+            heroUI.skinList.appendChild(button);
+            heroUI.skinButtons.set(skin.id, { button, name: skinName, status: skinStatus, desc: skinDesc });
+        });
+    }
+
+    openHeroDetail(heroId) {
+        if (!this.heroDetailTemplate || !this.heroDetailContent) {
+            return;
+        }
+        const hero = this.state.getHeroById(heroId);
+        if (!hero) {
+            return;
+        }
+        if (!this.heroDetailReturnFocus) {
+            this.heroDetailReturnFocus = document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+        }
+        const node = this.heroDetailTemplate.content.firstElementChild.cloneNode(true);
+        const heroUI = this.createHeroDetailBindings(node);
+        if (!heroUI) {
+            return;
+        }
+        this.buildHeroDetailSkinButtons(hero, heroUI);
+        this.heroDetailContent.innerHTML = '';
+        this.heroDetailContent.appendChild(node);
+        this.heroDetailUI = heroUI;
+        this.activeHeroDetailId = hero.id;
+        this.updateHeroDetail(hero);
+        if (this.heroDetailOverlay) {
+            this.heroDetailOverlay.classList.add('is-open');
+            this.heroDetailOverlay.setAttribute('aria-hidden', 'false');
+        }
+        if (this.heroDetailClose) {
+            this.heroDetailClose.setAttribute('aria-hidden', 'false');
+            this.heroDetailClose.setAttribute('tabindex', '0');
+            this.heroDetailClose.focus({ preventScroll: true });
+        }
+        document.body.classList.add('is-hero-detail-open');
+    }
+
+    closeHeroDetail() {
+        const returnFocus = this.heroDetailReturnFocus;
+        if (this.heroDetailOverlay) {
+            this.heroDetailOverlay.classList.remove('is-open');
+            this.heroDetailOverlay.setAttribute('aria-hidden', 'true');
+        }
+        if (this.heroDetailContent) {
+            this.heroDetailContent.innerHTML = '';
+        }
+        if (this.heroDetailClose) {
+            this.heroDetailClose.setAttribute('aria-hidden', 'true');
+            this.heroDetailClose.setAttribute('tabindex', '-1');
+        }
+        document.body.classList.remove('is-hero-detail-open');
+        this.heroDetailUI = null;
+        this.activeHeroDetailId = null;
+        if (returnFocus && typeof returnFocus.focus === 'function' && document.contains(returnFocus)) {
+            returnFocus.focus({ preventScroll: true });
+        }
+        this.heroDetailReturnFocus = null;
+    }
+
+    isHeroDetailOpen() {
+        return Boolean(this.heroDetailOverlay?.classList.contains('is-open'));
     }
 
     updateHero(hero) {
+        this.updateHeroIcon(hero);
+        if (this.activeHeroDetailId === hero.id) {
+            this.updateHeroDetail(hero);
+        }
+        this.updateHeroGachaEntry(hero);
+    }
+
+    updateHeroIcon(hero) {
         const heroUI = this.heroElements.get(hero.id);
         if (!heroUI) return;
         heroUI.node.dataset.rarity = hero.rarityId;
+        heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
+        if (heroUI.button) {
+            heroUI.button.dataset.heroId = hero.id;
+            heroUI.button.title = hero.name;
+            heroUI.button.setAttribute('aria-label', hero.name);
+        }
+        if (heroUI.name) {
+            heroUI.name.textContent = hero.name;
+        }
+        const accent = hero.activeSkin?.accentColor ?? hero.rarity?.color ?? null;
+        if (accent) {
+            heroUI.node.style.setProperty('--hero-icon-accent', accent);
+        } else {
+            heroUI.node.style.removeProperty('--hero-icon-accent');
+        }
+        if (heroUI.media) {
+            heroUI.media.title = hero.description ?? '';
+        }
+        const image = heroUI.image;
+        if (image) {
+            const imagePath = hero.isUnlocked && hero.activeSkin?.image ? hero.activeSkin.image : null;
+            const previousFailedSrc = image.dataset?.failedSrc ?? '';
+            const previouslyErrored = image.dataset?.loadError === 'true';
+            const canDisplayImage = Boolean(imagePath)
+                && (!previouslyErrored || previousFailedSrc !== imagePath);
+            if (canDisplayImage && imagePath) {
+                const currentSrc = image.dataset.currentSrc ?? '';
+                if (currentSrc !== imagePath) {
+                    image.dataset.currentSrc = imagePath;
+                    image.src = imagePath;
+                }
+                image.hidden = false;
+                image.alt = `${hero.name} 아이콘`;
+                heroUI.node.dataset.hasImage = 'true';
+            } else {
+                delete image.dataset.currentSrc;
+                if (image.hasAttribute('src')) {
+                    image.removeAttribute('src');
+                }
+                if (!imagePath) {
+                    delete image.dataset.failedSrc;
+                    image.dataset.loadError = 'false';
+                }
+                image.hidden = true;
+                image.alt = '';
+                heroUI.node.dataset.hasImage = 'false';
+            }
+        }
+    }
+
+    updateHeroDetail(hero) {
+        if (!this.heroDetailUI || this.activeHeroDetailId !== hero.id) {
+            return;
+        }
+        const heroUI = this.heroDetailUI;
+        heroUI.node.dataset.heroId = hero.id;
+        heroUI.node.dataset.rarity = hero.rarityId;
+        heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
         if (heroUI.name) {
             heroUI.name.textContent = hero.name;
         }
         if (heroUI.desc) {
-            heroUI.desc.textContent = hero.description;
+            heroUI.desc.textContent = hero.description ?? '';
         }
         if (heroUI.rarity) {
+            heroUI.rarity.classList.add('rarity-badge');
             heroUI.rarity.textContent = hero.rarityName;
             heroUI.rarity.title = hero.rarity?.description ?? '';
         }
-        heroUI.level.textContent = `Lv. ${hero.level}`;
-        heroUI.dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
-        this.updateHeroTraits(hero);
-        heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
-        if (hero.isUnlocked) {
-            heroUI.statusState.textContent = '합류 완료';
-            const extraLevels = hero.enhancementLevel;
-            const detailParts = [];
-            if (extraLevels > 0) {
-                detailParts.push(`추가 성장 +${extraLevels} (Lv. ${hero.level})`);
-            } else {
-                detailParts.push(`초회 합류 Lv. ${hero.level}`);
-            }
-            const activeSkin = hero.activeSkin;
-            if (activeSkin) {
-                detailParts.push(`현재 스킨: ${activeSkin.name}`);
-            }
-            const nextSkin = hero.nextSkinUnlock;
-            if (nextSkin) {
-                detailParts.push(`다음 스킨 Lv. ${nextSkin.requiredLevel} ${nextSkin.name}`);
-            }
-            heroUI.statusDetail.textContent = detailParts.join(' · ');
-        } else {
-            heroUI.statusState.textContent = '미합류';
-            const detailParts = [`${hero.rarityName} 학생을 가챠로 모집하세요.`];
-            const firstSkin = hero.skins?.[0];
-            if (firstSkin) {
-                detailParts.push(`첫 스킨 Lv. ${firstSkin.requiredLevel} ${firstSkin.name}`);
-            }
-            heroUI.statusDetail.textContent = detailParts.join(' · ');
+        if (heroUI.level) {
+            heroUI.level.textContent = `Lv. ${hero.level}`;
         }
-        this.updateHeroSkins(hero);
-        this.updateHeroGachaEntry(hero);
+        if (heroUI.dps) {
+            heroUI.dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
+        }
+        this.renderHeroTraits(hero, heroUI.traits);
+        if (hero.isUnlocked) {
+            if (heroUI.statusState) {
+                heroUI.statusState.textContent = '합류 완료';
+            }
+            if (heroUI.statusDetail) {
+                const extraLevels = hero.enhancementLevel;
+                const detailParts = [];
+                if (extraLevels > 0) {
+                    detailParts.push(`추가 성장 +${extraLevels} (Lv. ${hero.level})`);
+                } else {
+                    detailParts.push(`초회 합류 Lv. ${hero.level}`);
+                }
+                const activeSkin = hero.activeSkin;
+                if (activeSkin) {
+                    detailParts.push(`현재 스킨: ${activeSkin.name}`);
+                }
+                const nextSkin = hero.nextSkinUnlock;
+                if (nextSkin) {
+                    detailParts.push(`다음 스킨 Lv. ${nextSkin.requiredLevel} ${nextSkin.name}`);
+                }
+                heroUI.statusDetail.textContent = detailParts.join(' · ');
+            }
+        } else {
+            if (heroUI.statusState) {
+                heroUI.statusState.textContent = '미합류';
+            }
+            if (heroUI.statusDetail) {
+                const detailParts = [`${hero.rarityName} 학생을 가챠로 모집하세요.`];
+                const firstSkin = hero.skins?.[0];
+                if (firstSkin) {
+                    detailParts.push(`첫 스킨 Lv. ${firstSkin.requiredLevel} ${firstSkin.name}`);
+                }
+                heroUI.statusDetail.textContent = detailParts.join(' · ');
+            }
+        }
+        this.updateHeroSkinState(hero, heroUI);
     }
 
-    updateHeroTraits(hero) {
-        const heroUI = this.heroElements.get(hero.id);
-        if (!heroUI?.traits) return;
-        const container = heroUI.traits;
+    renderHeroTraits(hero, container) {
+        if (!container) return;
         container.innerHTML = '';
         const entries = Array.isArray(hero.traitEntries) ? hero.traitEntries : [];
         if (entries.length === 0) {
@@ -641,7 +827,7 @@ export class GameUI {
             } else {
                 delete badge.dataset.traitId;
             }
-            if (trait.accentColor) {
+            if (trait?.accentColor) {
                 badge.style.setProperty('--hero-trait-accent', trait.accentColor);
             } else {
                 badge.style.removeProperty('--hero-trait-accent');
@@ -666,8 +852,7 @@ export class GameUI {
         });
     }
 
-    updateHeroSkins(hero) {
-        const heroUI = this.heroElements.get(hero.id);
+    updateHeroSkinState(hero, heroUI) {
         if (!heroUI) return;
         const activeSkin = hero.activeSkin;
         const skinImageElement = heroUI.skinPreviewImage ?? null;
@@ -744,7 +929,8 @@ export class GameUI {
             }
         }
         if (heroUI.skinButtons && heroUI.skinButtons.size > 0) {
-            hero.skins.forEach((skin) => {
+            const skins = Array.isArray(hero.skins) ? hero.skins : [];
+            skins.forEach((skin) => {
                 const entry = heroUI.skinButtons.get(skin.id);
                 if (!entry) return;
                 entry.name.textContent = skin.name;
@@ -890,12 +1076,25 @@ export class GameUI {
     }
 
     handleHeroListClick(event) {
+        const button = event.target.closest('.hero-icon__button');
+        if (!button) return;
+        const heroElement = button.closest('.hero-icon');
+        const heroId = heroElement?.dataset.heroId ?? button.dataset.heroId;
+        if (!heroId) return;
+        this.heroDetailReturnFocus = button;
+        this.openHeroDetail(heroId);
+    }
+
+    handleHeroDetailContentClick(event) {
         const button = event.target.closest('.hero-skin');
         if (!button) return;
-        const heroElement = button.closest('.hero');
-        const heroId = heroElement?.dataset.heroId;
+        const heroId = this.activeHeroDetailId;
         const skinId = button.dataset.heroSkinId;
         if (!heroId || !skinId) return;
+        this.handleHeroSkinSelection(heroId, skinId);
+    }
+
+    handleHeroSkinSelection(heroId, skinId) {
         const hero = this.state.getHeroById(heroId);
         if (!hero) return;
         if (!hero.isSkinUnlocked(skinId)) {
@@ -1662,6 +1861,11 @@ export class GameUI {
         if (this.isSalvageModalOpen()) {
             event.preventDefault();
             this.closeSalvageModal();
+            return;
+        }
+        if (this.isHeroDetailOpen()) {
+            event.preventDefault();
+            this.closeHeroDetail();
             return;
         }
         if (this.isPanelOverlayOpen()) {
