@@ -150,6 +150,18 @@
                     <button
                         type="button"
                         class="panel-tab"
+                        id="tab-salvage"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-salvage"
+                        data-tab-target="salvage"
+                        tabindex="-1"
+                    >
+                        장비 분해
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
                         id="tab-missions"
                         role="tab"
                         aria-selected="false"
@@ -427,6 +439,27 @@
                             </div>
                             <div class="equipment__section">
                                 <h3 class="equipment__subheading">인벤토리</h3>
+                                <p id="equipmentCollectionEmpty" class="equipment-empty">
+                                    아직 확보한 전술 장비가 없습니다.
+                                </p>
+                                <ul id="equipmentCollection" class="equipment-list"></ul>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div
+                        class="panel-view"
+                        id="panel-salvage"
+                        role="tabpanel"
+                        aria-labelledby="tab-salvage"
+                        data-tab="salvage"
+                        hidden
+                    >
+                        <section class="panel panel--equipment">
+                            <header class="panel__header">
+                                <h2>장비 분해</h2>
+                            </header>
+                            <div class="equipment__section">
                                 <div class="equipment__controls">
                                     <p id="equipmentSalvageHint" class="equipment__hint">
                                         잠긴 전술 장비는 분해되지 않습니다. <strong>분해 가능한 장비만 보기</strong>
