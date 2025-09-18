@@ -14,13 +14,14 @@ import {
     HERO_TRAIT_MAP,
     HERO_RARITIES,
     MISSIONS,
+    MISSION_GROUPS,
     clampProbability,
 } from '../state/gameState.js';
 import { HERO_SET_BONUSES } from '../data/heroes.js';
 import { EQUIPMENT_TYPES, EQUIPMENT_DROP_CHANCE, EQUIPMENT_BOSS_DROP_CHANCE } from '../data/equipment.js';
 import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
 import { saveGame } from '../storage/save.js';
-import { formatNumber, formatPercent, formatSignedPercent } from '../utils/format.js';
+import { formatNumber, formatPercent, formatSignedPercent, formatCountdown } from '../utils/format.js';
 
 const UI = {
     stage: document.getElementById('stage'),
@@ -181,6 +182,10 @@ export class GameUI {
         this.setBonusElements = new Map();
         this.rebirthSkillElements = new Map();
         this.missionElements = new Map();
+        this.missionGroupElements = new Map();
+        this.missionGroupMissions = new Map();
+        this.missionGroupMap = new Map(MISSION_GROUPS.map((group) => [group.id, group]));
+        this.audioContext = null;
         this.gachaPoolElements = new Map();
         this.selectedEquipmentIds = new Set();
         this.filterSalvageable = false;
@@ -2257,68 +2262,146 @@ export class GameUI {
         if (!UI.missionList) return;
         UI.missionList.innerHTML = '';
         this.missionElements.clear();
+        this.missionGroupElements.clear();
+        this.missionGroupMissions.clear();
+
+        const fragment = document.createDocumentFragment();
+        const knownOrder = MISSION_GROUPS.map((group) => group.id);
+        const uniqueTypes = [];
         MISSIONS.forEach((mission) => {
-            const entry = document.createElement('li');
-            entry.className = 'mission';
-            entry.dataset.missionId = mission.id;
+            const type = mission.type ?? 'static';
+            if (!uniqueTypes.includes(type)) {
+                uniqueTypes.push(type);
+            }
+        });
+        const orderedTypes = [
+            ...knownOrder.filter((type) => uniqueTypes.includes(type)),
+            ...uniqueTypes.filter((type) => !knownOrder.includes(type)),
+        ];
 
-            const header = document.createElement('div');
-            header.className = 'mission__header';
+        orderedTypes.forEach((type) => {
+            const missionsForType = MISSIONS.filter((mission) => mission.type === type);
+            if (missionsForType.length === 0) {
+                return;
+            }
+            const groupMeta = this.missionGroupMap.get(type) ?? {
+                id: type,
+                label: type ?? '임무',
+                description: '',
+                resetInterval: null,
+            };
+            if (!this.missionGroupMap.has(type)) {
+                this.missionGroupMap.set(type, groupMeta);
+            }
+            this.missionGroupMissions.set(type, missionsForType);
 
-            const title = document.createElement('h3');
-            title.className = 'mission__title';
-            title.textContent = mission.name;
+            const groupItem = document.createElement('li');
+            groupItem.className = 'mission-group';
+            groupItem.dataset.missionGroup = type;
 
-            const status = document.createElement('span');
-            status.className = 'mission__status';
+            const groupHeader = document.createElement('div');
+            groupHeader.className = 'mission-group__header';
 
-            header.append(title, status);
+            const groupTitle = document.createElement('h2');
+            groupTitle.className = 'mission-group__title';
+            groupTitle.textContent = groupMeta.label ?? type;
 
-            const desc = document.createElement('p');
-            desc.className = 'mission__desc';
-            desc.textContent = mission.description;
+            const countdown = document.createElement('span');
+            countdown.className = 'mission-group__countdown';
 
-            const reward = document.createElement('div');
-            reward.className = 'mission__reward';
-            reward.textContent = `보상: ${this.formatMissionReward(mission.reward)}`;
+            groupHeader.append(groupTitle, countdown);
+            groupItem.appendChild(groupHeader);
 
-            const progressWrapper = document.createElement('div');
-            progressWrapper.className = 'mission__progress';
+            if (groupMeta.description) {
+                const groupDesc = document.createElement('p');
+                groupDesc.className = 'mission-group__description';
+                groupDesc.textContent = groupMeta.description;
+                groupItem.appendChild(groupDesc);
+            }
 
-            const progressLabel = document.createElement('span');
-            progressLabel.className = 'mission__progress-label';
+            const groupList = document.createElement('ul');
+            groupList.className = 'mission-group__list';
 
-            const progressBar = document.createElement('div');
-            progressBar.className = 'mission__progress-bar';
+            missionsForType.forEach((mission) => {
+                const entry = document.createElement('li');
+                entry.className = 'mission';
+                entry.dataset.missionId = mission.id;
+                entry.dataset.missionType = mission.type;
 
-            const progressFill = document.createElement('div');
-            progressFill.className = 'mission__progress-fill';
-            progressBar.appendChild(progressFill);
+                const header = document.createElement('div');
+                header.className = 'mission__header';
 
-            progressWrapper.append(progressLabel, progressBar);
+                const title = document.createElement('h3');
+                title.className = 'mission__title';
+                title.textContent = mission.name;
 
-            const actions = document.createElement('div');
-            actions.className = 'mission__actions';
+                const typeBadge = document.createElement('span');
+                typeBadge.className = 'mission__type';
+                typeBadge.textContent = this.getMissionTypeLabel(mission.type);
 
-            const button = document.createElement('button');
-            button.className = 'btn btn-secondary mission__claim';
-            button.type = 'button';
-            button.dataset.missionId = mission.id;
-            button.textContent = '보상 수령';
+                const status = document.createElement('span');
+                status.className = 'mission__status';
 
-            actions.appendChild(button);
+                header.append(title, typeBadge, status);
 
-            entry.append(header, desc, reward, progressWrapper, actions);
-            UI.missionList.appendChild(entry);
+                const desc = document.createElement('p');
+                desc.className = 'mission__desc';
+                desc.textContent = mission.description;
 
-            this.missionElements.set(mission.id, {
-                entry,
-                status,
-                progressLabel,
-                progressFill,
-                button,
+                const reward = document.createElement('div');
+                reward.className = 'mission__reward';
+                reward.textContent = `보상: ${this.formatMissionReward(mission.reward)}`;
+
+                const progressWrapper = document.createElement('div');
+                progressWrapper.className = 'mission__progress';
+
+                const progressLabel = document.createElement('span');
+                progressLabel.className = 'mission__progress-label';
+
+                const progressBar = document.createElement('div');
+                progressBar.className = 'mission__progress-bar';
+
+                const progressFill = document.createElement('div');
+                progressFill.className = 'mission__progress-fill';
+                progressBar.appendChild(progressFill);
+
+                progressWrapper.append(progressLabel, progressBar);
+
+                const actions = document.createElement('div');
+                actions.className = 'mission__actions';
+
+                const button = document.createElement('button');
+                button.className = 'btn btn-secondary mission__claim';
+                button.type = 'button';
+                button.dataset.missionId = mission.id;
+                button.textContent = '보상 수령';
+
+                actions.appendChild(button);
+
+                entry.append(header, desc, reward, progressWrapper, actions);
+                groupList.appendChild(entry);
+
+                this.missionElements.set(mission.id, {
+                    entry,
+                    status,
+                    progressLabel,
+                    progressFill,
+                    button,
+                    typeBadge,
+                    groupId: type,
+                });
+            });
+
+            groupItem.appendChild(groupList);
+            fragment.appendChild(groupItem);
+
+            this.missionGroupElements.set(type, {
+                container: groupItem,
+                countdown,
             });
         });
+
+        UI.missionList.appendChild(fragment);
         this.updateMissionUI();
     }
 
@@ -2326,6 +2409,7 @@ export class GameUI {
         this.updateMissionSummary();
         MISSIONS.forEach((mission) => this.updateMissionEntry(mission));
         this.updateMissionEmptyState();
+        this.updateMissionCountdowns();
     }
 
     updateMissionSummary() {
@@ -2361,6 +2445,10 @@ export class GameUI {
             : completed
             ? `보상: ${this.formatMissionReward(mission.reward)}`
             : '임무를 먼저 완료하세요.';
+        if (elements.typeBadge) {
+            const label = this.getMissionTypeLabel(state.type ?? mission.type);
+            elements.typeBadge.textContent = label;
+        }
     }
 
     updateMissionEmptyState() {
@@ -2381,6 +2469,132 @@ export class GameUI {
                 return `환생 포인트 ${amountText}P`;
             default:
                 return '알 수 없는 보상';
+        }
+    }
+
+    getMissionTypeLabel(type) {
+        if (!type) {
+            return '임무';
+        }
+        const group = this.missionGroupMap.get(type);
+        if (group?.label) {
+            return group.label;
+        }
+        if (typeof type === 'string') {
+            return type;
+        }
+        return '임무';
+    }
+
+    updateMissionCountdowns() {
+        const now = Date.now();
+        this.missionGroupMissions.forEach((missions, groupId) => {
+            const elements = this.missionGroupElements.get(groupId);
+            if (!elements) return;
+            const groupMeta = this.missionGroupMap.get(groupId);
+            const interval = Number(groupMeta?.resetInterval);
+            if (!Number.isFinite(interval) || interval <= 0) {
+                elements.countdown.textContent = '상시 진행';
+                elements.container.dataset.countdownState = 'static';
+                return;
+            }
+            let nextReset = null;
+            missions.forEach((mission) => {
+                const state = this.state.getMissionState(mission.id);
+                const candidate = Number(state?.resetAt);
+                if (Number.isFinite(candidate) && candidate > now) {
+                    nextReset = nextReset === null ? candidate : Math.min(nextReset, candidate);
+                }
+            });
+            if (!nextReset) {
+                elements.countdown.textContent = '곧 초기화';
+                elements.container.dataset.countdownState = 'imminent';
+                return;
+            }
+            const remaining = nextReset - now;
+            if (!Number.isFinite(remaining) || remaining <= 1000) {
+                elements.countdown.textContent = '곧 초기화';
+                elements.container.dataset.countdownState = 'imminent';
+                return;
+            }
+            elements.countdown.textContent = `초기화까지 ${formatCountdown(nextReset, now, { maxUnits: 2 })}`;
+            elements.container.dataset.countdownState = 'active';
+        });
+    }
+
+    pollMissionResets() {
+        const resets = this.state.checkMissionResets();
+        if (Array.isArray(resets) && resets.length > 0) {
+            this.handleMissionResets(resets);
+        } else {
+            this.updateMissionCountdowns();
+        }
+    }
+
+    handleMissionResets(resets) {
+        if (!Array.isArray(resets) || resets.length === 0) {
+            return;
+        }
+        const grouped = new Map();
+        resets.forEach((entry) => {
+            const type = entry?.mission?.type ?? 'static';
+            if (!grouped.has(type)) {
+                grouped.set(type, []);
+            }
+            grouped.get(type).push(entry);
+        });
+        grouped.forEach((entries, type) => {
+            const label = this.getMissionTypeLabel(type);
+            const count = entries.length;
+            const groupElements = this.missionGroupElements.get(type);
+            if (groupElements) {
+                const { container } = groupElements;
+                container.dataset.resetHighlight = 'true';
+                setTimeout(() => {
+                    delete container.dataset.resetHighlight;
+                }, 1200);
+            }
+            const formattedCount = formatNumber(count);
+            const message = count > 1
+                ? `${label} ${formattedCount}개 임무가 초기화되었습니다. 새로운 임무를 확인하세요!`
+                : `${label} 임무가 초기화되었습니다. 새로운 임무를 확인하세요!`;
+            this.addLog(message, 'info');
+        });
+        this.updateMissionUI();
+        this.playMissionResetSound();
+        saveGame(this.state);
+    }
+
+    playMissionResetSound() {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+            return;
+        }
+        try {
+            if (!this.audioContext) {
+                this.audioContext = new AudioContextClass();
+            }
+            const context = this.audioContext;
+            if (context.state === 'suspended') {
+                context.resume().catch(() => {});
+            }
+            const duration = 0.35;
+            const now = context.currentTime;
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(880, now);
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.25, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+            oscillator.connect(gain).connect(context.destination);
+            oscillator.start(now);
+            oscillator.stop(now + duration);
+        } catch (error) {
+            // 음향 재생 실패는 무시합니다.
         }
     }
 
@@ -2500,6 +2714,7 @@ export class GameUI {
     }
 
     handleMissionClaim(missionId) {
+        this.pollMissionResets();
         const result = this.state.claimMissionReward(missionId);
         if (!result.success) {
             this.addLog(result.message, 'warning');
@@ -2514,11 +2729,14 @@ export class GameUI {
     }
 
     handleMissionProgress(trigger, amount = 1) {
+        this.pollMissionResets();
         const completed = this.state.progressMissions(trigger, amount);
         this.updateMissionUI();
         if (completed.length === 0) return;
         completed.forEach(({ mission }) => {
-            this.addLog(`임무 완료: ${mission.name}! 보상을 수령하세요.`, 'success');
+            const typeLabel = this.getMissionTypeLabel(mission.type);
+            const prefix = typeLabel ? `[${typeLabel}] ` : '';
+            this.addLog(`${prefix}임무 완료: ${mission.name}! 보상을 수령하세요.`, 'success');
         });
         saveGame(this.state);
     }
@@ -3247,11 +3465,16 @@ export class GameUI {
         this.frenzyLoop = setInterval(() => this.updateFrenzyUI(), 200);
         this.bossTimerLoop = setInterval(() => this.handleBossTimerTick(), 100);
         this.handleBossTimerTick();
+        this.pollMissionResets();
     }
 
     applyDps() {
+        this.pollMissionResets();
         const dps = this.state.totalDps;
-        if (dps <= 0) return;
+        if (dps <= 0) {
+            this.updateMissionCountdowns();
+            return;
+        }
         const damage = dps / 4; // 250ms 마다 호출되므로 4로 나눔
         const defeated = this.state.enemy.applyDamage(damage);
         if (defeated) {
@@ -3263,6 +3486,7 @@ export class GameUI {
         this.updateHeroes();
         this.updateBossTimerUI();
         this.updateBossControls();
+        this.updateMissionCountdowns();
     }
 
     useFrenzy() {
@@ -3286,6 +3510,7 @@ export class GameUI {
     }
 
     autoSave() {
+        this.pollMissionResets();
         saveGame(this.state);
     }
 

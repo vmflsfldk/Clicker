@@ -15,7 +15,7 @@ import {
     EQUIPMENT_DROP_CHANCE,
     EQUIPMENT_BOSS_DROP_CHANCE,
 } from '../data/equipment.js';
-import { MISSIONS } from '../data/missions.js';
+import { MISSIONS, MISSION_GROUPS } from '../data/missions.js';
 import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
 import { formatNumber } from '../utils/format.js';
 
@@ -30,6 +30,7 @@ const DEFAULT_HERO_RARITY_ID = 'common';
 const EQUIPMENT_EFFECT_MAP = new Map(EQUIPMENT_EFFECTS.map((effect) => [effect.id, effect]));
 const EQUIPMENT_TYPE_MAP = new Map(EQUIPMENT_TYPES.map((type) => [type.id, type]));
 const EQUIPMENT_RARITY_MAP = new Map(EQUIPMENT_RARITIES.map((rarity) => [rarity.id, rarity]));
+const MISSION_GROUP_MAP = new Map(MISSION_GROUPS.map((group) => [group.id, group]));
 const MISSION_MAP = new Map(MISSIONS.map((mission) => [mission.id, mission]));
 
 const BOSS_STAGE_INTERVAL = 5;
@@ -193,6 +194,31 @@ const weightedRandom = (items, getWeight) => {
         }
     }
     return pool[pool.length - 1]?.item ?? null;
+};
+
+const getMissionResetInterval = (mission) => {
+    if (!mission) return null;
+    const missionInterval = Number(mission.resetInterval);
+    if (Number.isFinite(missionInterval) && missionInterval > 0) {
+        return Math.floor(missionInterval);
+    }
+    const group = MISSION_GROUP_MAP.get(mission.type);
+    const groupInterval = Number(group?.resetInterval);
+    if (Number.isFinite(groupInterval) && groupInterval > 0) {
+        return Math.floor(groupInterval);
+    }
+    return null;
+};
+
+const calculateNextMissionResetTime = (interval, referenceTime = Date.now()) => {
+    if (!Number.isFinite(interval) || interval <= 0) {
+        return null;
+    }
+    const normalizedInterval = Math.max(1, Math.floor(interval));
+    const now = Number.isFinite(referenceTime) ? Math.max(0, Math.floor(referenceTime)) : Date.now();
+    const remainder = now % normalizedInterval;
+    const next = remainder === 0 ? now + normalizedInterval : now + (normalizedInterval - remainder);
+    return next;
 };
 
 const calculateRebirthPoints = (highestStage) => {
@@ -1502,23 +1528,39 @@ export class GameState {
 
     initializeMissions(savedMissions) {
         this.missionProgress = {};
+        const now = Date.now();
         MISSIONS.forEach((mission) => {
-            const saved = savedMissions?.[mission.id];
+            const saved = savedMissions?.[mission.id] ?? null;
+            const interval = getMissionResetInterval(mission);
+            const savedResetAt = Number(saved?.resetAt);
+            const savedType = typeof saved?.type === 'string' ? saved.type : null;
+            const hasMatchingType = !savedType || savedType === mission.type;
+            const hasValidReset =
+                Boolean(interval) && Number.isFinite(savedResetAt) && savedResetAt > now && hasMatchingType;
+            const resetAt = interval
+                ? hasValidReset
+                    ? Math.floor(savedResetAt)
+                    : calculateNextMissionResetTime(interval, now)
+                : null;
+
+            const expired = Boolean(interval) && (!hasValidReset || !hasMatchingType);
             const rawProgress = Number(saved?.progress ?? 0);
-            const progress = Number.isFinite(rawProgress) ? Math.max(0, Math.floor(rawProgress)) : 0;
-            const completed = saved?.completed ?? progress >= mission.goal;
-            const claimed = saved?.claimed ?? false;
+            const sanitizedProgress = Number.isFinite(rawProgress) ? Math.max(0, Math.floor(rawProgress)) : 0;
+            const baseProgress = expired ? 0 : sanitizedProgress;
+            const completed = !expired && (saved?.completed ?? baseProgress >= mission.goal);
+            const claimed = !expired && (saved?.claimed ?? false);
+            const normalizedProgress = Math.min(
+                mission.goal,
+                completed ? Math.max(baseProgress, mission.goal) : baseProgress,
+            );
+
             this.missionProgress[mission.id] = {
-                progress: Math.min(mission.goal, progress),
+                progress: normalizedProgress,
                 completed: Boolean(completed),
                 claimed: Boolean(claimed),
+                resetAt: interval ? resetAt : null,
+                type: mission.type,
             };
-            if (this.missionProgress[mission.id].completed) {
-                this.missionProgress[mission.id].progress = Math.max(
-                    this.missionProgress[mission.id].progress,
-                    mission.goal,
-                );
-            }
         });
     }
 
@@ -1530,17 +1572,84 @@ export class GameState {
                     progress: state.progress,
                     completed: state.completed,
                     claimed: state.claimed,
+                    resetAt: Number.isFinite(state.resetAt) ? Math.floor(state.resetAt) : null,
+                    type: state.type ?? mission.type,
                 };
             }
             return acc;
         }, {});
     }
 
+    checkMissionResets(now = Date.now()) {
+        const resets = [];
+        MISSIONS.forEach((mission) => {
+            let state = this.missionProgress[mission.id];
+            const interval = getMissionResetInterval(mission);
+            if (!state) {
+                this.missionProgress[mission.id] = {
+                    progress: 0,
+                    completed: false,
+                    claimed: false,
+                    resetAt: interval ? calculateNextMissionResetTime(interval, now) : null,
+                    type: mission.type,
+                };
+                state = this.missionProgress[mission.id];
+            }
+            if (!interval) {
+                state.resetAt = null;
+                state.type = mission.type;
+                return;
+            }
+            const resetAt = Number(state.resetAt);
+            const previousType = state.type;
+            const needsReset =
+                !Number.isFinite(resetAt) ||
+                resetAt <= now ||
+                (typeof previousType === 'string' && previousType !== mission.type);
+            if (needsReset) {
+                const previous = {
+                    progress: state.progress,
+                    completed: state.completed,
+                    claimed: state.claimed,
+                };
+                state.progress = 0;
+                state.completed = false;
+                state.claimed = false;
+                state.resetAt = calculateNextMissionResetTime(interval, now);
+                state.type = mission.type;
+                resets.push({ mission, state, previous });
+            } else {
+                state.type = mission.type;
+                if (Number.isFinite(state.resetAt)) {
+                    state.resetAt = Math.floor(state.resetAt);
+                }
+            }
+        });
+        if (resets.length > 0) {
+            this.lastSave = now;
+        }
+        return resets;
+    }
+
     getMissionState(missionId) {
-        return this.missionProgress[missionId] ?? { progress: 0, completed: false, claimed: false };
+        const state = this.missionProgress[missionId];
+        if (state) {
+            return state;
+        }
+        const mission = MISSION_MAP.get(missionId);
+        const interval = getMissionResetInterval(mission);
+        return {
+            progress: 0,
+            completed: false,
+            claimed: false,
+            resetAt: interval ? calculateNextMissionResetTime(interval) : null,
+            type: mission?.type ?? null,
+        };
     }
 
     progressMissions(trigger, amount = 1) {
+        this.checkMissionResets();
+        const now = Date.now();
         const normalizedAmount = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
         if (normalizedAmount <= 0) {
             return [];
@@ -1548,7 +1657,20 @@ export class GameState {
         const completed = [];
         MISSIONS.forEach((mission) => {
             if (mission.trigger !== trigger) return;
-            const state = this.missionProgress[mission.id];
+            let state = this.missionProgress[mission.id];
+            if (!state) {
+                state = { ...this.getMissionState(mission.id) };
+                this.missionProgress[mission.id] = state;
+            }
+            state.type = mission.type;
+            const interval = getMissionResetInterval(mission);
+            if (interval) {
+                if (!Number.isFinite(state.resetAt) || state.resetAt <= now) {
+                    state.resetAt = calculateNextMissionResetTime(interval, now);
+                }
+            } else {
+                state.resetAt = null;
+            }
             if (!state || state.claimed) return;
             if (state.completed && state.progress >= mission.goal) return;
             const previousProgress = state.progress;
@@ -1565,6 +1687,7 @@ export class GameState {
     }
 
     claimMissionReward(missionId) {
+        this.checkMissionResets();
         const mission = MISSION_MAP.get(missionId);
         if (!mission) {
             return { success: false, message: '알 수 없는 임무입니다.' };
@@ -2065,4 +2188,5 @@ export {
     weightedRandom,
     chooseRarity,
     MISSIONS,
+    MISSION_GROUPS,
 };
