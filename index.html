@@ -296,16 +296,12 @@
                                 <h2>전술 스킬</h2>
                             </header>
                             <div class="panel__body panel-card__body">
-                                <article class="skill-card">
-                                    <div class="skill-card__content">
-                                        <h3 class="skill-card__title">아로나의 전술 지원</h3>
-                                        <p class="skill-card__desc">샬레의 지원 네트워크로 잠시 총 지원 화력을 2배로 높입니다.</p>
-                                    </div>
-                                    <div class="skill-card__actions">
-                                        <button id="skillFrenzy" class="btn btn-skill">지원 요청 (쿨타임 60초)</button>
-                                        <p id="skillCooldown" class="cooldown"></p>
-                                    </div>
-                                </article>
+                                <ul
+                                    id="skillList"
+                                    class="skill-list"
+                                    aria-live="polite"
+                                    aria-label="사용 가능한 전술 스킬"
+                                ></ul>
                             </div>
                         </section>
 
@@ -620,6 +616,30 @@
             <div id="equipmentDetailContent" class="equipment-detail-overlay__content"></div>
         </div>
     </div>
+
+    <template id="skillTemplate">
+        <li class="skill-card" data-skill-id="">
+            <div class="skill-card__content">
+                <h3 class="skill-card__title"></h3>
+                <p class="skill-card__desc"></p>
+                <div class="skill-card__meta">
+                    <span class="skill-card__cooldown-hint"></span>
+                    <span class="skill-card__duration-hint"></span>
+                </div>
+            </div>
+            <div class="skill-card__actions">
+                <button
+                    type="button"
+                    class="btn btn-skill skill-card__button"
+                    data-skill-button
+                    aria-pressed="false"
+                >
+                    <span class="skill-card__button-label">발동</span>
+                </button>
+                <p class="skill-card__status" aria-live="polite"></p>
+            </div>
+        </li>
+    </template>
 
     <template id="heroIconTemplate">
         <li class="hero-icon" data-recruited="false" data-rarity="common">

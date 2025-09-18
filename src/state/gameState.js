@@ -20,6 +20,7 @@ import {
 } from '../data/equipment.js';
 import { MISSIONS, MISSION_GROUPS } from '../data/missions.js';
 import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
+import { SKILLS, SKILL_EFFECT_TYPES, SKILL_MAP } from '../data/skills.js';
 import { formatNumber } from '../utils/format.js';
 
 const HERO_TRAIT_GROUP_MAP = new Map(HERO_TRAIT_GROUPS.map((group) => [group.id, group]));
@@ -875,8 +876,7 @@ export class GameState {
             ? Math.max(0, Math.floor(savedGoldGainLevel))
             : 0;
         this.lastSave = saved?.lastSave ?? Date.now();
-        this.frenzyCooldown = saved?.frenzyCooldown ?? 0;
-        this.frenzyActiveUntil = saved?.frenzyActiveUntil ?? 0;
+        this.initializeSkills(saved?.skills, saved);
         this.enemy = new Enemy(saved?.enemy?.stage ?? 1, saved?.enemy);
         const heroStates = saved?.heroes ?? [];
         this.heroes = defaultHeroes.map((hero) => new Hero(hero, heroStates.find((h) => h.id === hero.id)));
@@ -924,6 +924,257 @@ export class GameState {
         }
     }
 
+    initializeSkills(savedSkills = {}, legacySaved = null) {
+        this.activeSkills = new Map();
+        SKILLS.forEach((skill) => {
+            const savedState = savedSkills?.[skill.id] ?? {};
+            const savedCooldown = Number(savedState?.cooldownUntil ?? savedState?.cooldown ?? 0);
+            const savedActive = Number(savedState?.activeUntil ?? savedState?.active ?? 0);
+            const cooldownUntil = Number.isFinite(savedCooldown)
+                ? Math.max(0, Math.floor(savedCooldown))
+                : 0;
+            const activeUntil = Number.isFinite(savedActive) ? Math.max(0, Math.floor(savedActive)) : 0;
+            const context =
+                savedState && typeof savedState.context === 'object' && savedState.context !== null
+                    ? { ...savedState.context }
+                    : null;
+            this.activeSkills.set(skill.id, { cooldownUntil, activeUntil, context });
+        });
+        if (legacySaved) {
+            const legacyCooldown = Number(legacySaved?.frenzyCooldown ?? 0);
+            const legacyActive = Number(legacySaved?.frenzyActiveUntil ?? 0);
+            if (Number.isFinite(legacyCooldown) || Number.isFinite(legacyActive)) {
+                const current = this.activeSkills.get('frenzy') ?? { cooldownUntil: 0, activeUntil: 0, context: null };
+                if (Number.isFinite(legacyCooldown)) {
+                    current.cooldownUntil = Math.max(
+                        current.cooldownUntil,
+                        Math.max(0, Math.floor(legacyCooldown)),
+                    );
+                }
+                if (Number.isFinite(legacyActive)) {
+                    current.activeUntil = Math.max(current.activeUntil, Math.max(0, Math.floor(legacyActive)));
+                }
+                this.activeSkills.set('frenzy', current);
+            }
+        }
+    }
+
+    resetSkillStates() {
+        this.activeSkills.forEach((_, skillId) => {
+            this.activeSkills.set(skillId, { cooldownUntil: 0, activeUntil: 0, context: null });
+        });
+    }
+
+    serializeSkills() {
+        const result = {};
+        this.activeSkills.forEach((state, skillId) => {
+            const entry = {
+                cooldownUntil: Math.max(0, Math.floor(Number(state?.cooldownUntil ?? 0))),
+                activeUntil: Math.max(0, Math.floor(Number(state?.activeUntil ?? 0))),
+            };
+            if (state?.context && typeof state.context === 'object') {
+                entry.context = { ...state.context };
+            }
+            result[skillId] = entry;
+        });
+        return result;
+    }
+
+    getSkillState(skillId) {
+        if (!this.activeSkills.has(skillId)) {
+            this.activeSkills.set(skillId, { cooldownUntil: 0, activeUntil: 0, context: null });
+        }
+        const state = this.activeSkills.get(skillId) ?? { cooldownUntil: 0, activeUntil: 0, context: null };
+        return {
+            cooldownUntil: Math.max(0, Math.floor(Number(state.cooldownUntil ?? 0))),
+            activeUntil: Math.max(0, Math.floor(Number(state.activeUntil ?? 0))),
+            context: state.context ? { ...state.context } : null,
+        };
+    }
+
+    setSkillState(skillId, state) {
+        const cooldownUntil = Math.max(0, Math.floor(Number(state?.cooldownUntil ?? 0)));
+        const activeUntil = Math.max(0, Math.floor(Number(state?.activeUntil ?? 0)));
+        const context = state?.context && typeof state.context === 'object' ? { ...state.context } : null;
+        this.activeSkills.set(skillId, { cooldownUntil, activeUntil, context });
+    }
+
+    isSkillActive(skillId, now = Date.now()) {
+        const state = this.activeSkills.get(skillId);
+        if (!state) return false;
+        return Number(state.activeUntil ?? 0) > now;
+    }
+
+    getSkillStatus(skillId, now = Date.now()) {
+        const state = this.activeSkills.get(skillId) ?? { cooldownUntil: 0, activeUntil: 0, context: null };
+        const cooldownRemaining = Math.max(0, Number(state.cooldownUntil ?? 0) - now);
+        const activeRemaining = Math.max(0, Number(state.activeUntil ?? 0) - now);
+        return {
+            skill: SKILL_MAP.get(skillId) ?? null,
+            cooldownRemaining,
+            activeRemaining,
+            isActive: activeRemaining > 0,
+            state,
+        };
+    }
+
+    getActiveSkillsByType(effectType, now = Date.now()) {
+        const entries = [];
+        this.activeSkills.forEach((state, skillId) => {
+            const skill = SKILL_MAP.get(skillId);
+            if (!skill || skill.effectType !== effectType) return;
+            if (Number(state.activeUntil ?? 0) > now) {
+                entries.push({ skillId, skill, state });
+            }
+        });
+        return entries;
+    }
+
+    getActiveDpsMultiplier(now = Date.now()) {
+        const entries = this.getActiveSkillsByType(SKILL_EFFECT_TYPES.DPS_MULTIPLIER, now);
+        if (entries.length === 0) {
+            return 1;
+        }
+        return entries.reduce((total, { skill }) => {
+            const baseMultiplier = Number(skill.effectValue ?? 1);
+            const normalized = Number.isFinite(baseMultiplier) ? Math.max(1, baseMultiplier) : 1;
+            return total * (normalized * (1 + this.skillBonus));
+        }, 1);
+    }
+
+    getActiveBossTimerFreezeEntry(now = Date.now()) {
+        for (const [skillId, state] of this.activeSkills.entries()) {
+            const skill = SKILL_MAP.get(skillId);
+            if (!skill || skill.effectType !== SKILL_EFFECT_TYPES.BOSS_TIMER_FREEZE) continue;
+            const context = state.context ?? null;
+            if (context?.resumed) continue;
+            if (Number(state.activeUntil ?? 0) > now) {
+                return { skillId, skill, state };
+            }
+        }
+        return null;
+    }
+
+    resolveBossTimerFreeze(now = Date.now(), { force = false } = {}) {
+        let updated = false;
+        this.activeSkills.forEach((state, skillId) => {
+            const skill = SKILL_MAP.get(skillId);
+            if (!skill || skill.effectType !== SKILL_EFFECT_TYPES.BOSS_TIMER_FREEZE) return;
+            const context = state.context ?? null;
+            if (!context || context.resumed) return;
+            const activeUntil = Number(state.activeUntil ?? 0);
+            if (!force && activeUntil > now) return;
+            const storedRemaining = Math.max(0, Number(context.bossTimerRemaining ?? 0));
+            if (!force && storedRemaining > 0) {
+                this.bossDeadline = now + storedRemaining;
+            }
+            context.resumed = true;
+            state.context = context;
+            state.activeUntil = 0;
+            this.activeSkills.set(skillId, state);
+            updated = true;
+        });
+        return updated;
+    }
+
+    getBossTimerInfo(now = Date.now()) {
+        const isBossStage = this.isBossStage();
+        this.resolveBossTimerFreeze(now);
+        const hasDeadline = Number.isFinite(this.bossDeadline) && this.bossDeadline > 0;
+        const info = {
+            isBossStage,
+            hasDeadline,
+            remaining: 0,
+            freezeRemaining: 0,
+            isFrozen: false,
+        };
+        if (!isBossStage || !hasDeadline) {
+            return info;
+        }
+        const freezeEntry = this.getActiveBossTimerFreezeEntry(now);
+        if (freezeEntry) {
+            const context = freezeEntry.state.context ?? null;
+            info.isFrozen = true;
+            info.remaining = Math.max(0, Number(context?.bossTimerRemaining ?? 0));
+            info.freezeRemaining = Math.max(0, Number(freezeEntry.state.activeUntil ?? 0) - now);
+            return info;
+        }
+        info.remaining = Math.max(0, this.bossDeadline - now);
+        return info;
+    }
+
+    activateSkill(skillId) {
+        const skill = SKILL_MAP.get(skillId);
+        if (!skill) {
+            return { success: false, reason: 'unknown' };
+        }
+        const now = Date.now();
+        this.resolveBossTimerFreeze(now);
+        const currentState = this.getSkillState(skillId);
+        if (currentState.activeUntil > now) {
+            return { success: false, reason: 'active', skill, remaining: currentState.activeUntil - now };
+        }
+        if (currentState.cooldownUntil > now) {
+            return { success: false, reason: 'cooldown', skill, remaining: currentState.cooldownUntil - now };
+        }
+        const cooldown = Math.max(0, Math.floor(Number(skill.cooldown ?? 0)));
+        const baseDuration = Math.max(0, Math.floor(Number(skill.duration ?? 0)));
+        const duration = baseDuration > 0 ? Math.floor(baseDuration * (1 + this.skillBonus)) : 0;
+        const nextState = {
+            cooldownUntil: now + cooldown,
+            activeUntil: duration > 0 ? now + duration : 0,
+            context: null,
+        };
+        const effect = {};
+        switch (skill.effectType) {
+            case SKILL_EFFECT_TYPES.DPS_MULTIPLIER: {
+                const baseMultiplier = Number(skill.effectValue ?? 1);
+                const normalized = Number.isFinite(baseMultiplier) ? Math.max(1, baseMultiplier) : 1;
+                effect.multiplier = normalized * (1 + this.skillBonus);
+                break;
+            }
+            case SKILL_EFFECT_TYPES.BOSS_TIMER_FREEZE: {
+                if (!this.isBossStage()) {
+                    return { success: false, reason: 'notBoss', skill };
+                }
+                if (!this.bossDeadline) {
+                    this.startBossTimer();
+                }
+                const remaining = Math.max(0, this.bossDeadline ? this.bossDeadline - now : BOSS_TIME_LIMIT);
+                nextState.context = {
+                    bossTimerRemaining: remaining,
+                    resumed: false,
+                };
+                effect.freezeDuration = duration;
+                effect.remaining = remaining;
+                break;
+            }
+            case SKILL_EFFECT_TYPES.INSTANT_GOLD: {
+                const effectValue = Number(skill.effectValue ?? 0);
+                const normalized = Number.isFinite(effectValue) ? Math.max(0, effectValue) : 0;
+                const baseGain = Math.floor(this.totalDps * normalized * 0.25);
+                const goldGain = Math.floor(baseGain * (1 + this.goldBonus));
+                this.gold += goldGain;
+                effect.goldGain = goldGain;
+                nextState.activeUntil = 0;
+                break;
+            }
+            default:
+                break;
+        }
+        this.setSkillState(skillId, nextState);
+        this.lastSave = now;
+        return {
+            success: true,
+            skill,
+            cooldown,
+            duration,
+            effect,
+            state: nextState,
+            activatedAt: now,
+        };
+    }
+
     get totalDps() {
         const heroDps = this.heroes.reduce(
             (total, hero) => total + hero.damagePerSecond * (hero.bondSelfMultiplier ?? 1),
@@ -931,16 +1182,8 @@ export class GameState {
         );
         const heroMultiplier = 1 + this.heroBonus;
         const heroCritMultiplier = this.heroCritAverageMultiplier;
-        const frenzyMultiplier = this.isFrenzyActive ? this.frenzyMultiplier : 1;
-        return heroDps * heroMultiplier * heroCritMultiplier * frenzyMultiplier;
-    }
-
-    get isFrenzyActive() {
-        return Date.now() < this.frenzyActiveUntil;
-    }
-
-    get frenzyMultiplier() {
-        return 2 * (1 + this.skillBonus);
+        const skillMultiplier = this.getActiveDpsMultiplier();
+        return heroDps * heroMultiplier * heroCritMultiplier * skillMultiplier;
     }
 
     get tapBonus() {
@@ -1086,8 +1329,7 @@ export class GameState {
         this.enemy.reset(1);
         this.clearBossTimer();
         this.pendingBossEntry = false;
-        this.frenzyCooldown = 0;
-        this.frenzyActiveUntil = 0;
+        this.resetSkillStates();
         this.currentRunHighestStage = 0;
         this.normalizeEquippedState();
         return {
@@ -1643,6 +1885,8 @@ export class GameState {
     }
 
     checkBossTimeout() {
+        const now = Date.now();
+        this.resolveBossTimerFreeze(now);
         if (!this.isBossStage()) {
             if (this.bossDeadline !== 0) {
                 this.clearBossTimer();
@@ -1653,7 +1897,11 @@ export class GameState {
             this.startBossTimer();
             return null;
         }
-        if (Date.now() < this.bossDeadline) {
+        const freezeEntry = this.getActiveBossTimerFreezeEntry(now);
+        if (freezeEntry) {
+            return null;
+        }
+        if (now < this.bossDeadline) {
             return null;
         }
         const failedStage = this.enemy.stage;
@@ -1724,6 +1972,7 @@ export class GameState {
                 this.clearBossTimer();
             }
         }
+        this.resolveBossTimerFreeze(Date.now(), { force: !this.isBossStage() });
         return { reward, drop, gacha, defeatedStage, bond };
     }
 
@@ -1744,8 +1993,7 @@ export class GameState {
             hero.resetProgress();
         });
         this.gachaTokens = 0;
-        this.frenzyCooldown = 0;
-        this.frenzyActiveUntil = 0;
+        this.resetSkillStates();
         this.inventory = [];
         this.equipped = {};
         this.upgradeMaterials = 0;
@@ -1776,8 +2024,7 @@ export class GameState {
             enemy: this.enemy.toJSON(),
             heroes: this.heroes.map((hero) => hero.toJSON()),
             sortOrder: this.sortOrder,
-            frenzyCooldown: this.frenzyCooldown,
-            frenzyActiveUntil: this.frenzyActiveUntil,
+            skills: this.serializeSkills(),
             inventory: this.inventory,
             equipped: this.equipped,
             upgradeMaterials: this.upgradeMaterials,
