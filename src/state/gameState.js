@@ -19,7 +19,14 @@ import {
     EQUIPMENT_BOSS_DROP_CHANCE,
 } from '../data/equipment.js';
 import { MISSIONS, MISSION_GROUPS } from '../data/missions.js';
-import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
+import {
+    REBIRTH_EFFECT_LABELS,
+    REBIRTH_TREE,
+    REBIRTH_NODES,
+    REBIRTH_NODE_MAP,
+    REBIRTH_BRANCHES,
+    REBIRTH_BRANCH_MAP,
+} from '../data/rebirth.js';
 import {
     SKILLS,
     SKILL_EFFECT_TYPES,
@@ -186,7 +193,54 @@ const calculateStageReward = (stage, isBoss, goldBonus = 0) => {
     return Math.ceil(baseReward * bossMultiplier * bonusMultiplier);
 };
 
-const REBIRTH_SKILL_MAP = new Map(REBIRTH_SKILLS.map((skill) => [skill.id, skill]));
+const REBIRTH_NODE_IDS = new Set(REBIRTH_NODES.map((node) => node.id));
+const REBIRTH_BRANCH_ID_SET = new Set(REBIRTH_BRANCHES.map((branch) => branch.id));
+const DEFAULT_REBIRTH_BRANCH_FOCUS =
+    REBIRTH_BRANCHES.find((branch) => branch.id && branch.id !== 'core')?.id ??
+    REBIRTH_BRANCHES[0]?.id ??
+    null;
+const REBIRTH_BRANCH_FOCUS_FALLBACK =
+    (DEFAULT_REBIRTH_BRANCH_FOCUS && REBIRTH_BRANCH_ID_SET.has(DEFAULT_REBIRTH_BRANCH_FOCUS))
+        ? DEFAULT_REBIRTH_BRANCH_FOCUS
+        : REBIRTH_BRANCHES.find((branch) => REBIRTH_BRANCH_ID_SET.has(branch.id))?.id ??
+          Array.from(REBIRTH_BRANCH_ID_SET)[0] ??
+          null;
+const REBIRTH_RESPEC_COST = Math.max(0, Math.floor(REBIRTH_TREE.respecCost ?? 0));
+const REBIRTH_CORE_REWARD_RATIO = 50;
+const MIN_REBIRTH_CORE_REWARD = 1;
+
+const getRebirthNodeInitialLevel = (node) =>
+    Number.isFinite(node?.initialLevel) ? Math.max(0, Math.floor(node.initialLevel)) : 0;
+
+const clampRebirthNodeLevel = (node, savedLevel) => {
+    const initial = getRebirthNodeInitialLevel(node);
+    if (!Number.isFinite(savedLevel)) return initial;
+    const normalized = Math.max(0, Math.floor(savedLevel));
+    const maxLevel = Number.isFinite(node?.maxLevel)
+        ? Math.max(initial, Math.floor(node.maxLevel))
+        : normalized;
+    return Math.max(initial, Math.min(maxLevel, normalized));
+};
+
+const calculateRebirthNodeUpgradeCost = (node, level) => {
+    if (!node) return 0;
+    const baseCost = Number(node.baseCost ?? 0);
+    const growth = Number(node.costGrowth ?? 0);
+    const raw = baseCost + level * growth;
+    return Math.max(1, Math.ceil(raw));
+};
+
+const calculateRebirthNodeTotalCost = (node, level) => {
+    if (!node) return 0;
+    const initial = getRebirthNodeInitialLevel(node);
+    const normalizedLevel = Math.max(initial, Math.floor(level ?? initial));
+    if (normalizedLevel <= initial) return 0;
+    let total = 0;
+    for (let current = initial; current < normalizedLevel; current += 1) {
+        total += calculateRebirthNodeUpgradeCost(node, current);
+    }
+    return total;
+};
 const randomFromArray = (array) => array[Math.floor(Math.random() * array.length)];
 
 const randomInt = (min, max) => {
@@ -955,9 +1009,17 @@ export class GameState {
         this.currentRunHighestStage = Number.isFinite(loadedCurrent) ? Math.max(0, loadedCurrent) : fallbackCurrent;
         const loadedPoints = Number(saved?.rebirthPoints ?? 0);
         this.rebirthPoints = Number.isFinite(loadedPoints) ? Math.max(0, Math.floor(loadedPoints)) : 0;
+        const loadedCores = Number(saved?.rebirthCores ?? 0);
+        this.rebirthCores = Number.isFinite(loadedCores) ? Math.max(0, Math.floor(loadedCores)) : 0;
+        const savedBranchFocus = typeof saved?.rebirthBranchFocus === 'string' ? saved.rebirthBranchFocus : null;
+        const fallbackBranchFocus = REBIRTH_BRANCH_FOCUS_FALLBACK;
+        this.rebirthBranchFocus =
+            savedBranchFocus && REBIRTH_BRANCH_ID_SET.has(savedBranchFocus)
+                ? savedBranchFocus
+                : fallbackBranchFocus;
         const loadedRebirths = Number(saved?.totalRebirths ?? 0);
         this.totalRebirths = Number.isFinite(loadedRebirths) ? Math.max(0, Math.floor(loadedRebirths)) : 0;
-        this.initializeRebirthSkills(saved?.rebirthSkills);
+        this.initializeRebirthNodes(saved?.rebirthNodes, saved?.rebirthSkills);
         this.initializeMissions(saved?.missions);
         this.normalizeEquippedState();
         const savedBossDeadline = Number(saved?.bossDeadline ?? 0);
@@ -1446,55 +1508,163 @@ export class GameState {
     }
 
     getRebirthBonusValue(type) {
-        return REBIRTH_SKILLS.reduce((total, skill) => {
-            const level = this.rebirthSkills[skill.id] ?? 0;
+        return REBIRTH_NODES.reduce((total, node) => {
+            const level = this.getRebirthNodeLevel(node.id);
             if (level <= 0) return total;
-            const effect = skill.effect[type];
+            const effect = node.effect?.[type];
             if (!effect) return total;
             return total + effect * level;
         }, 0);
     }
 
     getRebirthBonusSummary() {
-        return REBIRTH_SKILLS.reduce((acc, skill) => {
-            const level = this.rebirthSkills[skill.id] ?? 0;
+        return REBIRTH_NODES.reduce((acc, node) => {
+            const level = this.getRebirthNodeLevel(node.id);
             if (level <= 0) return acc;
-            Object.entries(skill.effect).forEach(([key, value]) => {
+            Object.entries(node.effect ?? {}).forEach(([key, value]) => {
                 acc[key] = (acc[key] ?? 0) + value * level;
             });
             return acc;
         }, {});
     }
 
-    getRebirthSkillLevel(skillId) {
-        return this.rebirthSkills[skillId] ?? 0;
+    getRebirthNodeLevel(nodeId) {
+        if (!REBIRTH_NODE_IDS.has(nodeId)) return 0;
+        const node = REBIRTH_NODE_MAP.get(nodeId);
+        if (!node) return 0;
+        if (!this.rebirthNodes) {
+            this.rebirthNodes = {};
+        }
+        const stored = this.rebirthNodes[nodeId];
+        const level = clampRebirthNodeLevel(node, stored);
+        if (level !== stored) {
+            this.rebirthNodes[nodeId] = level;
+        }
+        return level;
     }
 
-    getRebirthSkillCost(skillId) {
-        const skill = REBIRTH_SKILL_MAP.get(skillId);
-        if (!skill) return Infinity;
-        const level = this.getRebirthSkillLevel(skillId);
-        if (skill.maxLevel && level >= skill.maxLevel) return 0;
-        return Math.max(1, Math.ceil(skill.baseCost + level * skill.costGrowth));
+    getRebirthNodeCost(nodeId) {
+        const node = REBIRTH_NODE_MAP.get(nodeId);
+        if (!node) return Infinity;
+        const level = this.getRebirthNodeLevel(nodeId);
+        const maxLevel = Number.isFinite(node.maxLevel) ? Math.floor(node.maxLevel) : null;
+        if (maxLevel !== null && level >= maxLevel) {
+            return 0;
+        }
+        return calculateRebirthNodeUpgradeCost(node, level);
     }
 
-    upgradeRebirthSkill(skillId) {
-        const skill = REBIRTH_SKILL_MAP.get(skillId);
-        if (!skill) {
-            return { success: false, message: '알 수 없는 환생 스킬입니다.' };
+    getRebirthNodeTotalCost(nodeId) {
+        const node = REBIRTH_NODE_MAP.get(nodeId);
+        if (!node) return 0;
+        const level = this.getRebirthNodeLevel(nodeId);
+        return calculateRebirthNodeTotalCost(node, level);
+    }
+
+    isRebirthNodeUnlocked(nodeId) {
+        const node = REBIRTH_NODE_MAP.get(nodeId);
+        if (!node) return false;
+        const requirements = Array.isArray(node.prerequisites) ? node.prerequisites : [];
+        if (requirements.length === 0) return true;
+        return requirements.every((requirement) => {
+            const requirementId = requirement?.node;
+            if (!REBIRTH_NODE_IDS.has(requirementId)) return false;
+            const requiredLevel = Number.isFinite(requirement?.level)
+                ? Math.max(0, Math.floor(requirement.level))
+                : 0;
+            return this.getRebirthNodeLevel(requirementId) >= requiredLevel;
+        });
+    }
+
+    canUpgradeRebirthNode(nodeId) {
+        const node = REBIRTH_NODE_MAP.get(nodeId);
+        if (!node) {
+            return { canUpgrade: false, reason: '알 수 없는 환생 노드입니다.' };
         }
-        const level = this.getRebirthSkillLevel(skillId);
-        if (skill.maxLevel && level >= skill.maxLevel) {
-            return { success: false, message: '이미 최대 레벨입니다.' };
+        const level = this.getRebirthNodeLevel(nodeId);
+        const maxLevel = Number.isFinite(node.maxLevel) ? Math.floor(node.maxLevel) : null;
+        if (maxLevel !== null && level >= maxLevel) {
+            return { canUpgrade: false, reason: '이미 최대 레벨입니다.', node, level, cost: 0 };
         }
-        const cost = this.getRebirthSkillCost(skillId);
-        if (this.rebirthPoints < cost) {
-            return { success: false, message: '환생 포인트가 부족합니다.' };
+        if (!this.isRebirthNodeUnlocked(nodeId)) {
+            return { canUpgrade: false, reason: '선행 노드를 먼저 강화해야 합니다.', node, level, cost: 0 };
         }
-        this.rebirthPoints -= cost;
-        this.rebirthSkills[skillId] = level + 1;
+        const cost = this.getRebirthNodeCost(nodeId);
+        if (cost > this.rebirthPoints) {
+            return { canUpgrade: false, reason: '환생 포인트가 부족합니다.', node, level, cost };
+        }
+        return { canUpgrade: true, node, level, cost };
+    }
+
+    upgradeRebirthNode(nodeId) {
+        const result = this.canUpgradeRebirthNode(nodeId);
+        if (!result.canUpgrade) {
+            return {
+                success: false,
+                message: result.reason ?? '강화할 수 없습니다.',
+                node: result.node ?? null,
+            };
+        }
+        this.rebirthPoints -= result.cost;
+        const newLevel = result.level + 1;
+        this.rebirthNodes[nodeId] = newLevel;
+        if (result.node?.branch && REBIRTH_BRANCH_ID_SET.has(result.node.branch)) {
+            this.rebirthBranchFocus = result.node.branch;
+        }
         this.lastSave = Date.now();
-        return { success: true, level: level + 1, cost, skill };
+        return { success: true, node: result.node, level: newLevel, cost: result.cost };
+    }
+
+    getRebirthTotalInvestment() {
+        return REBIRTH_NODES.reduce((total, node) => total + this.getRebirthNodeTotalCost(node.id), 0);
+    }
+
+    getRebirthBranchSummary(branchId) {
+        if (!branchId || !REBIRTH_BRANCH_ID_SET.has(branchId)) return {};
+        return REBIRTH_NODES.reduce((acc, node) => {
+            if (node.branch !== branchId) return acc;
+            const level = this.getRebirthNodeLevel(node.id);
+            if (level <= 0) return acc;
+            Object.entries(node.effect ?? {}).forEach(([key, value]) => {
+                acc[key] = (acc[key] ?? 0) + value * level;
+            });
+            return acc;
+        }, {});
+    }
+
+    getRebirthBranchLevel(branchId) {
+        if (!branchId || !REBIRTH_BRANCH_ID_SET.has(branchId)) return 0;
+        return REBIRTH_NODES.reduce((total, node) => {
+            if (node.branch !== branchId) return total;
+            return total + this.getRebirthNodeLevel(node.id);
+        }, 0);
+    }
+
+    setRebirthBranchFocus(branchId) {
+        if (!branchId || !REBIRTH_BRANCH_ID_SET.has(branchId)) return false;
+        if (this.rebirthBranchFocus === branchId) return false;
+        this.rebirthBranchFocus = branchId;
+        this.lastSave = Date.now();
+        return true;
+    }
+
+    respecRebirthTree() {
+        if (REBIRTH_RESPEC_COST <= 0) {
+            return { success: false, message: '재분배 비용 정보가 없습니다.' };
+        }
+        if (this.rebirthCores < REBIRTH_RESPEC_COST) {
+            return { success: false, message: '환생 코어가 부족합니다.' };
+        }
+        const refund = this.getRebirthTotalInvestment();
+        if (refund <= 0) {
+            return { success: false, message: '재분배할 노드가 없습니다.' };
+        }
+        this.rebirthCores -= REBIRTH_RESPEC_COST;
+        this.rebirthPoints += refund;
+        this.initializeRebirthNodes({});
+        this.rebirthBranchFocus = REBIRTH_BRANCH_FOCUS_FALLBACK;
+        this.lastSave = Date.now();
+        return { success: true, refunded: refund, cost: REBIRTH_RESPEC_COST, cores: this.rebirthCores };
     }
 
     performRebirth() {
@@ -1506,6 +1676,16 @@ export class GameState {
             };
         }
         this.rebirthPoints += pointsEarned;
+        const coresEarned =
+            pointsEarned > 0
+                ? Math.max(
+                      MIN_REBIRTH_CORE_REWARD,
+                      Math.floor(pointsEarned / REBIRTH_CORE_REWARD_RATIO),
+                  )
+                : 0;
+        if (coresEarned > 0) {
+            this.rebirthCores += coresEarned;
+        }
         this.totalRebirths += 1;
         const earnedFrom = this.currentRunHighestStage;
         this.gold = 0;
@@ -1527,6 +1707,8 @@ export class GameState {
         return {
             success: true,
             pointsEarned,
+            coresEarned,
+            coresTotal: this.rebirthCores,
             earnedFrom,
             totalPoints: this.rebirthPoints,
             rebirthCount: this.totalRebirths,
@@ -2217,7 +2399,9 @@ export class GameState {
         this.rebirthPoints = 0;
         this.totalRebirths = 0;
         this.goldGainLevel = 0;
-        this.initializeRebirthSkills({});
+        this.rebirthCores = 0;
+        this.rebirthBranchFocus = REBIRTH_BRANCH_FOCUS_FALLBACK;
+        this.initializeRebirthNodes({});
         this.initializeMissions({});
     }
 
@@ -2247,19 +2431,24 @@ export class GameState {
             pendingBossEntry: this.pendingBossEntry,
             gachaTokens: this.gachaTokens,
             rebirthPoints: this.rebirthPoints,
+            rebirthCores: this.rebirthCores,
+            rebirthBranchFocus: this.rebirthBranchFocus,
             totalRebirths: this.totalRebirths,
-            rebirthSkills: this.rebirthSkills,
+            rebirthNodes: this.rebirthNodes,
+            rebirthSkills: this.rebirthNodes,
             missions: this.serializeMissions(),
         };
     }
 
-    initializeRebirthSkills(savedSkills) {
-        this.rebirthSkills = {};
-        REBIRTH_SKILLS.forEach((skill) => {
-            const savedLevel = Number(savedSkills?.[skill.id] ?? 0);
-            this.rebirthSkills[skill.id] = Number.isFinite(savedLevel)
-                ? Math.max(0, Math.floor(savedLevel))
-                : 0;
+    initializeRebirthNodes(savedNodes, legacySkills = null) {
+        this.rebirthNodes = {};
+        REBIRTH_NODES.forEach((node) => {
+            const candidates = [savedNodes?.[node.id], legacySkills?.[node.id]];
+            const savedLevel = candidates
+                .map((value) => Number(value))
+                .find((value) => Number.isFinite(value));
+            const normalizedLevel = clampRebirthNodeLevel(node, savedLevel);
+            this.rebirthNodes[node.id] = normalizedLevel;
         });
     }
 
