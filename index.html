@@ -16,6 +16,60 @@
         </header>
 
         <main class="game__main">
+            <section class="game__overview" aria-label="전술 상황 요약">
+                <div class="overview-bar">
+                    <section class="overview-group" aria-labelledby="overview-resources-title">
+                        <h2 id="overview-resources-title" class="overview-group__title">자원 현황</h2>
+                        <dl class="overview-stats">
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">스테이지</dt>
+                                <dd class="overview-stat__value"><span id="stage">1</span></dd>
+                            </div>
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">골드</dt>
+                                <dd class="overview-stat__value"><span id="gold">0</span></dd>
+                            </div>
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">강화 재료</dt>
+                                <dd class="overview-stat__value"><span id="upgradeMaterials">0</span></dd>
+                            </div>
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">모집권</dt>
+                                <dd class="overview-stat__value"><span id="gachaTokensHeader">0</span></dd>
+                            </div>
+                        </dl>
+                    </section>
+                    <section class="overview-group" aria-labelledby="overview-combat-title">
+                        <h2 id="overview-combat-title" class="overview-group__title">전투 능력치</h2>
+                        <dl class="overview-stats">
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">전술 공격력</dt>
+                                <dd class="overview-stat__value"><span id="clickDamage">1</span></dd>
+                            </div>
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">총 지원 화력</dt>
+                                <dd class="overview-stat__value"><span id="totalDps">0</span></dd>
+                            </div>
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">학생 치명타 확률</dt>
+                                <dd class="overview-stat__value"><span id="heroCritChance">0%</span></dd>
+                            </div>
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">학생 치명타 배율</dt>
+                                <dd class="overview-stat__value"><span id="heroCritMultiplier">0배</span></dd>
+                            </div>
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">치명타 확률</dt>
+                                <dd class="overview-stat__value"><span id="critChance">0%</span></dd>
+                            </div>
+                            <div class="overview-stat">
+                                <dt class="overview-stat__label">치명타 배율</dt>
+                                <dd class="overview-stat__value"><span id="critMultiplier">0배</span></dd>
+                            </div>
+                        </dl>
+                    </section>
+                </div>
+            </section>
             <section class="game__enemy">
                 <div class="enemy__info">
                     <div id="enemyName" class="enemy__name">훈련용 타깃</div>
@@ -35,50 +89,6 @@
                 <div id="bossControls" class="boss-controls">
                     <button id="bossRetreat" class="btn btn-ghost boss-control__button" type="button">보스 퇴각</button>
                     <button id="bossAdvance" class="btn btn-secondary boss-control__button" type="button">보스 돌입</button>
-                </div>
-                <div class="game__enemy-stats">
-                    <div class="game__stats">
-                        <div class="stat">
-                            <span class="stat__label">스테이지</span>
-                            <span id="stage" class="stat__value">1</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">골드</span>
-                            <span id="gold" class="stat__value">0</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">강화 재료</span>
-                            <span id="upgradeMaterials" class="stat__value">0</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">모집권</span>
-                            <span id="gachaTokensHeader" class="stat__value">0</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">전술 공격력</span>
-                            <span id="clickDamage" class="stat__value">1</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">총 지원 화력</span>
-                            <span id="totalDps" class="stat__value">0</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">학생 치명타 확률</span>
-                            <span id="heroCritChance" class="stat__value">0%</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">학생 치명타 배율</span>
-                            <span id="heroCritMultiplier" class="stat__value">0배</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">치명타 확률</span>
-                            <span id="critChance" class="stat__value">0%</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat__label">치명타 배율</span>
-                            <span id="critMultiplier" class="stat__value">0배</span>
-                        </div>
-                    </div>
                 </div>
                 <div class="game__progress">
                     <div class="progress-track" id="stageProgressTrack"></div>
@@ -203,20 +213,24 @@
                         aria-labelledby="tab-heroes"
                         data-tab="heroes"
                     >
-                        <section class="panel panel--hero">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--hero">
+                            <header class="panel__header panel-card__header">
                                 <h2>학생</h2>
                                 <button id="sortHeroes" class="btn btn-secondary">정렬 순서 변경</button>
                             </header>
-                            <ul id="heroList" class="hero-list"></ul>
+                            <div class="panel__body panel-card__body">
+                                <ul id="heroList" class="hero-list"></ul>
+                            </div>
                         </section>
 
-                        <section class="panel panel--set-bonus">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--set-bonus">
+                            <header class="panel__header panel-card__header">
                                 <h2>전술 세트 효과</h2>
                                 <span id="setBonusSummary" class="set-bonus__summary">발동 중인 세트 없음</span>
                             </header>
-                            <ul id="setBonusList" class="set-bonus-list"></ul>
+                            <div class="panel__body panel-card__body">
+                                <ul id="setBonusList" class="set-bonus-list"></ul>
+                            </div>
                         </section>
                     </div>
 
@@ -228,14 +242,15 @@
                         data-tab="recruit"
                         hidden
                     >
-                        <section class="panel panel--recruit" aria-label="학생 모집">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--recruit" aria-label="학생 모집">
+                            <header class="panel__header panel-card__header">
                                 <h2>학생 모집</h2>
                             </header>
-                            <section class="gacha-panel" aria-label="학생 모집">
-                                <div class="gacha-panel__header">
-                                    <div>
-                                        <h3 class="gacha-panel__title">학생 모집</h3>
+                            <div class="panel__body panel-card__body">
+                                <section class="gacha-panel" aria-label="학생 모집">
+                                    <div class="gacha-panel__header">
+                                        <div>
+                                            <h3 class="gacha-panel__title">학생 모집</h3>
                                         <p class="gacha-panel__hint">보스를 처치하면 일정 확률로 모집권을 획득합니다.</p>
                                     </div>
                                     <div class="gacha-panel__tokens">
@@ -262,8 +277,9 @@
                                     aria-live="polite"
                                     aria-label="최근 가챠 결과"
                                 ></ul>
-                                <p id="gachaResultsEmpty" class="gacha-results__empty">아직 모집 기록이 없습니다.</p>
-                            </section>
+                                    <p id="gachaResultsEmpty" class="gacha-results__empty">아직 모집 기록이 없습니다.</p>
+                                </section>
+                            </div>
                         </section>
                     </div>
 
@@ -275,79 +291,73 @@
                         data-tab="skills"
                         hidden
                     >
-                        <section class="panel panel--skills">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--skills">
+                            <header class="panel__header panel-card__header">
                                 <h2>전술 스킬</h2>
                             </header>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>아로나의 전술 지원</h3>
-                                    <p>샬레의 지원 네트워크로 잠시 총 지원 화력을 2배로 높입니다.</p>
-                                </div>
-                                <button id="skillFrenzy" class="btn btn-skill">지원 요청 (쿨타임 60초)</button>
-                                <p id="skillCooldown" class="cooldown"></p>
+                            <div class="panel__body panel-card__body">
+                                <article class="skill-card">
+                                    <div class="skill-card__content">
+                                        <h3 class="skill-card__title">아로나의 전술 지원</h3>
+                                        <p class="skill-card__desc">샬레의 지원 네트워크로 잠시 총 지원 화력을 2배로 높입니다.</p>
+                                    </div>
+                                    <div class="skill-card__actions">
+                                        <button id="skillFrenzy" class="btn btn-skill">지원 요청 (쿨타임 60초)</button>
+                                        <p id="skillCooldown" class="cooldown"></p>
+                                    </div>
+                                </article>
                             </div>
                         </section>
 
-                        <section class="panel panel--upgrades">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--upgrades">
+                            <header class="panel__header panel-card__header">
                                 <h2>샬레 지원 센터</h2>
                             </header>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>전술 교육 프로그램</h3>
-                                    <p>학생의 기본 공격력을 강화합니다.</p>
+                            <div class="panel__body panel-card__body">
+                                <div class="panel__grid">
+                                    <article class="upgrade-card">
+                                        <h3 class="upgrade-card__title">전술 교육 프로그램</h3>
+                                        <p class="upgrade-card__desc">학생의 기본 공격력을 강화합니다.</p>
+                                        <button id="upgradeClick" class="btn btn-upgrade">전술 교육 (10 골드)</button>
+                                        <p id="clickUpgradeInfo" class="upgrade-card__info upgrade__info" aria-live="polite"></p>
+                                    </article>
+                                    <article class="upgrade-card">
+                                        <h3 class="upgrade-card__title">정밀 사격 교정</h3>
+                                        <p class="upgrade-card__desc">전술 분석으로 클릭 치명타 확률을 향상시킵니다.</p>
+                                        <button id="upgradeCritChance" class="btn btn-upgrade">정밀 교정 (50 골드)</button>
+                                        <p id="critChanceUpgradeInfo" class="upgrade-card__info upgrade__info" aria-live="polite"></p>
+                                    </article>
+                                    <article class="upgrade-card">
+                                        <h3 class="upgrade-card__title">특수 탄두 연구</h3>
+                                        <p class="upgrade-card__desc">치명타 발생 시 피해 배율을 높입니다.</p>
+                                        <button id="upgradeCritDamage" class="btn btn-upgrade">탄두 연구 (75 골드)</button>
+                                        <p id="critDamageUpgradeInfo" class="upgrade-card__info upgrade__info" aria-live="polite"></p>
+                                    </article>
+                                    <article class="upgrade-card">
+                                        <h3 class="upgrade-card__title">학생 정밀 사격 훈련</h3>
+                                        <p class="upgrade-card__desc">지원 학생들의 치명타 확률을 향상시킵니다.</p>
+                                        <button id="upgradeHeroCritChance" class="btn btn-upgrade">학생 치명타 교정 (150 골드)</button>
+                                        <p id="heroCritChanceUpgradeInfo" class="upgrade-card__info upgrade__info" aria-live="polite"></p>
+                                    </article>
+                                    <article class="upgrade-card">
+                                        <h3 class="upgrade-card__title">학생 탄두 개량 연구</h3>
+                                        <p class="upgrade-card__desc">학생 치명타 발생 시 피해 배율을 높입니다.</p>
+                                        <button id="upgradeHeroCritDamage" class="btn btn-upgrade">학생 탄두 개량 (200 골드)</button>
+                                        <p id="heroCritDamageUpgradeInfo" class="upgrade-card__info upgrade__info" aria-live="polite"></p>
+                                    </article>
+                                    <article class="upgrade-card">
+                                        <h3 class="upgrade-card__title">지원 화력 지휘 과정</h3>
+                                        <p class="upgrade-card__desc">학생 전체의 DPS를 영구적으로 증가시킵니다.</p>
+                                        <button id="upgradeHeroDps" class="btn btn-upgrade">지휘 과정 (100 골드)</button>
+                                        <p id="heroDpsUpgradeInfo" class="upgrade-card__info upgrade__info" aria-live="polite"></p>
+                                    </article>
+                                    <article class="upgrade-card">
+                                        <h3 class="upgrade-card__title">자금 운용 훈련</h3>
+                                        <p class="upgrade-card__desc">현장 예산 편성 훈련으로 획득 골드량을 늘립니다.</p>
+                                        <button id="upgradeGoldGain" class="btn btn-upgrade">자금 운용 훈련 (125 골드)</button>
+                                        <p id="goldGainUpgradeInfo" class="upgrade-card__info upgrade__info" aria-live="polite"></p>
+                                    </article>
                                 </div>
-                                <button id="upgradeClick" class="btn btn-upgrade">전술 교육 (10 골드)</button>
-                                <p id="clickUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
-                            </div>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>정밀 사격 교정</h3>
-                                    <p>전술 분석으로 클릭 치명타 확률을 향상시킵니다.</p>
-                                </div>
-                                <button id="upgradeCritChance" class="btn btn-upgrade">정밀 교정 (50 골드)</button>
-                                <p id="critChanceUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
-                            </div>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>특수 탄두 연구</h3>
-                                    <p>치명타 발생 시 피해 배율을 높입니다.</p>
-                                </div>
-                                <button id="upgradeCritDamage" class="btn btn-upgrade">탄두 연구 (75 골드)</button>
-                                <p id="critDamageUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
-                            </div>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>학생 정밀 사격 훈련</h3>
-                                    <p>지원 학생들의 치명타 확률을 향상시킵니다.</p>
-                                </div>
-                                <button id="upgradeHeroCritChance" class="btn btn-upgrade">학생 치명타 교정 (150 골드)</button>
-                                <p id="heroCritChanceUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
-                            </div>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>학생 탄두 개량 연구</h3>
-                                    <p>학생 치명타 발생 시 피해 배율을 높입니다.</p>
-                                </div>
-                                <button id="upgradeHeroCritDamage" class="btn btn-upgrade">학생 탄두 개량 (200 골드)</button>
-                                <p id="heroCritDamageUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
-                            </div>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>지원 화력 지휘 과정</h3>
-                                    <p>학생 전체의 DPS를 영구적으로 증가시킵니다.</p>
-                                </div>
-                                <button id="upgradeHeroDps" class="btn btn-upgrade">지휘 과정 (100 골드)</button>
-                                <p id="heroDpsUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
-                            </div>
-                            <div class="upgrade">
-                                <div>
-                                    <h3>자금 운용 훈련</h3>
-                                    <p>현장 예산 편성 훈련으로 획득 골드량을 늘립니다.</p>
-                                </div>
-                                <button id="upgradeGoldGain" class="btn btn-upgrade">자금 운용 훈련 (125 골드)</button>
-                                <p id="goldGainUpgradeInfo" class="upgrade__info" aria-live="polite"></p>
                             </div>
                         </section>
                     </div>
@@ -360,33 +370,35 @@
                         data-tab="rebirth"
                         hidden
                     >
-                        <section class="panel panel--rebirth" id="rebirthPanel">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--rebirth" id="rebirthPanel">
+                            <header class="panel__header panel-card__header">
                                 <h2>환생</h2>
                             </header>
-                            <div class="rebirth__summary">
-                                <div class="rebirth__stat">
-                                    <span class="rebirth__label">환생 횟수</span>
-                                    <strong id="rebirthCount">0</strong>
+                            <div class="panel__body panel-card__body">
+                                <div class="rebirth__summary">
+                                    <div class="rebirth__stat">
+                                        <span class="rebirth__label">환생 횟수</span>
+                                        <strong id="rebirthCount">0</strong>
+                                    </div>
+                                    <div class="rebirth__stat">
+                                        <span class="rebirth__label">최고 도달 층</span>
+                                        <strong id="rebirthHighestStage">0</strong>
+                                    </div>
+                                    <div class="rebirth__stat">
+                                        <span class="rebirth__label">이번 획득 예상 (보너스 적용)</span>
+                                        <strong id="rebirthPotential">0</strong>
+                                    </div>
+                                    <div class="rebirth__stat">
+                                        <span class="rebirth__label">보유 포인트</span>
+                                        <strong id="rebirthPoints">0</strong>
+                                    </div>
                                 </div>
-                                <div class="rebirth__stat">
-                                    <span class="rebirth__label">최고 도달 층</span>
-                                    <strong id="rebirthHighestStage">0</strong>
+                                <button id="rebirthButton" class="btn btn-rebirth" disabled>환생하기</button>
+                                <p id="rebirthRequirement" class="rebirth__requirement">100층을 돌파하면 환생할 수 있습니다.</p>
+                                <div class="rebirth__skills">
+                                    <h3 class="rebirth__subheading">환생 스킬</h3>
+                                    <ul id="rebirthSkillList" class="rebirth-skill-list"></ul>
                                 </div>
-                                <div class="rebirth__stat">
-                                    <span class="rebirth__label">이번 획득 예상 (보너스 적용)</span>
-                                    <strong id="rebirthPotential">0</strong>
-                                </div>
-                                <div class="rebirth__stat">
-                                    <span class="rebirth__label">보유 포인트</span>
-                                    <strong id="rebirthPoints">0</strong>
-                                </div>
-                            </div>
-                            <button id="rebirthButton" class="btn btn-rebirth" disabled>환생하기</button>
-                            <p id="rebirthRequirement" class="rebirth__requirement">100층을 돌파하면 환생할 수 있습니다.</p>
-                            <div class="rebirth__skills">
-                                <h3 class="rebirth__subheading">환생 스킬</h3>
-                                <ul id="rebirthSkillList" class="rebirth-skill-list"></ul>
                             </div>
                         </section>
                     </div>
@@ -399,50 +411,52 @@
                         data-tab="equipment"
                         hidden
                     >
-                        <section class="panel panel--equipment">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--equipment">
+                            <header class="panel__header panel-card__header">
                                 <h2>전술 장비</h2>
                             </header>
-                            <p id="equipmentSummary" class="equipment__summary" aria-live="polite">
-                                클릭 데미지 +0.0% · 지원 화력 +0.0% · 전술 스킬 +0.0% · 골드 획득 +0.0% · 치명타 확률 +0.0%
-                                · 치명타 피해 +0.0%
-                            </p>
-                            <div class="equipment__bonuses">
-                                <div class="equipment__bonus">
-                                    <span>클릭 데미지</span>
-                                    <strong id="equipmentTapBonus">+0.0%</strong>
-                                </div>
-                                <div class="equipment__bonus">
-                                    <span>지원 화력</span>
-                                    <strong id="equipmentHeroBonus">+0.0%</strong>
-                                </div>
-                                <div class="equipment__bonus">
-                                    <span>전술 스킬</span>
-                                    <strong id="equipmentSkillBonus">+0.0%</strong>
-                                </div>
-                                <div class="equipment__bonus">
-                                    <span>골드 획득</span>
-                                    <strong id="equipmentGoldBonus">+0.0%</strong>
-                                </div>
-                                <div class="equipment__bonus">
-                                    <span>치명타 확률</span>
-                                    <strong id="equipmentCritChanceBonus">+0.0%</strong>
-                                </div>
-                                <div class="equipment__bonus">
-                                    <span>치명타 피해</span>
-                                    <strong id="equipmentCritDamageBonus">+0.0%</strong>
-                                </div>
-                            </div>
-                            <div class="equipment__section">
-                                <h3 class="equipment__subheading">장착 장비</h3>
-                                <ul id="equipmentSlots" class="equipment-slots"></ul>
-                            </div>
-                            <div class="equipment__section">
-                                <h3 class="equipment__subheading">인벤토리</h3>
-                                <p id="equipmentCollectionEmpty" class="equipment-empty">
-                                    아직 확보한 전술 장비가 없습니다.
+                            <div class="panel__body panel-card__body">
+                                <p id="equipmentSummary" class="equipment__summary" aria-live="polite">
+                                    클릭 데미지 +0.0% · 지원 화력 +0.0% · 전술 스킬 +0.0% · 골드 획득 +0.0% · 치명타 확률 +0.0%
+                                    · 치명타 피해 +0.0%
                                 </p>
-                                <ul id="equipmentCollection" class="equipment-list"></ul>
+                                <div class="equipment__bonuses">
+                                    <div class="equipment__bonus">
+                                        <span>클릭 데미지</span>
+                                        <strong id="equipmentTapBonus">+0.0%</strong>
+                                    </div>
+                                    <div class="equipment__bonus">
+                                        <span>지원 화력</span>
+                                        <strong id="equipmentHeroBonus">+0.0%</strong>
+                                    </div>
+                                    <div class="equipment__bonus">
+                                        <span>전술 스킬</span>
+                                        <strong id="equipmentSkillBonus">+0.0%</strong>
+                                    </div>
+                                    <div class="equipment__bonus">
+                                        <span>골드 획득</span>
+                                        <strong id="equipmentGoldBonus">+0.0%</strong>
+                                    </div>
+                                    <div class="equipment__bonus">
+                                        <span>치명타 확률</span>
+                                        <strong id="equipmentCritChanceBonus">+0.0%</strong>
+                                    </div>
+                                    <div class="equipment__bonus">
+                                        <span>치명타 피해</span>
+                                        <strong id="equipmentCritDamageBonus">+0.0%</strong>
+                                    </div>
+                                </div>
+                                <div class="equipment__section">
+                                    <h3 class="equipment__subheading">장착 장비</h3>
+                                    <ul id="equipmentSlots" class="equipment-slots"></ul>
+                                </div>
+                                <div class="equipment__section">
+                                    <h3 class="equipment__subheading">인벤토리</h3>
+                                    <p id="equipmentCollectionEmpty" class="equipment-empty">
+                                        아직 확보한 전술 장비가 없습니다.
+                                    </p>
+                                    <ul id="equipmentCollection" class="equipment-list"></ul>
+                                </div>
                             </div>
                         </section>
                     </div>
@@ -455,47 +469,49 @@
                         data-tab="salvage"
                         hidden
                     >
-                        <section class="panel panel--equipment">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--salvage">
+                            <header class="panel__header panel-card__header">
                                 <h2>장비 분해</h2>
                             </header>
-                            <div class="equipment__section">
-                                <div class="equipment__controls">
-                                    <p id="equipmentSalvageHint" class="equipment__hint">
-                                        잠긴 전술 장비는 분해되지 않습니다. <strong>분해 가능한 장비만 보기</strong>
-                                        옵션이나 <strong>분해 가능 전체 선택</strong> 버튼으로 손쉽게 정리하세요.
-                                        <span
-                                            id="equipmentSelectionCount"
-                                            class="equipment__hint-count"
-                                            aria-live="polite"
-                                        >
-                                            현재 선택: 없음
-                                        </span>
-                                    </p>
-                                    <div class="equipment__control-bar">
-                                        <label class="equipment__filter">
-                                            <input type="checkbox" id="equipmentFilterSalvageable" />
-                                            분해 가능한 장비만 보기
-                                        </label>
-                                        <button
-                                            id="equipmentSelectSalvageable"
-                                            class="btn btn-secondary btn-small"
-                                            type="button"
-                                        >
-                                            분해 가능 전체 선택
-                                        </button>
-                                        <button
-                                            id="equipmentSalvageSelected"
-                                            class="btn btn-danger btn-small"
-                                            type="button"
-                                            disabled
-                                        >
-                                            선택 분해
-                                        </button>
+                            <div class="panel__body panel-card__body">
+                                <div class="equipment__section">
+                                    <div class="equipment__controls">
+                                        <p id="equipmentSalvageHint" class="equipment__hint">
+                                            잠긴 전술 장비는 분해되지 않습니다. <strong>분해 가능한 장비만 보기</strong>
+                                            옵션이나 <strong>분해 가능 전체 선택</strong> 버튼으로 손쉽게 정리하세요.
+                                            <span
+                                                id="equipmentSelectionCount"
+                                                class="equipment__hint-count"
+                                                aria-live="polite"
+                                            >
+                                                현재 선택: 없음
+                                            </span>
+                                        </p>
+                                        <div class="equipment__control-bar">
+                                            <label class="equipment__filter">
+                                                <input type="checkbox" id="equipmentFilterSalvageable" />
+                                                분해 가능한 장비만 보기
+                                            </label>
+                                            <button
+                                                id="equipmentSelectSalvageable"
+                                                class="btn btn-secondary btn-small"
+                                                type="button"
+                                            >
+                                                분해 가능 전체 선택
+                                            </button>
+                                            <button
+                                                id="equipmentSalvageSelected"
+                                                class="btn btn-danger btn-small"
+                                                type="button"
+                                                disabled
+                                            >
+                                                선택 분해
+                                            </button>
+                                        </div>
                                     </div>
+                                    <ul id="equipmentInventory" class="equipment-list"></ul>
+                                    <p id="equipmentEmpty" class="equipment-empty">아직 확보한 전술 장비가 없습니다.</p>
                                 </div>
-                                <ul id="equipmentInventory" class="equipment-list"></ul>
-                                <p id="equipmentEmpty" class="equipment-empty">아직 확보한 전술 장비가 없습니다.</p>
                             </div>
                         </section>
                     </div>
@@ -508,15 +524,17 @@
                         data-tab="missions"
                         hidden
                     >
-                        <section class="panel panel--missions">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--missions">
+                            <header class="panel__header panel-card__header">
                                 <h2>임무</h2>
                             </header>
-                            <p id="missionSummary" class="mission__summary">
-                                샬레의 지시를 수행해 보상을 획득하세요.
-                            </p>
-                            <ul id="missionList" class="mission-list"></ul>
-                            <p id="missionEmpty" class="mission-empty">모든 임무를 완료했습니다!</p>
+                            <div class="panel__body panel-card__body">
+                                <p id="missionSummary" class="mission__summary">
+                                    샬레의 지시를 수행해 보상을 획득하세요.
+                                </p>
+                                <ul id="missionList" class="mission-list"></ul>
+                                <p id="missionEmpty" class="mission-empty">모든 임무를 완료했습니다!</p>
+                            </div>
                         </section>
                     </div>
 
@@ -528,11 +546,13 @@
                         data-tab="log"
                         hidden
                     >
-                        <section class="panel panel--log">
-                            <header class="panel__header">
+                        <section class="panel panel-card panel-card--log">
+                            <header class="panel__header panel-card__header">
                                 <h2>전투 로그</h2>
                             </header>
-                            <ul id="log" class="log"></ul>
+                            <div class="panel__body panel-card__body">
+                                <ul id="log" class="log"></ul>
+                            </div>
                         </section>
                     </div>
                 </div>
