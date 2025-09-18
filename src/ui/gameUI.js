@@ -171,6 +171,9 @@ export class GameUI {
         this.panelOverlay = UI.panelOverlay ?? null;
         this.panelOverlayBackdrop = UI.panelOverlayBackdrop ?? null;
         this.panelOverlayClose = UI.panelOverlayClose ?? null;
+        this.handleDoubleClick = (event) => {
+            event.preventDefault();
+        };
         this.setupTabs();
         this.setupEvents();
         this.handleViewportChange();
@@ -385,6 +388,7 @@ export class GameUI {
                 this.closePanelOverlay();
             });
         }
+        document.addEventListener('dblclick', this.handleDoubleClick, { passive: false });
     }
 
     renderHeroes() {
