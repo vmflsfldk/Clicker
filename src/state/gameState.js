@@ -20,7 +20,15 @@ import {
 } from '../data/equipment.js';
 import { MISSIONS, MISSION_GROUPS } from '../data/missions.js';
 import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
-import { SKILLS, SKILL_EFFECT_TYPES, SKILL_MAP } from '../data/skills.js';
+import {
+    SKILLS,
+    SKILL_EFFECT_TYPES,
+    SKILL_MAP,
+    DEFAULT_SKILL_LEVEL,
+    getSkillLevelConfig,
+    getSkillLevelDefinition,
+    getSkillUpgradeCost as getSkillUpgradeCostValue,
+} from '../data/skills.js';
 import {
     ENEMY_STAGE_INTERVAL,
     ENEMY_NAME_POOLS,
@@ -969,6 +977,7 @@ export class GameState {
 
     initializeSkills(savedSkills = {}, legacySaved = null) {
         this.activeSkills = new Map();
+        this.skillLevels = new Map();
         SKILLS.forEach((skill) => {
             const savedState = savedSkills?.[skill.id] ?? {};
             const savedCooldown = Number(savedState?.cooldownUntil ?? savedState?.cooldown ?? 0);
@@ -982,6 +991,21 @@ export class GameState {
                     ? { ...savedState.context }
                     : null;
             this.activeSkills.set(skill.id, { cooldownUntil, activeUntil, context });
+            const config = getSkillLevelConfig(skill.id);
+            const maxLevel = Number(config?.maxLevel ?? DEFAULT_SKILL_LEVEL);
+            const savedLevelCandidates = [
+                savedState?.level,
+                savedState?.lvl,
+                savedSkills?.levels?.[skill.id],
+                legacySaved?.skillLevels?.[skill.id],
+            ];
+            const savedLevel = savedLevelCandidates
+                .map((value) => Number(value))
+                .find((value) => Number.isFinite(value));
+            const normalizedLevel = Number.isFinite(savedLevel)
+                ? Math.max(DEFAULT_SKILL_LEVEL, Math.min(maxLevel, Math.floor(savedLevel)))
+                : DEFAULT_SKILL_LEVEL;
+            this.skillLevels.set(skill.id, normalizedLevel);
         });
         if (legacySaved) {
             const legacyCooldown = Number(legacySaved?.frenzyCooldown ?? 0);
@@ -1000,6 +1024,8 @@ export class GameState {
                 this.activeSkills.set('frenzy', current);
             }
         }
+        const savedModules = Number(savedSkills?.modules ?? legacySaved?.skillModules ?? 0);
+        this.skillModules = Number.isFinite(savedModules) ? Math.max(0, Math.floor(savedModules)) : 0;
     }
 
     resetSkillStates() {
@@ -1018,8 +1044,10 @@ export class GameState {
             if (state?.context && typeof state.context === 'object') {
                 entry.context = { ...state.context };
             }
+            entry.level = this.getSkillLevel(skillId);
             result[skillId] = entry;
         });
+        result.modules = this.skillModules;
         return result;
     }
 
@@ -1040,6 +1068,95 @@ export class GameState {
         const activeUntil = Math.max(0, Math.floor(Number(state?.activeUntil ?? 0)));
         const context = state?.context && typeof state.context === 'object' ? { ...state.context } : null;
         this.activeSkills.set(skillId, { cooldownUntil, activeUntil, context });
+    }
+
+    getSkillLevel(skillId) {
+        if (!this.skillLevels) {
+            this.skillLevels = new Map();
+        }
+        const config = getSkillLevelConfig(skillId);
+        const maxLevel = Number(config?.maxLevel ?? DEFAULT_SKILL_LEVEL);
+        if (!this.skillLevels.has(skillId)) {
+            this.skillLevels.set(skillId, DEFAULT_SKILL_LEVEL);
+        }
+        const rawLevel = Number(this.skillLevels.get(skillId));
+        if (!Number.isFinite(rawLevel)) {
+            this.skillLevels.set(skillId, DEFAULT_SKILL_LEVEL);
+            return DEFAULT_SKILL_LEVEL;
+        }
+        const normalized = Math.max(DEFAULT_SKILL_LEVEL, Math.floor(rawLevel));
+        const clamped = Math.min(maxLevel, normalized);
+        if (clamped !== rawLevel) {
+            this.skillLevels.set(skillId, clamped);
+        }
+        return clamped;
+    }
+
+    setSkillLevel(skillId, level) {
+        const config = getSkillLevelConfig(skillId);
+        const maxLevel = Number(config?.maxLevel ?? DEFAULT_SKILL_LEVEL);
+        const normalized = Math.max(
+            DEFAULT_SKILL_LEVEL,
+            Math.min(maxLevel, Math.floor(Number(level) || DEFAULT_SKILL_LEVEL)),
+        );
+        if (!this.skillLevels) {
+            this.skillLevels = new Map();
+        }
+        this.skillLevels.set(skillId, normalized);
+        return normalized;
+    }
+
+    getSkillUpgradeCost(skillId) {
+        const currentLevel = this.getSkillLevel(skillId);
+        const cost = getSkillUpgradeCostValue(skillId, currentLevel);
+        if (cost === null) {
+            return null;
+        }
+        const normalized = Number(cost);
+        return Number.isFinite(normalized) ? Math.max(0, Math.floor(normalized)) : null;
+    }
+
+    getSkillComputedValues(skillId, { level = null } = {}) {
+        const skill = SKILL_MAP.get(skillId);
+        if (!skill) return null;
+        const config = getSkillLevelConfig(skillId);
+        const maxLevel = Number(config?.maxLevel ?? DEFAULT_SKILL_LEVEL);
+        const resolvedLevel = Math.max(
+            DEFAULT_SKILL_LEVEL,
+            Math.min(maxLevel, Math.floor(Number(level ?? this.getSkillLevel(skillId)) || DEFAULT_SKILL_LEVEL)),
+        );
+        const definition = getSkillLevelDefinition(skillId, resolvedLevel) ?? null;
+        const effectMultiplier = Number(definition?.effectMultiplier ?? 1) || 1;
+        const durationMultiplier = Number(definition?.durationMultiplier ?? 1) || 1;
+        const cooldownMultiplier = Number(definition?.cooldownMultiplier ?? 1) || 1;
+        const baseCooldown = Math.max(0, Math.floor(Number(skill.cooldown ?? 0)));
+        const baseDuration = Math.max(0, Math.floor(Number(skill.duration ?? 0)));
+        let baseEffectValue = Number(skill.effectValue);
+        if (!Number.isFinite(baseEffectValue)) {
+            baseEffectValue = skill.effectType === SKILL_EFFECT_TYPES.DPS_MULTIPLIER ? 1 : 0;
+        }
+        const cooldown = Math.max(0, Math.floor(baseCooldown * cooldownMultiplier));
+        const duration = Math.max(0, Math.floor(baseDuration * durationMultiplier));
+        const effectValue = baseEffectValue * effectMultiplier;
+        const nextLevel = resolvedLevel < maxLevel ? resolvedLevel + 1 : resolvedLevel;
+        const nextDefinition = resolvedLevel < maxLevel ? getSkillLevelDefinition(skillId, resolvedLevel + 1) : null;
+        return {
+            skill,
+            level: resolvedLevel,
+            maxLevel,
+            levelDefinition: definition,
+            nextLevel,
+            nextLevelDefinition: nextDefinition,
+            effectMultiplier,
+            durationMultiplier,
+            cooldownMultiplier,
+            cooldown,
+            duration,
+            baseCooldown,
+            baseDuration,
+            baseEffectValue,
+            effectValue,
+        };
     }
 
     isSkillActive(skillId, now = Date.now()) {
@@ -1078,8 +1195,9 @@ export class GameState {
         if (entries.length === 0) {
             return 1;
         }
-        return entries.reduce((total, { skill }) => {
-            const baseMultiplier = Number(skill.effectValue ?? 1);
+        return entries.reduce((total, { skillId, skill }) => {
+            const computed = this.getSkillComputedValues(skillId) ?? { effectValue: skill.effectValue };
+            const baseMultiplier = Number(computed?.effectValue ?? skill.effectValue ?? 1);
             const normalized = Number.isFinite(baseMultiplier) ? Math.max(1, baseMultiplier) : 1;
             return total * (normalized * (1 + this.skillBonus));
         }, 1);
@@ -1160,18 +1278,19 @@ export class GameState {
         if (currentState.cooldownUntil > now) {
             return { success: false, reason: 'cooldown', skill, remaining: currentState.cooldownUntil - now };
         }
-        const cooldown = Math.max(0, Math.floor(Number(skill.cooldown ?? 0)));
-        const baseDuration = Math.max(0, Math.floor(Number(skill.duration ?? 0)));
+        const computed = this.getSkillComputedValues(skillId) ?? null;
+        const baseCooldown = Math.max(0, Math.floor(Number(computed?.cooldown ?? skill.cooldown ?? 0)));
+        const baseDuration = Math.max(0, Math.floor(Number(computed?.duration ?? skill.duration ?? 0)));
         const duration = baseDuration > 0 ? Math.floor(baseDuration * (1 + this.skillBonus)) : 0;
         const nextState = {
-            cooldownUntil: now + cooldown,
+            cooldownUntil: now + baseCooldown,
             activeUntil: duration > 0 ? now + duration : 0,
             context: null,
         };
         const effect = {};
         switch (skill.effectType) {
             case SKILL_EFFECT_TYPES.DPS_MULTIPLIER: {
-                const baseMultiplier = Number(skill.effectValue ?? 1);
+                const baseMultiplier = Number(computed?.effectValue ?? skill.effectValue ?? 1);
                 const normalized = Number.isFinite(baseMultiplier) ? Math.max(1, baseMultiplier) : 1;
                 effect.multiplier = normalized * (1 + this.skillBonus);
                 break;
@@ -1193,7 +1312,7 @@ export class GameState {
                 break;
             }
             case SKILL_EFFECT_TYPES.INSTANT_GOLD: {
-                const effectValue = Number(skill.effectValue ?? 0);
+                const effectValue = Number(computed?.effectValue ?? skill.effectValue ?? 0);
                 const normalized = Number.isFinite(effectValue) ? Math.max(0, effectValue) : 0;
                 const baseGain = Math.floor(this.totalDps * normalized * 0.25);
                 const goldGain = Math.floor(baseGain * (1 + this.goldBonus));
@@ -1210,11 +1329,41 @@ export class GameState {
         return {
             success: true,
             skill,
-            cooldown,
+            cooldown: baseCooldown,
             duration,
             effect,
             state: nextState,
             activatedAt: now,
+            level: computed?.level ?? this.getSkillLevel(skillId),
+        };
+    }
+
+    upgradeSkill(skillId) {
+        const skill = SKILL_MAP.get(skillId);
+        if (!skill) {
+            return { success: false, reason: 'unknown' };
+        }
+        const config = getSkillLevelConfig(skillId);
+        const maxLevel = Number(config?.maxLevel ?? DEFAULT_SKILL_LEVEL);
+        const currentLevel = this.getSkillLevel(skillId);
+        if (currentLevel >= maxLevel) {
+            return { success: false, reason: 'max', skill, level: currentLevel, maxLevel };
+        }
+        const cost = this.getSkillUpgradeCost(skillId);
+        if (cost !== null && cost > this.skillModules) {
+            return { success: false, reason: 'resource', skill, cost, level: currentLevel, maxLevel };
+        }
+        if (cost) {
+            this.skillModules = Math.max(0, this.skillModules - cost);
+        }
+        const nextLevel = this.setSkillLevel(skillId, currentLevel + 1);
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            skill,
+            level: nextLevel,
+            maxLevel,
+            cost: cost ?? 0,
         };
     }
 
@@ -2051,6 +2200,12 @@ export class GameState {
         });
         this.gachaTokens = 0;
         this.resetSkillStates();
+        if (this.skillLevels) {
+            SKILLS.forEach((skill) => {
+                this.skillLevels.set(skill.id, DEFAULT_SKILL_LEVEL);
+            });
+        }
+        this.skillModules = 0;
         this.inventory = [];
         this.equipped = {};
         this.upgradeMaterials = 0;
@@ -2085,6 +2240,7 @@ export class GameState {
             inventory: this.inventory,
             equipped: this.equipped,
             upgradeMaterials: this.upgradeMaterials,
+            skillModules: this.skillModules,
             highestStage: this.highestStage,
             currentRunHighestStage: this.currentRunHighestStage,
             bossDeadline: this.bossDeadline,
