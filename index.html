@@ -533,12 +533,46 @@
         </div>
     </div>
 
-    <template id="heroTemplate">
-        <li class="hero" data-recruited="false" data-rarity="common">
+    <div id="heroDetailOverlay" class="hero-detail-overlay" aria-hidden="true">
+        <div id="heroDetailBackdrop" class="hero-detail-overlay__backdrop" data-dismiss="true"></div>
+        <div class="hero-detail-overlay__dialog" role="dialog" aria-modal="true" aria-labelledby="heroDetailTitle">
+            <button
+                type="button"
+                id="heroDetailClose"
+                class="hero-detail-overlay__close"
+                aria-label="학생 정보 닫기"
+            >
+                ✕
+            </button>
+            <div id="heroDetailContent" class="hero-detail-overlay__content"></div>
+        </div>
+    </div>
+
+    <template id="heroIconTemplate">
+        <li class="hero-icon" data-recruited="false" data-rarity="common">
+            <button type="button" class="hero-icon__button">
+                <span class="hero-icon__media" aria-hidden="true">
+                    <img
+                        class="hero-icon__image"
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        hidden
+                    />
+                    <span class="hero-icon__placeholder"></span>
+                    <span class="hero-icon__lock" aria-hidden="true">🔒</span>
+                </span>
+                <span class="hero-icon__name"></span>
+            </button>
+        </li>
+    </template>
+
+    <template id="heroDetailTemplate">
+        <article class="hero" data-recruited="false" data-rarity="common">
             <div class="hero__info">
                 <div class="hero__header">
                     <span class="hero__rarity"></span>
-                    <h3 class="hero__name"></h3>
+                    <h3 id="heroDetailTitle" class="hero__name"></h3>
                 </div>
                 <p class="hero__desc"></p>
                 <div class="hero__meta">
@@ -563,7 +597,7 @@
                 <span class="hero__status-state"></span>
                 <span class="hero__status-detail"></span>
             </div>
-        </li>
+        </article>
     </template>
 
     <script type="module" src="src/main.js"></script>
