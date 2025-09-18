@@ -215,6 +215,8 @@ export class GameUI {
         this.rebirthPreviewNodeId = null;
         this.rebirthResizeObserver = null;
         this.rebirthResizeHandler = null;
+        this.rebirthScrollHandler = null;
+        this.rebirthScrollContainer = UI.rebirthTree ?? null;
         this.missionElements = new Map();
         this.missionGroupElements = new Map();
         this.missionGroupMissions = new Map();
@@ -2108,12 +2110,20 @@ export class GameUI {
         const verticalStep = rowCount > 0 ? 100 / rowCount : 100;
         const horizontalStep = columnCount > 0 ? 100 / columnCount : 100;
         const dynamicHeight = Math.max(320, rowCount * 160);
+        const containerWidth = UI.rebirthTree?.clientWidth ?? 0;
+        const estimatedWidth = columnCount > 0 ? columnCount * 220 : 0;
+        const dynamicWidth = Math.max(360, containerWidth, estimatedWidth);
 
         if (UI.rebirthTree) {
             UI.rebirthTree.style.setProperty('--rebirth-tree-min-height', `${dynamicHeight}px`);
+            UI.rebirthTree.style.setProperty('--rebirth-tree-content-width', `${dynamicWidth}px`);
         }
         UI.rebirthTreeNodes.style.minHeight = `${dynamicHeight}px`;
+        UI.rebirthTreeNodes.style.minWidth = `${dynamicWidth}px`;
+        UI.rebirthTreeNodes.style.width = `${dynamicWidth}px`;
         UI.rebirthTreeConnections.style.minHeight = `${dynamicHeight}px`;
+        UI.rebirthTreeConnections.style.minWidth = `${dynamicWidth}px`;
+        UI.rebirthTreeConnections.style.width = `${dynamicWidth}px`;
 
         nodes.forEach((node) => {
             const wrapper = document.createElement('button');
@@ -2646,6 +2656,13 @@ export class GameUI {
         if (!UI.rebirthTreeNodes) {
             return;
         }
+        if (UI.rebirthTree && !this.rebirthScrollHandler) {
+            this.rebirthScrollContainer = UI.rebirthTree;
+            this.rebirthScrollHandler = () => this.updateRebirthConnections();
+            this.rebirthScrollContainer.addEventListener('scroll', this.rebirthScrollHandler, {
+                passive: true,
+            });
+        }
         if (typeof ResizeObserver !== 'undefined') {
             try {
                 this.rebirthResizeObserver = new ResizeObserver(() => this.updateRebirthConnections());
@@ -2667,6 +2684,13 @@ export class GameUI {
         if (this.rebirthResizeHandler) {
             window.removeEventListener('resize', this.rebirthResizeHandler);
             this.rebirthResizeHandler = null;
+        }
+        if (this.rebirthScrollContainer && this.rebirthScrollHandler) {
+            this.rebirthScrollContainer.removeEventListener('scroll', this.rebirthScrollHandler);
+            this.rebirthScrollHandler = null;
+        }
+        if (!UI.rebirthTree) {
+            this.rebirthScrollContainer = null;
         }
     }
 
