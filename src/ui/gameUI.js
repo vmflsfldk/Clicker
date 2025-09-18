@@ -44,6 +44,14 @@ const UI = {
     tapButton: document.getElementById('tapButton'),
     enemy: document.getElementById('enemy'),
     heroList: document.getElementById('heroList'),
+    heroDetailOverlay: document.getElementById('heroDetailOverlay'),
+    heroDetailBackdrop: document.getElementById('heroDetailBackdrop'),
+    heroDetailClose: document.getElementById('heroDetailClose'),
+    heroDetailContent: document.getElementById('heroDetailContent'),
+    equipmentDetailOverlay: document.getElementById('equipmentDetailOverlay'),
+    equipmentDetailBackdrop: document.getElementById('equipmentDetailBackdrop'),
+    equipmentDetailClose: document.getElementById('equipmentDetailClose'),
+    equipmentDetailContent: document.getElementById('equipmentDetailContent'),
     setBonusSummary: document.getElementById('setBonusSummary'),
     setBonusList: document.getElementById('setBonusList'),
     gachaTokens: document.getElementById('gachaTokens'),
@@ -156,8 +164,19 @@ const formatSetBonusEffects = (effects) => {
 export class GameUI {
     constructor(state) {
         this.state = state;
-        this.heroTemplate = document.getElementById('heroTemplate');
+        this.heroIconTemplate = document.getElementById('heroIconTemplate');
+        this.heroDetailTemplate = document.getElementById('heroDetailTemplate');
+        this.equipmentIconTemplate = document.getElementById('equipmentIconTemplate');
+        this.equipmentDetailTemplate = document.getElementById('equipmentDetailTemplate');
         this.heroElements = new Map();
+        this.equipmentElements = new Map();
+        this.heroDetailUI = null;
+        this.activeHeroDetailId = null;
+        this.heroDetailReturnFocus = null;
+        this.equipmentDetailUI = null;
+        this.activeEquipmentDetailId = null;
+        this.equipmentDetailReturnFocus = null;
+        this.equipmentDetailReturnFocusId = null;
         this.setBonusElements = new Map();
         this.rebirthSkillElements = new Map();
         this.missionElements = new Map();
@@ -171,6 +190,22 @@ export class GameUI {
         this.panelOverlay = UI.panelOverlay ?? null;
         this.panelOverlayBackdrop = UI.panelOverlayBackdrop ?? null;
         this.panelOverlayClose = UI.panelOverlayClose ?? null;
+        this.heroDetailOverlay = UI.heroDetailOverlay ?? null;
+        this.heroDetailBackdrop = UI.heroDetailBackdrop ?? null;
+        this.heroDetailClose = UI.heroDetailClose ?? null;
+        this.heroDetailContent = UI.heroDetailContent ?? null;
+        if (this.heroDetailClose) {
+            this.heroDetailClose.setAttribute('aria-hidden', 'true');
+            this.heroDetailClose.setAttribute('tabindex', '-1');
+        }
+        this.equipmentDetailOverlay = UI.equipmentDetailOverlay ?? null;
+        this.equipmentDetailBackdrop = UI.equipmentDetailBackdrop ?? null;
+        this.equipmentDetailClose = UI.equipmentDetailClose ?? null;
+        this.equipmentDetailContent = UI.equipmentDetailContent ?? null;
+        if (this.equipmentDetailClose) {
+            this.equipmentDetailClose.setAttribute('aria-hidden', 'true');
+            this.equipmentDetailClose.setAttribute('tabindex', '-1');
+        }
         this.handleDoubleClick = (event) => {
             event.preventDefault();
         };
@@ -322,6 +357,28 @@ export class GameUI {
         UI.sortHeroes.addEventListener('click', () => this.toggleHeroSort());
         if (UI.heroList) {
             UI.heroList.addEventListener('click', (event) => this.handleHeroListClick(event));
+        }
+        if (this.heroDetailClose) {
+            this.heroDetailClose.addEventListener('click', () => this.closeHeroDetail());
+        }
+        if (this.heroDetailBackdrop) {
+            this.heroDetailBackdrop.addEventListener('click', () => this.closeHeroDetail());
+        }
+        if (this.heroDetailContent) {
+            this.heroDetailContent.addEventListener('click', (event) =>
+                this.handleHeroDetailContentClick(event),
+            );
+        }
+        if (this.equipmentDetailClose) {
+            this.equipmentDetailClose.addEventListener('click', () => this.closeEquipmentDetail());
+        }
+        if (this.equipmentDetailBackdrop) {
+            this.equipmentDetailBackdrop.addEventListener('click', () => this.closeEquipmentDetail());
+        }
+        if (this.equipmentDetailContent) {
+            this.equipmentDetailContent.addEventListener('click', (event) =>
+                this.handleEquipmentDetailClick(event),
+            );
         }
         if (UI.bossRetreat) {
             UI.bossRetreat.addEventListener('click', () => this.handleBossRetreat());
@@ -482,55 +539,53 @@ export class GameUI {
     }
 
     addHero(hero) {
-        const node = this.heroTemplate.content.firstElementChild.cloneNode(true);
+        if (!this.heroIconTemplate) return;
+        const node = this.heroIconTemplate.content.firstElementChild.cloneNode(true);
         node.dataset.heroId = hero.id;
-        const name = node.querySelector('.hero__name');
-        const desc = node.querySelector('.hero__desc');
-        const level = node.querySelector('.hero__level');
-        const dps = node.querySelector('.hero__dps');
-        const statusState = node.querySelector('.hero__status-state');
-        const statusDetail = node.querySelector('.hero__status-detail');
-        const rarity = node.querySelector('.hero__rarity');
-        const traits = node.querySelector('.hero__traits');
-        const skinPreview = node.querySelector('.hero__skin-preview');
-        const skinPreviewImage = node.querySelector('.hero__skin-preview-image');
-        const skinList = node.querySelector('.hero__skin-list');
-        const skinButtons = new Map();
+        const button = node.querySelector('.hero-icon__button');
+        const image = node.querySelector('.hero-icon__image');
+        const name = node.querySelector('.hero-icon__name');
+        const media = node.querySelector('.hero-icon__media');
 
-        if (rarity) {
-            rarity.classList.add('rarity-badge');
-            rarity.textContent = hero.rarityName;
-            rarity.title = hero.rarity?.description ?? '';
+        if (button) {
+            button.dataset.heroId = hero.id;
         }
-
-        name.textContent = hero.name;
-        desc.textContent = hero.description;
-        node.dataset.rarity = hero.rarityId;
-        if (skinList) {
-            skinList.innerHTML = '';
-            hero.skins.forEach((skin) => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'hero-skin';
-                button.dataset.heroSkinId = skin.id;
-                button.dataset.heroId = hero.id;
-
-                const skinName = document.createElement('span');
-                skinName.className = 'hero-skin__name';
-
-                const skinStatus = document.createElement('span');
-                skinStatus.className = 'hero-skin__status';
-
-                const skinDesc = document.createElement('span');
-                skinDesc.className = 'hero-skin__desc';
-                skinDesc.textContent = skin.description ?? '';
-
-                button.append(skinName, skinStatus, skinDesc);
-                skinList.appendChild(button);
-                skinButtons.set(skin.id, { button, name: skinName, status: skinStatus, desc: skinDesc });
+        if (image) {
+            image.dataset.loadError = 'false';
+            image.addEventListener('error', () => {
+                node.dataset.hasImage = 'false';
+                image.dataset.loadError = 'true';
+                image.dataset.failedSrc = image.dataset.currentSrc ?? image.src ?? '';
+                delete image.dataset.currentSrc;
+                if (image.hasAttribute('src')) {
+                    image.removeAttribute('src');
+                }
+                image.hidden = true;
+            });
+            image.addEventListener('load', () => {
+                image.dataset.loadError = 'false';
+                delete image.dataset.failedSrc;
+                node.dataset.hasImage = 'true';
+                image.hidden = false;
             });
         }
 
+        this.heroElements.set(hero.id, {
+            node,
+            button,
+            image,
+            name,
+            media,
+        });
+        this.updateHero(hero);
+
+        UI.heroList.appendChild(node);
+    }
+
+    createHeroDetailBindings(node) {
+        if (!node) return null;
+        const skinPreview = node.querySelector('.hero__skin-preview');
+        const skinPreviewImage = node.querySelector('.hero__skin-preview-image');
         if (skinPreview && skinPreviewImage) {
             skinPreviewImage.dataset.loadError = 'false';
             skinPreviewImage.addEventListener('error', () => {
@@ -551,80 +606,241 @@ export class GameUI {
                 skinPreview.setAttribute('aria-hidden', 'false');
             });
         }
-
-        this.heroElements.set(hero.id, {
+        return {
             node,
-            name,
-            desc,
-            level,
-            dps,
-            statusState,
-            statusDetail,
-            rarity,
-            traits,
+            name: node.querySelector('.hero__name'),
+            desc: node.querySelector('.hero__desc'),
+            level: node.querySelector('.hero__level'),
+            dps: node.querySelector('.hero__dps'),
+            statusState: node.querySelector('.hero__status-state'),
+            statusDetail: node.querySelector('.hero__status-detail'),
+            rarity: node.querySelector('.hero__rarity'),
+            traits: node.querySelector('.hero__traits'),
             skinPreview,
             skinPreviewImage,
-            skinList,
-            skinButtons,
-        });
-        this.updateHero(hero);
+            skinList: node.querySelector('.hero__skin-list'),
+            skinButtons: new Map(),
+        };
+    }
 
-        UI.heroList.appendChild(node);
+    buildHeroDetailSkinButtons(hero, heroUI) {
+        if (!heroUI?.skinList) return;
+        heroUI.skinList.innerHTML = '';
+        heroUI.skinButtons = new Map();
+        const skins = Array.isArray(hero.skins) ? hero.skins : [];
+        skins.forEach((skin) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'hero-skin';
+            button.dataset.heroSkinId = skin.id;
+            button.dataset.heroId = hero.id;
+
+            const skinName = document.createElement('span');
+            skinName.className = 'hero-skin__name';
+
+            const skinStatus = document.createElement('span');
+            skinStatus.className = 'hero-skin__status';
+
+            const skinDesc = document.createElement('span');
+            skinDesc.className = 'hero-skin__desc';
+            skinDesc.textContent = skin.description ?? '';
+
+            button.append(skinName, skinStatus, skinDesc);
+            heroUI.skinList.appendChild(button);
+            heroUI.skinButtons.set(skin.id, { button, name: skinName, status: skinStatus, desc: skinDesc });
+        });
+    }
+
+    openHeroDetail(heroId) {
+        if (!this.heroDetailTemplate || !this.heroDetailContent) {
+            return;
+        }
+        const hero = this.state.getHeroById(heroId);
+        if (!hero) {
+            return;
+        }
+        if (!this.heroDetailReturnFocus) {
+            this.heroDetailReturnFocus = document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+        }
+        const node = this.heroDetailTemplate.content.firstElementChild.cloneNode(true);
+        const heroUI = this.createHeroDetailBindings(node);
+        if (!heroUI) {
+            return;
+        }
+        this.buildHeroDetailSkinButtons(hero, heroUI);
+        this.heroDetailContent.innerHTML = '';
+        this.heroDetailContent.appendChild(node);
+        this.heroDetailUI = heroUI;
+        this.activeHeroDetailId = hero.id;
+        this.updateHeroDetail(hero);
+        if (this.heroDetailOverlay) {
+            this.heroDetailOverlay.classList.add('is-open');
+            this.heroDetailOverlay.setAttribute('aria-hidden', 'false');
+        }
+        if (this.heroDetailClose) {
+            this.heroDetailClose.setAttribute('aria-hidden', 'false');
+            this.heroDetailClose.setAttribute('tabindex', '0');
+            this.heroDetailClose.focus({ preventScroll: true });
+        }
+        document.body.classList.add('is-hero-detail-open');
+    }
+
+    closeHeroDetail() {
+        const returnFocus = this.heroDetailReturnFocus;
+        if (this.heroDetailOverlay) {
+            this.heroDetailOverlay.classList.remove('is-open');
+            this.heroDetailOverlay.setAttribute('aria-hidden', 'true');
+        }
+        if (this.heroDetailContent) {
+            this.heroDetailContent.innerHTML = '';
+        }
+        if (this.heroDetailClose) {
+            this.heroDetailClose.setAttribute('aria-hidden', 'true');
+            this.heroDetailClose.setAttribute('tabindex', '-1');
+        }
+        document.body.classList.remove('is-hero-detail-open');
+        this.heroDetailUI = null;
+        this.activeHeroDetailId = null;
+        if (returnFocus && typeof returnFocus.focus === 'function' && document.contains(returnFocus)) {
+            returnFocus.focus({ preventScroll: true });
+        }
+        this.heroDetailReturnFocus = null;
+    }
+
+    isHeroDetailOpen() {
+        return Boolean(this.heroDetailOverlay?.classList.contains('is-open'));
     }
 
     updateHero(hero) {
+        this.updateHeroIcon(hero);
+        if (this.activeHeroDetailId === hero.id) {
+            this.updateHeroDetail(hero);
+        }
+        this.updateHeroGachaEntry(hero);
+    }
+
+    updateHeroIcon(hero) {
         const heroUI = this.heroElements.get(hero.id);
         if (!heroUI) return;
         heroUI.node.dataset.rarity = hero.rarityId;
+        heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
+        if (heroUI.button) {
+            heroUI.button.dataset.heroId = hero.id;
+            heroUI.button.title = hero.name;
+            heroUI.button.setAttribute('aria-label', hero.name);
+        }
+        if (heroUI.name) {
+            heroUI.name.textContent = hero.name;
+        }
+        const accent = hero.activeSkin?.accentColor ?? hero.rarity?.color ?? null;
+        if (accent) {
+            heroUI.node.style.setProperty('--hero-icon-accent', accent);
+        } else {
+            heroUI.node.style.removeProperty('--hero-icon-accent');
+        }
+        if (heroUI.media) {
+            heroUI.media.title = hero.description ?? '';
+        }
+        const image = heroUI.image;
+        if (image) {
+            const imagePath = hero.isUnlocked && hero.activeSkin?.image ? hero.activeSkin.image : null;
+            const previousFailedSrc = image.dataset?.failedSrc ?? '';
+            const previouslyErrored = image.dataset?.loadError === 'true';
+            const canDisplayImage = Boolean(imagePath)
+                && (!previouslyErrored || previousFailedSrc !== imagePath);
+            if (canDisplayImage && imagePath) {
+                const currentSrc = image.dataset.currentSrc ?? '';
+                if (currentSrc !== imagePath) {
+                    image.dataset.currentSrc = imagePath;
+                    image.src = imagePath;
+                }
+                image.hidden = false;
+                image.alt = `${hero.name} 아이콘`;
+                heroUI.node.dataset.hasImage = 'true';
+            } else {
+                delete image.dataset.currentSrc;
+                if (image.hasAttribute('src')) {
+                    image.removeAttribute('src');
+                }
+                if (!imagePath) {
+                    delete image.dataset.failedSrc;
+                    image.dataset.loadError = 'false';
+                }
+                image.hidden = true;
+                image.alt = '';
+                heroUI.node.dataset.hasImage = 'false';
+            }
+        }
+    }
+
+    updateHeroDetail(hero) {
+        if (!this.heroDetailUI || this.activeHeroDetailId !== hero.id) {
+            return;
+        }
+        const heroUI = this.heroDetailUI;
+        heroUI.node.dataset.heroId = hero.id;
+        heroUI.node.dataset.rarity = hero.rarityId;
+        heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
         if (heroUI.name) {
             heroUI.name.textContent = hero.name;
         }
         if (heroUI.desc) {
-            heroUI.desc.textContent = hero.description;
+            heroUI.desc.textContent = hero.description ?? '';
         }
         if (heroUI.rarity) {
+            heroUI.rarity.classList.add('rarity-badge');
             heroUI.rarity.textContent = hero.rarityName;
             heroUI.rarity.title = hero.rarity?.description ?? '';
         }
-        heroUI.level.textContent = `Lv. ${hero.level}`;
-        heroUI.dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
-        this.updateHeroTraits(hero);
-        heroUI.node.dataset.recruited = hero.isUnlocked ? 'true' : 'false';
-        if (hero.isUnlocked) {
-            heroUI.statusState.textContent = '합류 완료';
-            const extraLevels = hero.enhancementLevel;
-            const detailParts = [];
-            if (extraLevels > 0) {
-                detailParts.push(`추가 성장 +${extraLevels} (Lv. ${hero.level})`);
-            } else {
-                detailParts.push(`초회 합류 Lv. ${hero.level}`);
-            }
-            const activeSkin = hero.activeSkin;
-            if (activeSkin) {
-                detailParts.push(`현재 스킨: ${activeSkin.name}`);
-            }
-            const nextSkin = hero.nextSkinUnlock;
-            if (nextSkin) {
-                detailParts.push(`다음 스킨 Lv. ${nextSkin.requiredLevel} ${nextSkin.name}`);
-            }
-            heroUI.statusDetail.textContent = detailParts.join(' · ');
-        } else {
-            heroUI.statusState.textContent = '미합류';
-            const detailParts = [`${hero.rarityName} 학생을 가챠로 모집하세요.`];
-            const firstSkin = hero.skins?.[0];
-            if (firstSkin) {
-                detailParts.push(`첫 스킨 Lv. ${firstSkin.requiredLevel} ${firstSkin.name}`);
-            }
-            heroUI.statusDetail.textContent = detailParts.join(' · ');
+        if (heroUI.level) {
+            heroUI.level.textContent = `Lv. ${hero.level}`;
         }
-        this.updateHeroSkins(hero);
-        this.updateHeroGachaEntry(hero);
+        if (heroUI.dps) {
+            heroUI.dps.textContent = `DPS: ${formatNumber(this.state.getHeroEffectiveDps(hero))}`;
+        }
+        this.renderHeroTraits(hero, heroUI.traits);
+        if (hero.isUnlocked) {
+            if (heroUI.statusState) {
+                heroUI.statusState.textContent = '합류 완료';
+            }
+            if (heroUI.statusDetail) {
+                const extraLevels = hero.enhancementLevel;
+                const detailParts = [];
+                if (extraLevels > 0) {
+                    detailParts.push(`추가 성장 +${extraLevels} (Lv. ${hero.level})`);
+                } else {
+                    detailParts.push(`초회 합류 Lv. ${hero.level}`);
+                }
+                const activeSkin = hero.activeSkin;
+                if (activeSkin) {
+                    detailParts.push(`현재 스킨: ${activeSkin.name}`);
+                }
+                const nextSkin = hero.nextSkinUnlock;
+                if (nextSkin) {
+                    detailParts.push(`다음 스킨 Lv. ${nextSkin.requiredLevel} ${nextSkin.name}`);
+                }
+                heroUI.statusDetail.textContent = detailParts.join(' · ');
+            }
+        } else {
+            if (heroUI.statusState) {
+                heroUI.statusState.textContent = '미합류';
+            }
+            if (heroUI.statusDetail) {
+                const detailParts = [`${hero.rarityName} 학생을 가챠로 모집하세요.`];
+                const firstSkin = hero.skins?.[0];
+                if (firstSkin) {
+                    detailParts.push(`첫 스킨 Lv. ${firstSkin.requiredLevel} ${firstSkin.name}`);
+                }
+                heroUI.statusDetail.textContent = detailParts.join(' · ');
+            }
+        }
+        this.updateHeroSkinState(hero, heroUI);
     }
 
-    updateHeroTraits(hero) {
-        const heroUI = this.heroElements.get(hero.id);
-        if (!heroUI?.traits) return;
-        const container = heroUI.traits;
+    renderHeroTraits(hero, container) {
+        if (!container) return;
         container.innerHTML = '';
         const entries = Array.isArray(hero.traitEntries) ? hero.traitEntries : [];
         if (entries.length === 0) {
@@ -641,7 +857,7 @@ export class GameUI {
             } else {
                 delete badge.dataset.traitId;
             }
-            if (trait.accentColor) {
+            if (trait?.accentColor) {
                 badge.style.setProperty('--hero-trait-accent', trait.accentColor);
             } else {
                 badge.style.removeProperty('--hero-trait-accent');
@@ -666,8 +882,7 @@ export class GameUI {
         });
     }
 
-    updateHeroSkins(hero) {
-        const heroUI = this.heroElements.get(hero.id);
+    updateHeroSkinState(hero, heroUI) {
         if (!heroUI) return;
         const activeSkin = hero.activeSkin;
         const skinImageElement = heroUI.skinPreviewImage ?? null;
@@ -744,7 +959,8 @@ export class GameUI {
             }
         }
         if (heroUI.skinButtons && heroUI.skinButtons.size > 0) {
-            hero.skins.forEach((skin) => {
+            const skins = Array.isArray(hero.skins) ? hero.skins : [];
+            skins.forEach((skin) => {
                 const entry = heroUI.skinButtons.get(skin.id);
                 if (!entry) return;
                 entry.name.textContent = skin.name;
@@ -890,12 +1106,25 @@ export class GameUI {
     }
 
     handleHeroListClick(event) {
+        const button = event.target.closest('.hero-icon__button');
+        if (!button) return;
+        const heroElement = button.closest('.hero-icon');
+        const heroId = heroElement?.dataset.heroId ?? button.dataset.heroId;
+        if (!heroId) return;
+        this.heroDetailReturnFocus = button;
+        this.openHeroDetail(heroId);
+    }
+
+    handleHeroDetailContentClick(event) {
         const button = event.target.closest('.hero-skin');
         if (!button) return;
-        const heroElement = button.closest('.hero');
-        const heroId = heroElement?.dataset.heroId;
+        const heroId = this.activeHeroDetailId;
         const skinId = button.dataset.heroSkinId;
         if (!heroId || !skinId) return;
+        this.handleHeroSkinSelection(heroId, skinId);
+    }
+
+    handleHeroSkinSelection(heroId, skinId) {
         const hero = this.state.getHeroById(heroId);
         if (!hero) return;
         if (!hero.isSkinUnlocked(skinId)) {
@@ -1258,6 +1487,7 @@ export class GameUI {
     renderEquipmentInventory() {
         if (!UI.equipmentInventory) return;
         this.sanitizeSelectedEquipment();
+        this.equipmentElements.clear();
         UI.equipmentInventory.innerHTML = '';
         const sorted = [...this.state.inventory];
         sorted.sort((a, b) => {
@@ -1288,152 +1518,110 @@ export class GameUI {
         }
 
         visibleItems.forEach((item) => {
-            const type = EQUIPMENT_TYPE_MAP.get(item.type);
-            const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
-            const equipped = this.state.equipped[item.type] === item.id;
-            const salvageable = this.state.canSalvageItem(item);
+            const icon = this.buildEquipmentIcon(item);
+            if (icon) {
+                UI.equipmentInventory.appendChild(icon);
+            }
+        });
 
-            const entry = document.createElement('li');
-            entry.className = 'equipment-item';
-            entry.dataset.rarity = item.rarity;
-            entry.dataset.equipped = equipped ? 'true' : 'false';
-            entry.dataset.salvageable = salvageable ? 'true' : 'false';
+        this.updateEquipmentControls();
+        this.refreshEquipmentDetailFocus();
+        this.refreshActiveEquipmentDetail();
+    }
 
-            const selectWrapper = document.createElement('label');
-            selectWrapper.className = 'equipment-item__select';
-            const selectTooltip = salvageable
+    buildEquipmentIcon(item) {
+        if (!this.equipmentIconTemplate) return null;
+        const node = this.equipmentIconTemplate.content.firstElementChild?.cloneNode(true);
+        if (!node) return null;
+        const equipped = this.state.equipped[item.type] === item.id;
+        const salvageable = this.state.canSalvageItem(item);
+        const selected = this.selectedEquipmentIds.has(item.id);
+        node.dataset.equipmentId = item.id;
+        node.dataset.rarity = item.rarity ?? 'common';
+        node.dataset.equipped = equipped ? 'true' : 'false';
+        node.dataset.salvageable = salvageable ? 'true' : 'false';
+        node.dataset.selected = selected ? 'true' : 'false';
+
+        const button = node.querySelector('.equipment-icon__button');
+        const typeLabel = node.querySelector('.equipment-icon__type');
+        const levelLabel = node.querySelector('.equipment-icon__level');
+        const effectLabel = node.querySelector('.equipment-icon__effect');
+        const nameLabel = node.querySelector('.equipment-icon__name');
+        const checkbox = node.querySelector('input[data-select-id]');
+        const selectLabel = node.querySelector('.equipment-icon__select');
+
+        const type = EQUIPMENT_TYPE_MAP.get(item.type);
+        const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
+        const effects = this.getEquipmentEffectDescriptions(item);
+        const primaryValue = this.getPrimaryEquipmentEffectValue(item);
+        const fallbackEffect = describeEquipmentEffect(item.type, primaryValue) ?? formatSignedPercent(primaryValue);
+        const effectText = effects.length > 0 ? effects[0] : fallbackEffect;
+
+        if (button) {
+            button.dataset.equipmentId = item.id;
+            button.title = `${item.name} · ${effectText}`;
+            button.setAttribute('aria-label', `${item.name} 상세 보기`);
+        }
+        if (typeLabel) {
+            typeLabel.textContent = type?.label ?? '전술 장비';
+        }
+        if (levelLabel) {
+            levelLabel.textContent = `Lv. ${item.level}/${item.maxLevel}`;
+        }
+        if (effectLabel) {
+            effectLabel.textContent = effectText;
+        }
+        if (nameLabel) {
+            const rarityPrefix = rarity ? `[${rarity.name}] ` : '';
+            nameLabel.textContent = `${rarityPrefix}${item.name}`;
+        }
+        if (checkbox) {
+            checkbox.dataset.selectId = item.id;
+            checkbox.checked = selected;
+            checkbox.disabled = !salvageable;
+        }
+        if (selectLabel) {
+            selectLabel.title = salvageable
                 ? '선택하여 여러 장비를 한 번에 분해할 수 있습니다.'
                 : item.locked
                 ? '잠금 중인 전술 장비는 선택할 수 없습니다.'
                 : equipped
                 ? '장착 중인 전술 장비는 선택할 수 없습니다.'
                 : '선택할 수 없는 전술 장비입니다.';
-            selectWrapper.title = selectTooltip;
+        }
 
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.dataset.selectId = item.id;
-            checkbox.checked = this.selectedEquipmentIds.has(item.id);
-            checkbox.disabled = !salvageable;
-
-            const checkboxLabel = document.createElement('span');
-            checkboxLabel.className = 'equipment-item__select-label';
-            checkboxLabel.textContent = '선택';
-
-            selectWrapper.append(checkbox, checkboxLabel);
-
-            const info = document.createElement('div');
-            info.className = 'equipment-item__info';
-
-            const name = document.createElement('span');
-            name.className = 'equipment-item__name';
-            const rarityLabel = rarity ? `[${rarity.name}] ` : '';
-            name.textContent = `${rarityLabel}${item.name}`;
-
-            const details = document.createElement('span');
-            details.className = 'equipment-item__details';
-            const typeLabel = type?.label ?? '전술 장비';
-            const effects = this.getEquipmentEffectDescriptions(item);
-            const primary = item.effects?.[item.type]?.value ?? item.value ?? 0;
-            const fallbackEffect = describeEquipmentEffect(item.type, primary) ?? formatSignedPercent(primary);
-            const effectText = effects.length > 0 ? effects.join(' / ') : fallbackEffect;
-            details.textContent = `${typeLabel} · ${effectText} · Lv. ${item.level}/${item.maxLevel} · 스테이지 ${item.stage}`;
-
-            const status = document.createElement('span');
-            status.className = 'equipment-item__status';
-            if (item.locked) {
-                status.textContent = '🔒 잠금 상태';
-                status.dataset.state = 'locked';
-            } else if (equipped) {
-                status.textContent = '장착 중';
-                status.dataset.state = 'equipped';
-            } else if (salvageable) {
-                status.textContent = '분해 가능';
-                status.dataset.state = 'available';
-            } else {
-                status.textContent = '보관 중';
-                status.dataset.state = 'stored';
-            }
-
-            info.append(name, details, status);
-
-            const actions = document.createElement('div');
-            actions.className = 'equipment-item__actions';
-
-            const lockButton = document.createElement('button');
-            lockButton.type = 'button';
-            lockButton.className = 'btn btn-ghost equipment-item__lock';
-            lockButton.dataset.lockId = item.id;
-            lockButton.textContent = item.locked ? '잠금 해제' : '잠금';
-            lockButton.title = item.locked
-                ? '잠금을 해제하여 강화 재료로 사용하거나 분해할 수 있습니다.'
-                : '잠금하면 분해 및 강화 재료로 사용되지 않습니다.';
-
-            const upgradeContext = this.getEquipmentUpgradeContext(item);
-            const upgradeAvailable = upgradeContext.canUpgrade;
-
-            const upgradeButton = document.createElement('button');
-            upgradeButton.type = 'button';
-            upgradeButton.className = 'btn btn-upgrade equipment-item__upgrade';
-            upgradeButton.dataset.upgradeId = item.id;
-            if (item.level >= item.maxLevel) {
-                upgradeButton.textContent = '최대 강화';
-                upgradeButton.disabled = true;
-                upgradeButton.title = '이미 최대 강화 단계입니다.';
-            } else {
-                upgradeButton.textContent =
-                    upgradeContext.cost > 0
-                        ? `강화 (${formatNumber(upgradeContext.cost)}개)`
-                        : '강화';
-                upgradeButton.disabled = !upgradeAvailable;
-                if (!upgradeAvailable) {
-                    if (!upgradeContext.hasMaterials && upgradeContext.cost > 0) {
-                        upgradeButton.title = `강화 재료가 부족합니다. 필요 ${formatNumber(
-                            upgradeContext.cost,
-                        )}개, 보유 ${formatNumber(this.state.upgradeMaterials)}개`;
-                    } else {
-                        upgradeButton.title = '강화를 진행할 수 없습니다.';
-                    }
-                } else {
-                    upgradeButton.title =
-                        upgradeContext.cost > 0
-                            ? `강화에 강화 재료 ${formatNumber(upgradeContext.cost)}개가 소모됩니다. (보유 재료 ${formatNumber(
-                                  this.state.upgradeMaterials,
-                              )}개)`
-                            : '강화 재료 없이 강화를 진행할 수 있습니다.';
-                }
-            }
-
-            const equipButton = document.createElement('button');
-            equipButton.type = 'button';
-            equipButton.className = 'btn btn-secondary equipment-item__equip';
-            equipButton.textContent = equipped ? '장착 중' : '장착';
-            equipButton.disabled = equipped;
-            equipButton.dataset.equipId = item.id;
-            equipButton.title = equipped ? '이미 장착 중입니다.' : '선택한 전술 장비를 장착합니다.';
-
-            const salvageButton = document.createElement('button');
-            salvageButton.type = 'button';
-            salvageButton.className = 'btn btn-danger equipment-item__salvage';
-            salvageButton.dataset.salvageId = item.id;
-            salvageButton.textContent = '분해';
-            salvageButton.disabled = !salvageable;
-            if (item.locked) {
-                salvageButton.title = '잠긴 전술 장비는 분해할 수 없습니다.';
-            } else if (equipped) {
-                salvageButton.title = '장착 중인 전술 장비는 분해할 수 없습니다.';
-            } else {
-                salvageButton.title = '전술 장비를 분해하여 강화 재료와 골드를 획득합니다.';
-            }
-
-            actions.append(lockButton, upgradeButton, equipButton, salvageButton);
-
-            entry.append(selectWrapper, info, actions);
-            UI.equipmentInventory.appendChild(entry);
+        this.equipmentElements.set(item.id, {
+            node,
+            button,
+            checkbox,
+            name: nameLabel,
+            effect: effectLabel,
         });
-
-        this.updateEquipmentControls();
+        return node;
     }
+
+    refreshEquipmentDetailFocus() {
+        if (!this.equipmentDetailReturnFocusId || !UI.equipmentInventory) {
+            return;
+        }
+        const selector = '.equipment-icon__button[data-equipment-id=\'' + this.equipmentDetailReturnFocusId + '\']';
+        const button = UI.equipmentInventory.querySelector(selector);
+        if (button) {
+            this.equipmentDetailReturnFocus = button;
+        }
+    }
+
+    refreshActiveEquipmentDetail() {
+        if (!this.activeEquipmentDetailId) return;
+        const item = this.state.inventory.find((entry) => entry.id === this.activeEquipmentDetailId);
+        if (item) {
+            this.updateEquipmentDetail(item);
+        } else {
+            this.closeEquipmentDetail();
+        }
+    }
+
+
 
 
     sanitizeSelectedEquipment() {
@@ -1476,45 +1664,15 @@ export class GameUI {
             UI.equipmentSelectionCount.textContent =
                 selectedCount > 0 ? `현재 선택: ${formatNumber(selectedCount)}개` : '현재 선택: 없음';
         }
-        if (UI.equipmentInventory) {
-            const upgradeButtons = UI.equipmentInventory.querySelectorAll('[data-upgrade-id]');
-            upgradeButtons.forEach((button) => {
-                const itemId = button.dataset.upgradeId;
-                if (!itemId) return;
-                const item = this.state.inventory.find((entry) => entry.id === itemId);
-                if (!item) {
-                    button.disabled = true;
-                    button.title = '전술 장비를 찾을 수 없습니다.';
-                    return;
-                }
-                if (item.level >= item.maxLevel) {
-                    button.textContent = '최대 강화';
-                    button.disabled = true;
-                    button.title = '이미 최대 강화 단계입니다.';
-                    return;
-                }
-                const context = this.getEquipmentUpgradeContext(item);
-                button.textContent =
-                    context.cost > 0 ? `강화 (${formatNumber(context.cost)}개)` : '강화';
-                button.disabled = !context.canUpgrade;
-                if (!context.canUpgrade) {
-                    if (!context.hasMaterials && context.cost > 0) {
-                        button.title = `강화 재료가 부족합니다. 필요 ${formatNumber(
-                            context.cost,
-                        )}개, 보유 ${formatNumber(this.state.upgradeMaterials)}개`;
-                    } else {
-                        button.title = '강화를 진행할 수 없습니다.';
-                    }
-                } else {
-                    button.title =
-                        context.cost > 0
-                            ? `강화에 강화 재료 ${formatNumber(context.cost)}개가 소모됩니다. (보유 재료 ${formatNumber(
-                                  this.state.upgradeMaterials,
-                              )}개)`
-                            : '강화 재료 없이 강화를 진행할 수 있습니다.';
-                }
-            });
-        }
+        this.equipmentElements.forEach((elements, itemId) => {
+            const isSelected = this.selectedEquipmentIds.has(itemId);
+            if (elements.checkbox) {
+                elements.checkbox.checked = isSelected;
+            }
+            if (elements.node) {
+                elements.node.dataset.selected = isSelected ? 'true' : 'false';
+            }
+        });
     }
 
     handleEquipmentInventoryChange(event) {
@@ -1528,6 +1686,9 @@ export class GameUI {
             this.selectedEquipmentIds.delete(itemId);
         }
         this.updateEquipmentControls();
+        if (this.activeEquipmentDetailId === itemId) {
+            this.refreshActiveEquipmentDetail();
+        }
     }
 
     handleEquipmentFilterChange(event) {
@@ -1662,6 +1823,16 @@ export class GameUI {
         if (this.isSalvageModalOpen()) {
             event.preventDefault();
             this.closeSalvageModal();
+            return;
+        }
+        if (this.isEquipmentDetailOpen()) {
+            event.preventDefault();
+            this.closeEquipmentDetail();
+            return;
+        }
+        if (this.isHeroDetailOpen()) {
+            event.preventDefault();
+            this.closeHeroDetail();
             return;
         }
         if (this.isPanelOverlayOpen()) {
@@ -1805,73 +1976,89 @@ export class GameUI {
     handleEquipmentInventoryClick(event) {
         const lockButton = event.target.closest('[data-lock-id]');
         if (lockButton) {
-            const itemId = lockButton.dataset.lockId;
-            if (!itemId) return;
-            const result = this.state.toggleEquipmentLock(itemId);
-            if (!result.success) {
-                this.addLog(result.message, 'warning');
-                return;
-            }
-            if (result.locked) {
-                this.selectedEquipmentIds.delete(result.item.id);
-            }
-            const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
-            const prefix = rarity ? `[${rarity.name}] ` : '';
-            const actionText = result.locked ? '잠금되었습니다.' : '잠금이 해제되었습니다.';
-            this.addLog(`${prefix}${result.item.name}이(가) ${actionText}`, result.locked ? 'info' : 'success');
-            this.renderEquipmentInventory();
-            saveGame(this.state);
+            this.toggleEquipmentLock(lockButton.dataset.lockId);
             return;
         }
-
         const salvageButton = event.target.closest('[data-salvage-id]');
         if (salvageButton) {
             const itemId = salvageButton.dataset.salvageId;
-            if (!itemId) return;
-            this.openSalvageModal([itemId]);
+            if (itemId) {
+                this.openSalvageModal([itemId]);
+            }
             return;
         }
-
         const upgradeButton = event.target.closest('[data-upgrade-id]');
         if (upgradeButton) {
-            const itemId = upgradeButton.dataset.upgradeId;
-            const result = this.state.upgradeEquipment(itemId);
-            if (!result.success) {
-                this.addLog(result.message, 'warning');
-                return;
-            }
-            const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
-            const type = EQUIPMENT_TYPE_MAP.get(result.item.type);
-            const prefix = rarity ? `[${rarity.name}] ` : '';
-            const label = type?.label ?? '전술 장비';
-            const previousLevel = result.previousLevel;
-            const previousValueText = formatSignedPercent(result.previousValue);
-            const currentPrimary = this.getPrimaryEquipmentEffectValue(result.item);
-            const newValueText = formatSignedPercent(currentPrimary);
-            const effectDetails = this.getEquipmentEffectDescriptions(result.item);
-            const summaryText = effectDetails.length > 0 ? ` (옵션: ${effectDetails.join(' / ')})` : '';
-            this.addLog(
-                `${prefix}${result.item.name} 강화 성공! Lv. ${previousLevel} → ${result.item.level}, ${label} ${previousValueText} → ${newValueText}${summaryText}`,
-                'success',
-            );
-            if (result.materialsSpent > 0) {
-                const spentText = formatNumber(result.materialsSpent);
-                const remainingText = formatNumber(this.state.upgradeMaterials);
-                this.addLog(
-                    `강화 재료 ${spentText}개를 사용했습니다. (보유 재료 ${remainingText}개)`,
-                    'info',
-                );
-            }
-            this.renderEquipmentSlots();
-            this.renderEquipmentInventory();
-            this.updateStats();
-            this.updateHeroes();
-            saveGame(this.state);
+            this.upgradeEquipmentItem(upgradeButton.dataset.upgradeId);
             return;
         }
-        const button = event.target.closest('[data-equip-id]');
-        if (!button) return;
-        const itemId = button.dataset.equipId;
+        const equipButton = event.target.closest('[data-equip-id]');
+        if (equipButton) {
+            this.equipEquipmentItem(equipButton.dataset.equipId);
+            return;
+        }
+        const iconButton = event.target.closest('.equipment-icon__button');
+        if (!iconButton) return;
+        const itemId = iconButton.dataset.equipmentId;
+        if (!itemId) return;
+        this.equipmentDetailReturnFocus = iconButton;
+        this.equipmentDetailReturnFocusId = itemId;
+        this.openEquipmentDetail(itemId);
+    }
+
+    toggleEquipmentLock(itemId) {
+        if (!itemId) return;
+        const result = this.state.toggleEquipmentLock(itemId);
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        if (result.locked) {
+            this.selectedEquipmentIds.delete(result.item.id);
+        }
+        const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
+        const prefix = rarity ? `[${rarity.name}] ` : '';
+        const actionText = result.locked ? '잠금되었습니다.' : '잠금이 해제되었습니다.';
+        this.addLog(`${prefix}${result.item.name}이(가) ${actionText}`, result.locked ? 'info' : 'success');
+        this.renderEquipmentInventory();
+        saveGame(this.state);
+    }
+
+    upgradeEquipmentItem(itemId) {
+        if (!itemId) return;
+        const result = this.state.upgradeEquipment(itemId);
+        if (!result.success) {
+            this.addLog(result.message, 'warning');
+            return;
+        }
+        const rarity = EQUIPMENT_RARITY_MAP.get(result.item.rarity);
+        const type = EQUIPMENT_TYPE_MAP.get(result.item.type);
+        const prefix = rarity ? `[${rarity.name}] ` : '';
+        const label = type?.label ?? '전술 장비';
+        const previousLevel = result.previousLevel;
+        const previousValueText = formatSignedPercent(result.previousValue);
+        const currentPrimary = this.getPrimaryEquipmentEffectValue(result.item);
+        const newValueText = formatSignedPercent(currentPrimary);
+        const effectDetails = this.getEquipmentEffectDescriptions(result.item);
+        const summaryText = effectDetails.length > 0 ? ` (옵션: ${effectDetails.join(' / ')})` : '';
+        this.addLog(
+            `${prefix}${result.item.name} 강화 성공! Lv. ${previousLevel} → ${result.item.level}, ${label} ${previousValueText} → ${newValueText}${summaryText}`,
+            'success',
+        );
+        if (result.materialsSpent > 0) {
+            const spentText = formatNumber(result.materialsSpent);
+            const remainingText = formatNumber(this.state.upgradeMaterials);
+            this.addLog(`강화 재료 ${spentText}개를 사용했습니다. (보유 재료 ${remainingText}개)`, 'info');
+        }
+        this.renderEquipmentSlots();
+        this.renderEquipmentInventory();
+        this.updateStats();
+        this.updateHeroes();
+        saveGame(this.state);
+    }
+
+    equipEquipmentItem(itemId) {
+        if (!itemId) return;
         const result = this.state.equipItem(itemId);
         if (!result.success) {
             this.addLog(result.message, 'warning');
@@ -1899,7 +2086,274 @@ export class GameUI {
         this.renderEquipmentInventory();
         this.updateStats();
         this.updateHeroes();
+        saveGame(this.state);
     }
+
+    handleEquipmentDetailClick(event) {
+        const lockButton = event.target.closest('[data-lock-id]');
+        if (lockButton) {
+            this.toggleEquipmentLock(lockButton.dataset.lockId);
+            return;
+        }
+        const upgradeButton = event.target.closest('[data-upgrade-id]');
+        if (upgradeButton) {
+            this.upgradeEquipmentItem(upgradeButton.dataset.upgradeId);
+            return;
+        }
+        const equipButton = event.target.closest('[data-equip-id]');
+        if (equipButton) {
+            this.equipEquipmentItem(equipButton.dataset.equipId);
+            return;
+        }
+        const salvageButton = event.target.closest('[data-salvage-id]');
+        if (salvageButton) {
+            const itemId = salvageButton.dataset.salvageId;
+            if (itemId) {
+                this.openSalvageModal([itemId]);
+            }
+            return;
+        }
+        const selectionButton = event.target.closest('.equipment-detail__selection[data-select-id]');
+        if (selectionButton) {
+            this.toggleEquipmentSelection(selectionButton.dataset.selectId);
+        }
+    }
+
+    createEquipmentDetailBindings(node) {
+        if (!node) return null;
+        return {
+            node,
+            rarity: node.querySelector('.equipment-detail__rarity'),
+            name: node.querySelector('.equipment-detail__name'),
+            type: node.querySelector('.equipment-detail__type'),
+            level: node.querySelector('.equipment-detail__level'),
+            stage: node.querySelector('.equipment-detail__stage'),
+            effects: node.querySelector('.equipment-detail__effects'),
+            status: node.querySelector('.equipment-detail__status'),
+            lockButton: node.querySelector('.equipment-detail__lock'),
+            upgradeButton: node.querySelector('.equipment-detail__upgrade'),
+            equipButton: node.querySelector('.equipment-detail__equip'),
+            salvageButton: node.querySelector('.equipment-detail__salvage'),
+            selectionButton: node.querySelector('.equipment-detail__selection'),
+        };
+    }
+
+    openEquipmentDetail(itemId) {
+        if (!this.equipmentDetailTemplate || !this.equipmentDetailContent) return;
+        const item = this.state.inventory.find((entry) => entry.id === itemId);
+        if (!item) return;
+        const node = this.equipmentDetailTemplate.content.firstElementChild?.cloneNode(true);
+        if (!node) return;
+        const detailUI = this.createEquipmentDetailBindings(node);
+        if (!detailUI) return;
+        this.equipmentDetailContent.innerHTML = '';
+        this.equipmentDetailContent.appendChild(node);
+        this.equipmentDetailUI = detailUI;
+        this.activeEquipmentDetailId = itemId;
+        this.updateEquipmentDetail(item);
+        if (this.equipmentDetailOverlay) {
+            this.equipmentDetailOverlay.classList.add('is-open');
+            this.equipmentDetailOverlay.setAttribute('aria-hidden', 'false');
+        }
+        if (this.equipmentDetailClose) {
+            this.equipmentDetailClose.setAttribute('aria-hidden', 'false');
+            this.equipmentDetailClose.setAttribute('tabindex', '0');
+            this.equipmentDetailClose.focus({ preventScroll: true });
+        }
+        document.body.classList.add('is-equipment-detail-open');
+    }
+
+    closeEquipmentDetail() {
+        const returnFocus = this.equipmentDetailReturnFocus;
+        if (this.equipmentDetailOverlay) {
+            this.equipmentDetailOverlay.classList.remove('is-open');
+            this.equipmentDetailOverlay.setAttribute('aria-hidden', 'true');
+        }
+        if (this.equipmentDetailContent) {
+            this.equipmentDetailContent.innerHTML = '';
+        }
+        if (this.equipmentDetailClose) {
+            this.equipmentDetailClose.setAttribute('aria-hidden', 'true');
+            this.equipmentDetailClose.setAttribute('tabindex', '-1');
+        }
+        document.body.classList.remove('is-equipment-detail-open');
+        this.equipmentDetailUI = null;
+        this.activeEquipmentDetailId = null;
+        if (returnFocus && typeof returnFocus.focus === 'function') {
+            if (document.contains(returnFocus)) {
+                returnFocus.focus({ preventScroll: true });
+            } else if (this.equipmentDetailReturnFocusId) {
+                const selector = `.equipment-icon__button[data-equipment-id="${this.equipmentDetailReturnFocusId}"]`;
+                const fallback = document.querySelector(selector);
+                if (fallback) {
+                    fallback.focus({ preventScroll: true });
+                }
+            }
+        }
+        this.equipmentDetailReturnFocus = null;
+        this.equipmentDetailReturnFocusId = null;
+    }
+
+    isEquipmentDetailOpen() {
+        return Boolean(this.equipmentDetailOverlay?.classList.contains('is-open'));
+    }
+
+    updateEquipmentDetail(item) {
+        if (!this.equipmentDetailUI) return;
+        const ui = this.equipmentDetailUI;
+        const equipped = this.state.equipped[item.type] === item.id;
+        const salvageable = this.state.canSalvageItem(item);
+        const selected = this.selectedEquipmentIds.has(item.id);
+        const rarity = EQUIPMENT_RARITY_MAP.get(item.rarity);
+        const type = EQUIPMENT_TYPE_MAP.get(item.type);
+        const effects = this.getEquipmentEffectDescriptions(item);
+        const primaryValue = this.getPrimaryEquipmentEffectValue(item);
+        const fallbackEffect = describeEquipmentEffect(item.type, primaryValue) ?? formatSignedPercent(primaryValue);
+
+        if (ui.node) {
+            ui.node.dataset.rarity = item.rarity ?? 'common';
+            ui.node.dataset.equipped = equipped ? 'true' : 'false';
+            ui.node.dataset.salvageable = salvageable ? 'true' : 'false';
+            ui.node.dataset.selected = selected ? 'true' : 'false';
+        }
+        if (ui.rarity) {
+            ui.rarity.textContent = rarity?.name ?? '일반';
+        }
+        if (ui.name) {
+            ui.name.textContent = item.name;
+        }
+        if (ui.type) {
+            ui.type.textContent = type?.label ?? '전술 장비';
+        }
+        if (ui.level) {
+            ui.level.textContent = `강화 Lv. ${item.level}/${item.maxLevel}`;
+        }
+        if (ui.stage) {
+            const stageValue = Number.isFinite(item.stage) ? formatNumber(item.stage) : '미확인';
+            ui.stage.textContent = `획득 스테이지 ${stageValue}`;
+        }
+        if (ui.effects) {
+            ui.effects.innerHTML = '';
+            const effectEntries = effects.length > 0 ? effects : [fallbackEffect];
+            effectEntries.forEach((text) => {
+                const entry = document.createElement('div');
+                entry.className = 'equipment-detail__effect';
+                entry.textContent = text;
+                ui.effects.appendChild(entry);
+            });
+        }
+        if (ui.status) {
+            if (item.locked) {
+                ui.status.textContent = '🔒 잠금 상태 – 분해 및 강화 재료로 사용할 수 없습니다.';
+            } else if (equipped) {
+                ui.status.textContent = '장착 중 – 다른 장비를 장착하면 인벤토리로 이동합니다.';
+            } else if (salvageable) {
+                ui.status.textContent = '분해 가능 – 강화 재료와 골드로 분해할 수 있습니다.';
+            } else {
+                ui.status.textContent = '보관 중 – 현재 사용하지 않는 전술 장비입니다.';
+            }
+        }
+        if (ui.lockButton) {
+            ui.lockButton.dataset.lockId = item.id;
+            ui.lockButton.textContent = item.locked ? '잠금 해제' : '잠금';
+            ui.lockButton.title = item.locked
+                ? '잠금을 해제하여 강화 재료로 사용하거나 분해할 수 있습니다.'
+                : '잠금하면 분해 및 강화 재료로 사용되지 않습니다.';
+        }
+        if (ui.upgradeButton) {
+            ui.upgradeButton.dataset.upgradeId = item.id;
+            const context = this.getEquipmentUpgradeContext(item);
+            if (item.level >= item.maxLevel) {
+                ui.upgradeButton.textContent = '최대 강화';
+                ui.upgradeButton.disabled = true;
+                ui.upgradeButton.title = '이미 최대 강화 단계입니다.';
+            } else {
+                ui.upgradeButton.textContent =
+                    context.cost > 0 ? `강화 (${formatNumber(context.cost)}개)` : '강화';
+                ui.upgradeButton.disabled = !context.canUpgrade;
+                if (!context.canUpgrade) {
+                    if (!context.hasMaterials && context.cost > 0) {
+                        ui.upgradeButton.title = `강화 재료가 부족합니다. 필요 ${formatNumber(context.cost)}개, 보유 ${formatNumber(
+                            this.state.upgradeMaterials,
+                        )}개`;
+                    } else {
+                        ui.upgradeButton.title = '강화를 진행할 수 없습니다.';
+                    }
+                } else {
+                    ui.upgradeButton.title =
+                        context.cost > 0
+                            ? `강화에 강화 재료 ${formatNumber(context.cost)}개가 소모됩니다. (보유 재료 ${formatNumber(
+                                  this.state.upgradeMaterials,
+                              )}개)`
+                            : '강화 재료 없이 강화를 진행할 수 있습니다.';
+                }
+            }
+        }
+        if (ui.equipButton) {
+            ui.equipButton.dataset.equipId = item.id;
+            ui.equipButton.textContent = equipped ? '장착 중' : '장착';
+            ui.equipButton.disabled = equipped;
+            ui.equipButton.title = equipped ? '이미 장착 중입니다.' : '선택한 전술 장비를 장착합니다.';
+        }
+        if (ui.salvageButton) {
+            ui.salvageButton.dataset.salvageId = item.id;
+            ui.salvageButton.disabled = !salvageable;
+            if (item.locked) {
+                ui.salvageButton.title = '잠긴 전술 장비는 분해할 수 없습니다.';
+            } else if (equipped) {
+                ui.salvageButton.title = '장착 중인 전술 장비는 분해할 수 없습니다.';
+            } else {
+                ui.salvageButton.title = '전술 장비를 분해하여 강화 재료와 골드를 획득합니다.';
+            }
+        }
+        if (ui.selectionButton) {
+            ui.selectionButton.dataset.selectId = item.id;
+            ui.selectionButton.disabled = !salvageable;
+            if (!salvageable) {
+                ui.selectionButton.textContent = '분해 선택 불가';
+                ui.selectionButton.title = item.locked
+                    ? '잠금 해제 후 선택할 수 있습니다.'
+                    : equipped
+                    ? '장착 중인 전술 장비는 선택할 수 없습니다.'
+                    : '선택할 수 없는 전술 장비입니다.';
+            } else {
+                ui.selectionButton.textContent = selected ? '분해 선택에서 제외' : '분해 선택에 추가';
+                ui.selectionButton.title = selected
+                    ? '분해 선택 목록에서 제거합니다.'
+                    : '분해 선택 목록에 추가합니다.';
+            }
+        }
+    }
+
+    toggleEquipmentSelection(itemId) {
+        if (!itemId) return;
+        const item = this.state.inventory.find((entry) => entry.id === itemId);
+        if (!item) return;
+        if (!this.state.canSalvageItem(item)) {
+            this.addLog('잠금 또는 장착 상태에서는 분해 선택에 추가할 수 없습니다.', 'warning');
+            return;
+        }
+        if (this.selectedEquipmentIds.has(itemId)) {
+            this.selectedEquipmentIds.delete(itemId);
+        } else {
+            this.selectedEquipmentIds.add(itemId);
+        }
+        const elements = this.equipmentElements.get(itemId);
+        const isSelected = this.selectedEquipmentIds.has(itemId);
+        if (elements?.checkbox) {
+            elements.checkbox.checked = isSelected;
+        }
+        if (elements?.node) {
+            elements.node.dataset.selected = isSelected ? 'true' : 'false';
+        }
+        this.updateEquipmentControls();
+        if (this.activeEquipmentDetailId === itemId) {
+            this.refreshActiveEquipmentDetail();
+        }
+    }
+
+
+
 
     handleMissionListClick(event) {
         const button = event.target.closest('.mission__claim');

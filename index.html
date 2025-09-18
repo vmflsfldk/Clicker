@@ -461,7 +461,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                <ul id="equipmentInventory" class="equipment-list"></ul>
+                                <ul id="equipmentInventory" class="equipment-grid" aria-label="전술 장비 목록"></ul>
                                 <p id="equipmentEmpty" class="equipment-empty">아직 확보한 전술 장비가 없습니다.</p>
                             </div>
                         </section>
@@ -533,12 +533,46 @@
         </div>
     </div>
 
-    <template id="heroTemplate">
-        <li class="hero" data-recruited="false" data-rarity="common">
+    <div id="heroDetailOverlay" class="hero-detail-overlay" aria-hidden="true">
+        <div id="heroDetailBackdrop" class="hero-detail-overlay__backdrop" data-dismiss="true"></div>
+        <div class="hero-detail-overlay__dialog" role="dialog" aria-modal="true" aria-labelledby="heroDetailTitle">
+            <button
+                type="button"
+                id="heroDetailClose"
+                class="hero-detail-overlay__close"
+                aria-label="학생 정보 닫기"
+            >
+                ✕
+            </button>
+            <div id="heroDetailContent" class="hero-detail-overlay__content"></div>
+        </div>
+    </div>
+
+    <template id="heroIconTemplate">
+        <li class="hero-icon" data-recruited="false" data-rarity="common">
+            <button type="button" class="hero-icon__button">
+                <span class="hero-icon__media" aria-hidden="true">
+                    <img
+                        class="hero-icon__image"
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        hidden
+                    />
+                    <span class="hero-icon__placeholder"></span>
+                    <span class="hero-icon__lock" aria-hidden="true">🔒</span>
+                </span>
+                <span class="hero-icon__name"></span>
+            </button>
+        </li>
+    </template>
+
+    <template id="heroDetailTemplate">
+        <article class="hero" data-recruited="false" data-rarity="common">
             <div class="hero__info">
                 <div class="hero__header">
                     <span class="hero__rarity"></span>
-                    <h3 class="hero__name"></h3>
+                    <h3 id="heroDetailTitle" class="hero__name"></h3>
                 </div>
                 <p class="hero__desc"></p>
                 <div class="hero__meta">
@@ -563,7 +597,69 @@
                 <span class="hero__status-state"></span>
                 <span class="hero__status-detail"></span>
             </div>
+        </article>
+    </template>
+
+    <div id="equipmentDetailOverlay" class="equipment-detail-overlay" aria-hidden="true">
+        <div id="equipmentDetailBackdrop" class="equipment-detail-overlay__backdrop" data-dismiss="true"></div>
+        <div class="equipment-detail-overlay__dialog" role="dialog" aria-modal="true" aria-labelledby="equipmentDetailTitle">
+            <button
+                type="button"
+                id="equipmentDetailClose"
+                class="equipment-detail-overlay__close"
+                aria-label="전술 장비 정보 닫기"
+            >
+                ✕
+            </button>
+            <div id="equipmentDetailContent" class="equipment-detail-overlay__content"></div>
+        </div>
+    </div>
+
+    <template id="equipmentIconTemplate">
+        <li
+            class="equipment-icon"
+            data-equipment-id=""
+            data-rarity="common"
+            data-equipped="false"
+            data-salvageable="false"
+            data-selected="false"
+        >
+            <button type="button" class="equipment-icon__button" data-equipment-id="">
+                <span class="equipment-icon__media" aria-hidden="true">
+                    <span class="equipment-icon__type"></span>
+                    <span class="equipment-icon__level"></span>
+                </span>
+                <span class="equipment-icon__effect"></span>
+                <span class="equipment-icon__name"></span>
+            </button>
+            <label class="equipment-icon__select">
+                <input type="checkbox" data-select-id="" />
+                <span>선택</span>
+            </label>
         </li>
+    </template>
+
+    <template id="equipmentDetailTemplate">
+        <article class="equipment-detail" data-rarity="common" data-equipped="false" data-salvageable="false">
+            <header class="equipment-detail__header">
+                <span class="equipment-detail__rarity"></span>
+                <h3 id="equipmentDetailTitle" class="equipment-detail__name"></h3>
+            </header>
+            <div class="equipment-detail__meta">
+                <span class="equipment-detail__type"></span>
+                <span class="equipment-detail__level"></span>
+                <span class="equipment-detail__stage"></span>
+            </div>
+            <div class="equipment-detail__effects" role="list" aria-label="장비 효과"></div>
+            <p class="equipment-detail__status"></p>
+            <div class="equipment-detail__actions">
+                <button type="button" class="btn btn-ghost equipment-detail__lock" data-lock-id="">잠금</button>
+                <button type="button" class="btn btn-upgrade equipment-detail__upgrade" data-upgrade-id="">강화</button>
+                <button type="button" class="btn btn-secondary equipment-detail__equip" data-equip-id="">장착</button>
+                <button type="button" class="btn btn-danger equipment-detail__salvage" data-salvage-id="">분해</button>
+            </div>
+            <button type="button" class="btn btn-ghost equipment-detail__selection" data-select-id=""></button>
+        </article>
     </template>
 
     <script type="module" src="src/main.js"></script>
