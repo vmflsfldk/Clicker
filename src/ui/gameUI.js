@@ -1,4 +1,5 @@
 import {
+    BOSS_STAGE_INTERVAL,
     BOSS_TIME_LIMIT_SECONDS,
     BOSS_WARNING_THRESHOLD,
     REBIRTH_STAGE_REQUIREMENT,
@@ -40,6 +41,11 @@ const UI = {
     enemyMaxHp: document.getElementById('enemyMaxHp'),
     enemyHealthBar: document.getElementById('enemyHealthBar'),
     bossTimer: document.getElementById('bossTimer'),
+    stageGimmick: document.getElementById('stageGimmick'),
+    stageGimmickIcon: document.getElementById('stageGimmickIcon'),
+    stageGimmickLabel: document.getElementById('stageGimmickLabel'),
+    stageGimmickDescription: document.getElementById('stageGimmickDescription'),
+    stageGimmickReward: document.getElementById('stageGimmickReward'),
     bossControls: document.getElementById('bossControls'),
     bossRetreat: document.getElementById('bossRetreat'),
     bossAdvance: document.getElementById('bossAdvance'),
@@ -3246,14 +3252,95 @@ export class GameUI {
         this.updateHeroes();
     }
 
+    hasStageModifierEffect(modifiers) {
+        if (!modifiers || typeof modifiers !== 'object') return false;
+        if (Number.isFinite(modifiers.rewardMultiplier) && modifiers.rewardMultiplier !== 1) return true;
+        if (Number.isFinite(modifiers.goldBonus) && modifiers.goldBonus !== 0) return true;
+        if (Number.isFinite(modifiers.equipmentDropBonus) && modifiers.equipmentDropBonus !== 0) return true;
+        if (Number.isFinite(modifiers.gachaDropBonus) && modifiers.gachaDropBonus !== 0) return true;
+        if (Number.isFinite(modifiers.hpMultiplier) && modifiers.hpMultiplier !== 1) return true;
+        return false;
+    }
+
+    describeStageGimmickModifiers(modifiers) {
+        if (!modifiers || typeof modifiers !== 'object') {
+            return '추가 효과 없음';
+        }
+        const parts = [];
+        if (Number.isFinite(modifiers.rewardMultiplier) && modifiers.rewardMultiplier !== 1) {
+            parts.push(`골드 보상 ${formatSignedPercent(modifiers.rewardMultiplier - 1)}`);
+        }
+        if (Number.isFinite(modifiers.goldBonus) && modifiers.goldBonus !== 0) {
+            parts.push(`추가 골드 ${formatSignedPercent(modifiers.goldBonus)}`);
+        }
+        if (Number.isFinite(modifiers.equipmentDropBonus) && modifiers.equipmentDropBonus !== 0) {
+            parts.push(`장비 드롭 ${formatSignedPercent(modifiers.equipmentDropBonus)}`);
+        }
+        if (Number.isFinite(modifiers.gachaDropBonus) && modifiers.gachaDropBonus !== 0) {
+            parts.push(`모집권 ${formatSignedPercent(modifiers.gachaDropBonus)}`);
+        }
+        if (Number.isFinite(modifiers.hpMultiplier) && modifiers.hpMultiplier !== 1) {
+            parts.push(`적 체력 ${formatSignedPercent(modifiers.hpMultiplier - 1)}`);
+        }
+        return parts.length > 0 ? parts.join(' · ') : '추가 효과 없음';
+    }
+
+    updateStageGimmick() {
+        const container = UI.stageGimmick;
+        if (!container) return;
+        const gimmick = this.state.getStageGimmick();
+        const modifiers = gimmick?.modifiers ?? {};
+        const shouldShow = Boolean(gimmick?.highlight) || this.hasStageModifierEffect(modifiers);
+        if (!shouldShow) {
+            container.classList.remove(
+                'stage-gimmick--visible',
+                'stage-gimmick--warning',
+                'stage-gimmick--boost',
+                'stage-gimmick--info',
+            );
+            container.setAttribute('aria-hidden', 'true');
+            if (UI.stageGimmickIcon) UI.stageGimmickIcon.textContent = '';
+            if (UI.stageGimmickLabel) UI.stageGimmickLabel.textContent = '';
+            if (UI.stageGimmickDescription) UI.stageGimmickDescription.textContent = '';
+            if (UI.stageGimmickReward) UI.stageGimmickReward.textContent = '';
+            return;
+        }
+        container.classList.add('stage-gimmick--visible');
+        container.setAttribute('aria-hidden', 'false');
+        const alertType = gimmick.alert ?? 'info';
+        container.classList.toggle('stage-gimmick--warning', alertType === 'warning');
+        container.classList.toggle('stage-gimmick--boost', alertType === 'boost');
+        container.classList.toggle('stage-gimmick--info', alertType === 'info');
+        if (UI.stageGimmickIcon) {
+            UI.stageGimmickIcon.textContent = gimmick.icon ?? '⚠️';
+        }
+        if (UI.stageGimmickLabel) {
+            UI.stageGimmickLabel.textContent = gimmick.label ?? '특수 작전';
+        }
+        if (UI.stageGimmickDescription) {
+            UI.stageGimmickDescription.textContent = gimmick.description ?? '';
+        }
+        if (UI.stageGimmickReward) {
+            const rewardText =
+                Array.isArray(gimmick.effects) && gimmick.effects.length > 0
+                    ? gimmick.effects.join(' · ')
+                    : this.describeStageGimmickModifiers(modifiers);
+            UI.stageGimmickReward.textContent = rewardText;
+        }
+    }
+
     updateEnemy() {
         UI.enemyName.textContent = this.state.enemy.name;
         UI.enemyCurrentHp.textContent = formatNumber(this.state.enemy.hp);
         UI.enemyMaxHp.textContent = formatNumber(this.state.enemy.maxHp);
         const percentage = Math.max(0, (this.state.enemy.hp / this.state.enemy.maxHp) * 100);
         UI.enemyHealthBar.style.width = `${percentage}%`;
-        const progressPercent = ((this.state.enemy.stage - 1) % 5) / 4;
+        const interval = Math.max(1, BOSS_STAGE_INTERVAL);
+        const remainder = (this.state.enemy.stage - 1) % interval;
+        const maxProgressSteps = Math.max(1, interval - 1);
+        const progressPercent = Math.min(1, remainder / maxProgressSteps);
         UI.stageProgressTrack.style.width = `${Math.min(100, progressPercent * 100)}%`;
+        this.updateStageGimmick();
     }
 
     updateStats() {
