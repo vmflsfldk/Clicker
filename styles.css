@@ -36,7 +36,8 @@ body {
     height: 100%;
     display: block;
     margin: 0;
-    padding-bottom: 8rem;
+    padding-bottom: calc(8rem + constant(safe-area-inset-bottom));
+    padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -382,9 +383,13 @@ h1,
     position: fixed;
     left: 50%;
     bottom: 1.5rem;
+    bottom: calc(1.5rem + constant(safe-area-inset-bottom));
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%);
     width: min(960px, calc(100% - 3rem));
     padding: 0.75rem 1rem;
+    padding-bottom: calc(0.75rem + constant(safe-area-inset-bottom));
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
     border-radius: 22px;
     background: rgba(15, 23, 42, 0.9);
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.6);
@@ -440,9 +445,13 @@ h1,
     position: fixed;
     left: 50%;
     bottom: 0;
+    bottom: constant(safe-area-inset-bottom);
+    bottom: env(safe-area-inset-bottom, 0px);
     width: min(960px, calc(100% - 2.5rem));
     max-height: min(75vh, 760px);
     padding: 3.25rem 2.25rem 2.5rem;
+    padding-bottom: calc(2.5rem + constant(safe-area-inset-bottom));
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
     background: rgba(15, 23, 42, 0.98);
     border-radius: 32px 32px 0 0;
     box-shadow: 0 -24px 50px rgba(15, 23, 42, 0.6);
@@ -1090,6 +1099,8 @@ h1,
     align-items: center;
     justify-content: center;
     padding: 1.5rem;
+    padding-bottom: calc(1.5rem + constant(safe-area-inset-bottom));
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.25s ease;
@@ -1161,6 +1172,8 @@ h1,
     align-items: center;
     justify-content: center;
     padding: 1.5rem;
+    padding-bottom: calc(1.5rem + constant(safe-area-inset-bottom));
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.25s ease;
@@ -2601,6 +2614,8 @@ body.modal-open {
     align-items: center;
     justify-content: center;
     padding: 1.5rem;
+    padding-bottom: calc(1.5rem + constant(safe-area-inset-bottom));
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 .modal__dialog {
