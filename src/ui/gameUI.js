@@ -20,6 +20,7 @@ import {
 import { HERO_SET_BONUSES } from '../data/heroes.js';
 import { EQUIPMENT_TYPES, EQUIPMENT_DROP_CHANCE, EQUIPMENT_BOSS_DROP_CHANCE } from '../data/equipment.js';
 import { REBIRTH_EFFECT_LABELS, REBIRTH_SKILLS } from '../data/rebirth.js';
+import { SKILLS, SKILL_EFFECT_TYPES, SKILL_MAP } from '../data/skills.js';
 import { saveGame } from '../storage/save.js';
 import { formatNumber, formatPercent, formatSignedPercent, formatCountdown } from '../utils/format.js';
 
@@ -76,8 +77,7 @@ const UI = {
     sortHeroes: document.getElementById('sortHeroes'),
     stageProgressTrack: document.getElementById('stageProgressTrack'),
     damageIndicator: document.getElementById('damageIndicator'),
-    skillFrenzy: document.getElementById('skillFrenzy'),
-    skillCooldown: document.getElementById('skillCooldown'),
+    skillList: document.getElementById('skillList'),
     saveProgress: document.getElementById('saveProgress'),
     resetProgress: document.getElementById('resetProgress'),
     rebirthPanel: document.getElementById('rebirthPanel'),
@@ -185,6 +185,9 @@ export class GameUI {
         this.missionGroupElements = new Map();
         this.missionGroupMissions = new Map();
         this.missionGroupMap = new Map(MISSION_GROUPS.map((group) => [group.id, group]));
+        this.skillTemplate = document.getElementById('skillTemplate');
+        this.skillElements = new Map();
+        this.skillMap = SKILL_MAP;
         this.audioContext = null;
         this.gachaPoolElements = new Map();
         this.selectedEquipmentIds = new Set();
@@ -224,6 +227,7 @@ export class GameUI {
         this.updateGachaHistoryVisibility();
         this.renderGachaOverview();
         this.renderHeroSetBonuses();
+        this.renderSkills();
         this.renderHeroes();
         this.renderEquipmentUI();
         this.renderMissionUI();
@@ -396,7 +400,9 @@ export class GameUI {
         if (UI.gachaTen) {
             UI.gachaTen.addEventListener('click', () => this.handleGachaRoll(GACHA_MULTI_COUNT));
         }
-        UI.skillFrenzy.addEventListener('click', () => this.useFrenzy());
+        if (UI.skillList) {
+            UI.skillList.addEventListener('click', (event) => this.handleSkillListClick(event));
+        }
         UI.saveProgress.addEventListener('click', () => this.manualSave());
         UI.resetProgress.addEventListener('click', () => this.resetGame());
         if (UI.rebirthButton) {
@@ -1305,6 +1311,207 @@ export class GameUI {
                     : '활성화된 세트 효과가 있습니다.';
             }
         }
+    }
+
+    renderSkills() {
+        if (!UI.skillList || !this.skillTemplate) {
+            return;
+        }
+        UI.skillList.innerHTML = '';
+        this.skillElements.clear();
+        const fragment = document.createDocumentFragment();
+        SKILLS.forEach((skill) => {
+            const instance = this.skillTemplate.content.cloneNode(true);
+            const card = instance.querySelector('.skill-card');
+            if (!card) {
+                return;
+            }
+            card.dataset.skillId = skill.id;
+            const title = instance.querySelector('.skill-card__title');
+            if (title) {
+                title.textContent = skill.name;
+            }
+            const description = instance.querySelector('.skill-card__desc');
+            if (description) {
+                description.textContent = skill.description;
+            }
+            const cooldownHint = instance.querySelector('.skill-card__cooldown-hint');
+            if (cooldownHint) {
+                const seconds = Math.round(Number(skill.cooldown ?? 0) / 1000);
+                cooldownHint.textContent = `쿨타임 ${seconds}초`;
+            }
+            const durationHint = instance.querySelector('.skill-card__duration-hint');
+            if (durationHint) {
+                const rawDuration = Number(skill.duration ?? 0);
+                if (rawDuration > 0) {
+                    const durationSeconds = rawDuration % 1000 === 0
+                        ? (rawDuration / 1000).toFixed(0)
+                        : (rawDuration / 1000).toFixed(1);
+                    durationHint.textContent = `지속 ${durationSeconds}초`;
+                } else {
+                    durationHint.textContent = '즉시 발동';
+                }
+            }
+            const button = instance.querySelector('[data-skill-button]');
+            if (button) {
+                button.dataset.skillId = skill.id;
+                button.setAttribute('aria-pressed', 'false');
+                const label = instance.querySelector('.skill-card__button-label');
+                if (label) {
+                    label.textContent = '발동';
+                } else {
+                    button.textContent = '발동';
+                }
+                const cooldownSeconds = Math.round(Number(skill.cooldown ?? 0) / 1000);
+                button.setAttribute('aria-label', `${skill.name} 발동 (쿨타임 ${cooldownSeconds}초)`);
+            }
+            const status = instance.querySelector('.skill-card__status');
+            if (status) {
+                status.textContent = '즉시 사용 가능';
+                status.id = `skill-status-${skill.id}`;
+            }
+            if (button && status) {
+                button.setAttribute('aria-describedby', status.id);
+            }
+            fragment.appendChild(instance);
+            this.skillElements.set(skill.id, {
+                button,
+                status,
+                cooldownHint,
+                durationHint,
+            });
+        });
+        UI.skillList.appendChild(fragment);
+        this.updateSkillCooldowns();
+    }
+
+    updateSkillCooldowns() {
+        if (this.skillElements.size === 0) {
+            return;
+        }
+        const now = Date.now();
+        SKILLS.forEach((skill) => {
+            const elements = this.skillElements.get(skill.id);
+            if (!elements) return;
+            const { button, status } = elements;
+            const info = this.state.getSkillStatus(skill.id, now);
+            const isActive = info.isActive;
+            const cooldownRemaining = Math.max(0, info.cooldownRemaining);
+            const activeRemaining = Math.max(0, info.activeRemaining);
+            let statusText = '';
+            if (isActive) {
+                const seconds = activeRemaining / 1000;
+                const formatted = seconds >= 1 ? seconds.toFixed(1) : seconds.toFixed(2);
+                statusText =
+                    skill.effectType === SKILL_EFFECT_TYPES.BOSS_TIMER_FREEZE
+                        ? `정지 유지: ${formatted}s`
+                        : `지속 시간: ${formatted}s`;
+                if (button) {
+                    button.disabled = true;
+                    button.setAttribute('aria-pressed', 'true');
+                }
+            } else if (cooldownRemaining > 0) {
+                const seconds = Math.ceil(cooldownRemaining / 1000);
+                statusText = `재사용 대기: ${seconds}s`;
+                if (button) {
+                    button.disabled = true;
+                    button.setAttribute('aria-pressed', 'false');
+                }
+            } else {
+                statusText = '즉시 사용 가능';
+                let canUse = true;
+                if (skill.effectType === SKILL_EFFECT_TYPES.BOSS_TIMER_FREEZE && !this.state.isBossStage()) {
+                    statusText = '보스 전투에서 사용 가능';
+                    canUse = false;
+                }
+                if (button) {
+                    button.disabled = !canUse;
+                    button.setAttribute('aria-pressed', 'false');
+                }
+            }
+            if (status) {
+                status.textContent = statusText;
+            }
+            if (button) {
+                const stateLabel = isActive
+                    ? 'active'
+                    : cooldownRemaining > 0
+                        ? 'cooldown'
+                        : button.disabled
+                            ? 'locked'
+                            : 'ready';
+                button.dataset.skillState = stateLabel;
+            }
+        });
+    }
+
+    handleSkillListClick(event) {
+        const button = event.target.closest('[data-skill-button]');
+        if (!button) {
+            return;
+        }
+        const skillId = button.dataset.skillId;
+        if (!skillId) {
+            return;
+        }
+        const result = this.state.activateSkill(skillId);
+        const skill = result.skill ?? this.skillMap.get(skillId);
+        const skillName = skill?.name ?? '스킬';
+        if (!result.success) {
+            if (result.reason === 'cooldown') {
+                const seconds = Math.ceil((Number(result.remaining ?? 0)) / 1000);
+                this.addLog(`${skillName}은 아직 재사용 대기 중입니다. (${seconds}s)`, 'warning');
+            } else if (result.reason === 'active') {
+                this.addLog(`${skillName}의 효과가 아직 유지되고 있습니다.`, 'warning');
+            } else if (result.reason === 'notBoss') {
+                this.addLog('보스 전투 중에만 사용할 수 있는 스킬입니다.', 'warning');
+            } else {
+                this.addLog('스킬을 지금은 사용할 수 없습니다.', 'warning');
+            }
+            this.updateSkillCooldowns();
+            return;
+        }
+        if (skill) {
+            switch (skill.effectType) {
+                case SKILL_EFFECT_TYPES.DPS_MULTIPLIER: {
+                    const durationSeconds = result.duration > 0 ? (result.duration / 1000).toFixed(1) : '0';
+                    const multiplier = Number(result.effect?.multiplier ?? 1);
+                    this.addLog(
+                        `${skill.name} 발동! ${durationSeconds}초 동안 총 지원 화력이 ${multiplier.toFixed(1)}배가 됩니다!`,
+                        'success',
+                    );
+                    break;
+                }
+                case SKILL_EFFECT_TYPES.BOSS_TIMER_FREEZE: {
+                    const freezeSeconds = result.effect?.freezeDuration
+                        ? (result.effect.freezeDuration / 1000).toFixed(1)
+                        : '0';
+                    this.addLog(
+                        `${skill.name} 발동! 보스 제한시간이 ${freezeSeconds}초 동안 정지합니다.`,
+                        'info',
+                    );
+                    break;
+                }
+                case SKILL_EFFECT_TYPES.INSTANT_GOLD: {
+                    const goldGain = Number(result.effect?.goldGain ?? 0);
+                    if (goldGain > 0) {
+                        this.addLog(
+                            `${skill.name} 발동! ${formatNumber(goldGain)} 골드를 즉시 확보했습니다!`,
+                            'success',
+                        );
+                    } else {
+                        this.addLog(`${skill.name} 발동! 추가 골드를 확보하지 못했습니다.`, 'info');
+                    }
+                    break;
+                }
+                default:
+                    this.addLog(`${skill.name} 발동!`, 'success');
+            }
+        }
+        this.updateSkillCooldowns();
+        this.updateStats();
+        this.updateBossTimerUI();
+        saveGame(this.state);
     }
 
     handleHeroListClick(event) {
@@ -3224,41 +3431,29 @@ export class GameUI {
         this.updateRebirthUI();
     }
 
-    updateFrenzyUI() {
-        const now = Date.now();
-        const remainingCooldown = Math.max(0, this.state.frenzyCooldown - now);
-        if (this.state.isFrenzyActive) {
-            const secondsLeft = ((this.state.frenzyActiveUntil - now) / 1000).toFixed(1);
-            UI.skillCooldown.textContent = `전술 지원 지속: ${secondsLeft}s`;
-            UI.skillFrenzy.disabled = true;
-        } else if (remainingCooldown > 0) {
-            const seconds = Math.ceil(remainingCooldown / 1000);
-            UI.skillCooldown.textContent = `재가동까지: ${seconds}s`;
-            UI.skillFrenzy.disabled = true;
-        } else {
-            UI.skillCooldown.textContent = '지원 가능';
-            UI.skillFrenzy.disabled = false;
-        }
-    }
-
     updateBossTimerUI() {
         if (!UI.bossTimer) return;
-        if (!this.state.isBossStage()) {
+        const info = this.state.getBossTimerInfo();
+        if (!info.isBossStage) {
             UI.bossTimer.textContent = '';
             UI.bossTimer.classList.remove('boss-timer--visible', 'boss-timer--warning');
             return;
         }
         UI.bossTimer.classList.add('boss-timer--visible');
-        const deadline = this.state.bossDeadline;
-        if (!deadline) {
+        if (!info.hasDeadline) {
             UI.bossTimer.textContent = '보스 제한시간 준비 중...';
             UI.bossTimer.classList.remove('boss-timer--warning');
             return;
         }
-        const remaining = Math.max(0, deadline - Date.now());
-        const seconds = (remaining / 1000).toFixed(1);
-        UI.bossTimer.textContent = `보스 제한시간: ${seconds}s`;
-        if (remaining <= BOSS_WARNING_THRESHOLD) {
+        if (info.isFrozen) {
+            const frozenText = formatCountdown(info.remaining);
+            UI.bossTimer.textContent = `보스 제한시간: 정지 중 (${frozenText})`;
+            UI.bossTimer.classList.remove('boss-timer--warning');
+            return;
+        }
+        const countdownText = formatCountdown(info.remaining);
+        UI.bossTimer.textContent = `보스 제한시간: ${countdownText}`;
+        if (info.remaining <= BOSS_WARNING_THRESHOLD) {
             UI.bossTimer.classList.add('boss-timer--warning');
         } else {
             UI.bossTimer.classList.remove('boss-timer--warning');
@@ -3283,12 +3478,12 @@ export class GameUI {
 
     updateUI() {
         this.updateStats();
+        this.updateSkillCooldowns();
         this.updateMissionUI();
         this.updateGachaUI();
         this.updateHeroes();
         this.updateHeroSetBonuses();
         this.updateEnemy();
-        this.updateFrenzyUI();
         this.updateBossTimerUI();
         this.updateBossControls();
     }
@@ -3726,7 +3921,7 @@ export class GameUI {
     startLoops() {
         this.damageLoop = setInterval(() => this.applyDps(), 250);
         this.saveLoop = setInterval(() => this.autoSave(), 10000);
-        this.frenzyLoop = setInterval(() => this.updateFrenzyUI(), 200);
+        this.skillLoop = setInterval(() => this.updateSkillCooldowns(), 200);
         this.bossTimerLoop = setInterval(() => this.handleBossTimerTick(), 100);
         this.handleBossTimerTick();
         this.pollMissionResets();
@@ -3746,31 +3941,12 @@ export class GameUI {
         }
         this.updateEnemy();
         this.updateStats();
+        this.updateSkillCooldowns();
         this.updateGachaUI();
         this.updateHeroes();
         this.updateBossTimerUI();
         this.updateBossControls();
         this.updateMissionCountdowns();
-    }
-
-    useFrenzy() {
-        const now = Date.now();
-        if (this.state.frenzyCooldown > now || this.state.isFrenzyActive) {
-            this.addLog('아로나의 전술 지원은 아직 준비되지 않았습니다.', 'warning');
-            return;
-        }
-        const baseDuration = 15000; // 15초 기본 지속
-        const cooldown = 60000; // 60초 쿨타임
-        const duration = Math.floor(baseDuration * (1 + this.state.skillBonus));
-        const multiplier = this.state.frenzyMultiplier;
-        this.state.frenzyActiveUntil = now + duration;
-        this.state.frenzyCooldown = now + cooldown;
-        this.addLog(
-            `아로나의 전술 지원 발동! ${(duration / 1000).toFixed(1)}초 동안 DPS가 ${multiplier.toFixed(1)}배입니다!`,
-            'success',
-        );
-        this.updateFrenzyUI();
-        this.updateStats();
     }
 
     autoSave() {
