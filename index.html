@@ -34,6 +34,10 @@
                                 <dd class="overview-stat__value"><span id="upgradeMaterials">0</span></dd>
                             </div>
                             <div class="overview-stat">
+                                <dt class="overview-stat__label">스킬 모듈</dt>
+                                <dd class="overview-stat__value"><span id="skillModules">0</span></dd>
+                            </div>
+                            <div class="overview-stat">
                                 <dt class="overview-stat__label">모집권</dt>
                                 <dd class="overview-stat__value"><span id="gachaTokensHeader">0</span></dd>
                             </div>
@@ -633,6 +637,11 @@
                 <div class="skill-card__meta">
                     <span class="skill-card__cooldown-hint"></span>
                     <span class="skill-card__duration-hint"></span>
+                    <span class="skill-card__effect-hint"></span>
+                </div>
+                <div class="skill-card__level-info">
+                    <span class="skill-card__level"></span>
+                    <span class="skill-card__next-hint"></span>
                 </div>
             </div>
             <div class="skill-card__actions">
@@ -644,6 +653,16 @@
                 >
                     <span class="skill-card__button-label">발동</span>
                 </button>
+                <div class="skill-card__upgrade">
+                    <button
+                        type="button"
+                        class="btn btn-ghost skill-card__upgrade-button"
+                        data-skill-upgrade
+                    >
+                        강화
+                    </button>
+                    <span class="skill-card__upgrade-cost"></span>
+                </div>
                 <p class="skill-card__status" aria-live="polite"></p>
             </div>
         </li>

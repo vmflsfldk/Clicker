@@ -29,6 +29,7 @@ const UI = {
     stage: document.getElementById('stage'),
     gold: document.getElementById('gold'),
     upgradeMaterials: document.getElementById('upgradeMaterials'),
+    skillModules: document.getElementById('skillModules'),
     gachaTokensHeader: document.getElementById('gachaTokensHeader'),
     clickDamage: document.getElementById('clickDamage'),
     totalDps: document.getElementById('totalDps'),
@@ -1343,21 +1344,15 @@ export class GameUI {
             }
             const cooldownHint = instance.querySelector('.skill-card__cooldown-hint');
             if (cooldownHint) {
-                const seconds = Math.round(Number(skill.cooldown ?? 0) / 1000);
-                cooldownHint.textContent = `쿨타임 ${seconds}초`;
+                cooldownHint.textContent = '';
             }
             const durationHint = instance.querySelector('.skill-card__duration-hint');
             if (durationHint) {
-                const rawDuration = Number(skill.duration ?? 0);
-                if (rawDuration > 0) {
-                    const durationSeconds = rawDuration % 1000 === 0
-                        ? (rawDuration / 1000).toFixed(0)
-                        : (rawDuration / 1000).toFixed(1);
-                    durationHint.textContent = `지속 ${durationSeconds}초`;
-                } else {
-                    durationHint.textContent = '즉시 발동';
-                }
+                durationHint.textContent = '';
             }
+            const effectHint = instance.querySelector('.skill-card__effect-hint');
+            const levelLabel = instance.querySelector('.skill-card__level');
+            const nextHint = instance.querySelector('.skill-card__next-hint');
             const button = instance.querySelector('[data-skill-button]');
             if (button) {
                 button.dataset.skillId = skill.id;
@@ -1368,8 +1363,7 @@ export class GameUI {
                 } else {
                     button.textContent = '발동';
                 }
-                const cooldownSeconds = Math.round(Number(skill.cooldown ?? 0) / 1000);
-                button.setAttribute('aria-label', `${skill.name} 발동 (쿨타임 ${cooldownSeconds}초)`);
+                button.setAttribute('aria-label', `${skill.name} 발동`);
             }
             const status = instance.querySelector('.skill-card__status');
             if (status) {
@@ -1379,16 +1373,58 @@ export class GameUI {
             if (button && status) {
                 button.setAttribute('aria-describedby', status.id);
             }
+            const upgradeButton = instance.querySelector('[data-skill-upgrade]');
+            if (upgradeButton) {
+                upgradeButton.dataset.skillId = skill.id;
+            }
+            const upgradeCost = instance.querySelector('.skill-card__upgrade-cost');
             fragment.appendChild(instance);
             this.skillElements.set(skill.id, {
                 button,
                 status,
                 cooldownHint,
                 durationHint,
+                effectHint,
+                levelLabel,
+                nextHint,
+                upgradeButton,
+                upgradeCost,
             });
         });
         UI.skillList.appendChild(fragment);
         this.updateSkillCooldowns();
+    }
+
+    describeSkillEffect(skill, computed) {
+        if (!skill) {
+            return '효과 정보 없음';
+        }
+        const data = computed ?? this.state.getSkillComputedValues(skill.id);
+        if (!data) {
+            return '효과 정보 없음';
+        }
+        switch (skill.effectType) {
+            case SKILL_EFFECT_TYPES.DPS_MULTIPLIER: {
+                const multiplier = Math.max(1, Number(data.effectValue ?? skill.effectValue ?? 1));
+                const formatted = multiplier >= 10 ? multiplier.toFixed(0) : multiplier.toFixed(1);
+                return `총 지원 화력 ${formatted}배`;
+            }
+            case SKILL_EFFECT_TYPES.BOSS_TIMER_FREEZE: {
+                const seconds = Math.max(0, Number(data.duration ?? skill.duration ?? 0) / 1000);
+                const formatted = seconds >= 1
+                    ? Number.isInteger(seconds)
+                        ? seconds.toFixed(0)
+                        : seconds.toFixed(1)
+                    : seconds.toFixed(2);
+                return `제한 시간 정지 ${formatted}초`;
+            }
+            case SKILL_EFFECT_TYPES.INSTANT_GOLD: {
+                const ratio = Math.max(0, Number(data.effectValue ?? skill.effectValue ?? 0)) * 0.25;
+                return `즉시 골드 ${formatPercent(ratio)}`;
+            }
+            default:
+                return '효과 정보 없음';
+        }
     }
 
     updateSkillCooldowns() {
@@ -1399,11 +1435,90 @@ export class GameUI {
         SKILLS.forEach((skill) => {
             const elements = this.skillElements.get(skill.id);
             if (!elements) return;
-            const { button, status } = elements;
+            const {
+                button,
+                status,
+                cooldownHint,
+                durationHint,
+                effectHint,
+                levelLabel,
+                nextHint,
+                upgradeButton,
+                upgradeCost,
+            } = elements;
             const info = this.state.getSkillStatus(skill.id, now);
             const isActive = info.isActive;
             const cooldownRemaining = Math.max(0, info.cooldownRemaining);
             const activeRemaining = Math.max(0, info.activeRemaining);
+            const computed = this.state.getSkillComputedValues(skill.id);
+            if (button && computed) {
+                const cooldownSeconds = Math.max(0, Math.round(computed.cooldown / 1000));
+                button.setAttribute('aria-label', `${skill.name} 발동 (쿨타임 ${cooldownSeconds}초)`);
+            }
+            if (cooldownHint && computed) {
+                const cooldownSeconds = Math.max(0, Math.round(computed.cooldown / 1000));
+                cooldownHint.textContent = `쿨타임 ${cooldownSeconds}초`;
+            }
+            if (durationHint && computed) {
+                if (computed.duration > 0) {
+                    const seconds = computed.duration / 1000;
+                    const formatted = seconds >= 1
+                        ? Number.isInteger(seconds)
+                            ? seconds.toFixed(0)
+                            : seconds.toFixed(1)
+                        : seconds.toFixed(2);
+                    durationHint.textContent = `지속 ${formatted}초`;
+                } else {
+                    durationHint.textContent = '즉시 발동';
+                }
+            }
+            if (effectHint) {
+                effectHint.textContent = this.describeSkillEffect(skill, computed);
+            }
+            if (levelLabel && computed) {
+                levelLabel.textContent = `Lv.${computed.level}/${computed.maxLevel}`;
+            }
+            if (nextHint && computed) {
+                if (computed.level >= computed.maxLevel) {
+                    nextHint.textContent = '최대 레벨';
+                } else {
+                    const nextComputed = this.state.getSkillComputedValues(skill.id, {
+                        level: computed.level + 1,
+                    });
+                    const nextText = this.describeSkillEffect(skill, nextComputed);
+                    nextHint.textContent = nextText ? `다음: ${nextText}` : '다음 효과 정보 없음';
+                }
+            }
+            if (upgradeButton || upgradeCost) {
+                const cost = this.state.getSkillUpgradeCost(skill.id);
+                const isMaxed = computed ? computed.level >= computed.maxLevel : false;
+                if (upgradeButton) {
+                    if (isMaxed) {
+                        upgradeButton.disabled = true;
+                        upgradeButton.textContent = '최대 레벨';
+                        upgradeButton.setAttribute('aria-label', `${skill.name} 최대 레벨`);
+                    } else {
+                        const canUpgrade = cost === null || cost <= this.state.skillModules;
+                        upgradeButton.disabled = !canUpgrade;
+                        upgradeButton.textContent = '강화';
+                        const costText = cost !== null ? formatNumber(cost) : '0';
+                        upgradeButton.setAttribute(
+                            'aria-label',
+                            `${skill.name} 강화 (필요 ${costText} 모듈)`,
+                        );
+                    }
+                }
+                if (upgradeCost) {
+                    if (isMaxed) {
+                        upgradeCost.textContent = '강화 완료';
+                    } else {
+                        const costValue = cost !== null ? cost : 0;
+                        upgradeCost.textContent = `필요: ${formatNumber(costValue)} 모듈 · 보유 ${formatNumber(
+                            this.state.skillModules,
+                        )}`;
+                    }
+                }
+            }
             let statusText = '';
             if (isActive) {
                 const seconds = activeRemaining / 1000;
@@ -1452,6 +1567,35 @@ export class GameUI {
     }
 
     handleSkillListClick(event) {
+        const upgradeButton = event.target.closest('[data-skill-upgrade]');
+        if (upgradeButton) {
+            const skillId = upgradeButton.dataset.skillId;
+            if (!skillId) {
+                return;
+            }
+            const result = this.state.upgradeSkill(skillId);
+            const skill = result.skill ?? this.skillMap.get(skillId);
+            const skillName = skill?.name ?? '스킬';
+            if (!result.success) {
+                if (result.reason === 'max') {
+                    this.addLog(`${skillName}은 이미 최대 레벨입니다.`, 'info');
+                } else if (result.reason === 'resource') {
+                    const costText = formatNumber(Number(result.cost ?? 0));
+                    this.addLog(`스킬 모듈이 부족합니다. (${costText} 필요)`, 'warning');
+                } else {
+                    this.addLog('스킬을 지금은 강화할 수 없습니다.', 'warning');
+                }
+                this.updateSkillCooldowns();
+                return;
+            }
+            const levelText = `Lv.${result.level}/${result.maxLevel}`;
+            const costText = formatNumber(Number(result.cost ?? 0));
+            this.addLog(`${skillName} 강화 완료! (${levelText}, 소모 ${costText} 모듈)`, 'success');
+            this.updateSkillCooldowns();
+            this.updateStats();
+            saveGame(this.state);
+            return;
+        }
         const button = event.target.closest('[data-skill-button]');
         if (!button) {
             return;
@@ -3348,6 +3492,9 @@ export class GameUI {
         UI.gold.textContent = formatNumber(this.state.gold);
         if (UI.upgradeMaterials) {
             UI.upgradeMaterials.textContent = formatNumber(this.state.upgradeMaterials);
+        }
+        if (UI.skillModules) {
+            UI.skillModules.textContent = formatNumber(this.state.skillModules);
         }
         if (UI.clickDamage) {
             UI.clickDamage.textContent = formatNumber(this.state.expectedClickDamage);
