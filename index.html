@@ -403,10 +403,63 @@
                                 </div>
                                 <button id="rebirthButton" class="btn btn-rebirth" disabled>환생하기</button>
                                 <p id="rebirthRequirement" class="rebirth__requirement">100층을 돌파하면 환생할 수 있습니다.</p>
-                                <div class="rebirth__skills">
-                                    <h3 class="rebirth__subheading">환생 스킬</h3>
-                                    <ul id="rebirthSkillList" class="rebirth-skill-list"></ul>
+                                <div class="rebirth__currencies">
+                                    <div class="rebirth__stat rebirth__stat--currency">
+                                        <span class="rebirth__label">환생 코어</span>
+                                        <strong id="rebirthCores">0</strong>
+                                    </div>
+                                    <button
+                                        id="rebirthRespecButton"
+                                        class="btn btn-ghost rebirth__respec"
+                                        type="button"
+                                    >
+                                        트리 재분배
+                                    </button>
                                 </div>
+                                <div class="rebirth-tree" id="rebirthTree">
+                                    <svg
+                                        id="rebirthTreeConnections"
+                                        class="rebirth-tree__connections"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        aria-hidden="true"
+                                    ></svg>
+                                    <div id="rebirthTreeNodes" class="rebirth-tree__nodes" role="list"></div>
+                                </div>
+                                <section class="rebirth-detail" id="rebirthDetail" aria-live="polite">
+                                    <header class="rebirth-detail__header">
+                                        <h3 id="rebirthDetailTitle" class="rebirth-detail__title">노드를 선택하세요</h3>
+                                        <span id="rebirthDetailBranch" class="rebirth-detail__branch"></span>
+                                    </header>
+                                    <p id="rebirthDetailDescription" class="rebirth-detail__description"></p>
+                                    <dl class="rebirth-detail__stats">
+                                        <div class="rebirth-detail__stat">
+                                            <dt>현재 효과</dt>
+                                            <dd id="rebirthDetailCurrent">-</dd>
+                                        </div>
+                                        <div class="rebirth-detail__stat">
+                                            <dt>다음 레벨</dt>
+                                            <dd id="rebirthDetailNext">-</dd>
+                                        </div>
+                                        <div class="rebirth-detail__stat">
+                                            <dt>필요 포인트</dt>
+                                            <dd id="rebirthDetailCost">-</dd>
+                                        </div>
+                                    </dl>
+                                    <p id="rebirthDetailStatus" class="rebirth-detail__status"></p>
+                                    <div class="rebirth-detail__branch-info">
+                                        <h4 id="rebirthBranchTitle" class="rebirth-detail__branch-title"></h4>
+                                        <p id="rebirthBranchDescription" class="rebirth-detail__branch-desc"></p>
+                                        <p id="rebirthBranchTotals" class="rebirth-detail__branch-totals"></p>
+                                    </div>
+                                    <button
+                                        id="rebirthDetailUpgrade"
+                                        class="btn btn-secondary rebirth-detail__action"
+                                        type="button"
+                                        disabled
+                                    >
+                                        강화
+                                    </button>
+                                </section>
                             </div>
                         </section>
                     </div>

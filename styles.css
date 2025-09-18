@@ -1010,76 +1010,251 @@ h1,
     color: var(--success-color);
 }
 
-.rebirth__skills {
+.rebirth__currencies {
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.rebirth__subheading {
-    font-size: 1.1rem;
-    color: #e2e8f0;
-}
-
-.rebirth-skill-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0.9rem;
-}
-
-.rebirth-skill {
-    background: rgba(30, 41, 59, 0.9);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 16px;
-    padding: 1rem 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-}
-
-.rebirth-skill__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.5rem;
-}
-
-.rebirth-skill__name {
-    font-size: 1.1rem;
-}
-
-.rebirth-skill__level {
-    font-size: 0.95rem;
-    color: var(--subtext-color);
-}
-
-.rebirth-skill__desc {
-    font-size: 0.9rem;
-    color: var(--subtext-color);
-    line-height: 1.4;
-}
-
-.rebirth-skill__bonus {
-    font-size: 0.9rem;
-    color: rgba(226, 232, 240, 0.9);
-}
-
-.rebirth-skill__actions {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 0.75rem;
+    justify-content: space-between;
+    gap: 1rem;
     flex-wrap: wrap;
+    margin-top: 0.75rem;
 }
 
-.rebirth-skill__total {
-    font-size: 0.9rem;
+.rebirth__stat--currency strong {
+    color: var(--accent-color);
+}
+
+.rebirth__respec {
+    padding: 0.5rem 0.9rem;
+    border-radius: 9999px;
+}
+
+.rebirth-tree {
+    position: relative;
+    margin-top: 1.25rem;
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.75), rgba(15, 23, 42, 0.9));
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 1.5rem;
+    min-height: 320px;
+    box-shadow: inset 0 0 30px rgba(15, 23, 42, 0.35);
+}
+
+.rebirth-tree__connections {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.rebirth-tree__nodes {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.rebirth-tree__connections line {
+    stroke: rgba(148, 163, 184, 0.35);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    transition: stroke 0.2s ease, stroke-width 0.2s ease;
+}
+
+.rebirth-tree__connections line[data-active='true'] {
+    stroke-width: 3.2;
+}
+
+.rebirth-node {
+    --branch-color: rgba(59, 130, 246, 0.55);
+    --rebirth-node-offset-x: -50%;
+    --rebirth-node-offset-y: 0;
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 150px;
+    max-width: 180px;
+    padding: 0.9rem 1rem;
+    border-radius: 16px;
+    border: 1px solid var(--branch-color);
+    background: rgba(15, 23, 42, 0.82);
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.45);
+    text-align: left;
+    transform: translate(var(--rebirth-node-offset-x), var(--rebirth-node-offset-y));
+}
+
+.rebirth-node[data-branch='assault'] {
+    --branch-color: rgba(248, 113, 113, 0.65);
+}
+
+.rebirth-node[data-branch='supply'] {
+    --branch-color: rgba(251, 191, 36, 0.65);
+}
+
+.rebirth-node[data-branch='drop'] {
+    --branch-color: rgba(96, 165, 250, 0.65);
+}
+
+.rebirth-node[data-branch='core'] {
+    --branch-color: rgba(148, 163, 184, 0.55);
+}
+
+.rebirth-node:hover,
+.rebirth-node:focus {
+    outline: none;
+    transform: translate(var(--rebirth-node-offset-x), calc(var(--rebirth-node-offset-y) - 2px));
+    box-shadow: 0 15px 40px rgba(15, 23, 42, 0.6), 0 0 0 2px rgba(148, 163, 184, 0.25);
+}
+
+.rebirth-node[data-selected='true'] {
+    box-shadow: 0 18px 45px rgba(14, 116, 144, 0.35), 0 0 0 2px rgba(248, 250, 252, 0.25);
+    transform: translate(var(--rebirth-node-offset-x), calc(var(--rebirth-node-offset-y) - 3px));
+}
+
+.rebirth-node[data-state='locked'] {
+    opacity: 0.45;
+    border-color: rgba(148, 163, 184, 0.25);
+    cursor: not-allowed;
+}
+
+.rebirth-node[data-state='blocked'] {
+    opacity: 0.75;
+    border-color: rgba(148, 163, 184, 0.35);
+}
+
+.rebirth-node[data-state='maxed'] {
+    border-color: rgba(34, 197, 94, 0.75);
+}
+
+.rebirth-node[data-state='available'] {
+    box-shadow: 0 20px 40px rgba(234, 179, 8, 0.25), 0 0 0 1px rgba(250, 204, 21, 0.5);
+}
+
+.rebirth-tree[data-branch-focus] .rebirth-node[data-branch] {
+    opacity: 0.55;
+}
+
+.rebirth-tree[data-branch-focus='assault'] .rebirth-node[data-branch='assault'],
+.rebirth-tree[data-branch-focus='supply'] .rebirth-node[data-branch='supply'],
+.rebirth-tree[data-branch-focus='drop'] .rebirth-node[data-branch='drop'],
+.rebirth-tree .rebirth-node[data-branch='core'] {
+    opacity: 1;
+}
+
+.rebirth-node__name {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.rebirth-node__level {
+    font-size: 0.85rem;
+    color: rgba(226, 232, 240, 0.75);
+}
+
+.rebirth-node__effect {
+    font-size: 0.85rem;
+    color: rgba(226, 232, 240, 0.9);
+    line-height: 1.35;
+}
+
+.rebirth-node__cost {
+    font-size: 0.8rem;
     color: var(--gold-color);
 }
 
-.rebirth-skill__button {
-    min-width: 120px;
+.rebirth-detail {
+    margin-top: 1.5rem;
+    background: rgba(15, 23, 42, 0.82);
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.rebirth-detail__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.rebirth-detail__title {
+    font-size: 1.25rem;
+}
+
+.rebirth-detail__branch {
+    font-size: 0.85rem;
+    color: rgba(148, 163, 184, 0.9);
+}
+
+.rebirth-detail__description {
+    font-size: 0.9rem;
+    color: rgba(226, 232, 240, 0.85);
+    line-height: 1.5;
+}
+
+.rebirth-detail__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+}
+
+.rebirth-detail__stat {
+    background: rgba(30, 41, 59, 0.7);
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.rebirth-detail__stat dt {
+    font-size: 0.8rem;
+    color: rgba(148, 163, 184, 0.9);
+}
+
+.rebirth-detail__stat dd {
+    font-size: 0.95rem;
+    color: #e2e8f0;
+}
+
+.rebirth-detail__status {
+    font-size: 0.85rem;
+    color: var(--subtext-color);
+    min-height: 1em;
+}
+
+.rebirth-detail__branch-info {
+    background: rgba(30, 64, 175, 0.15);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.rebirth-detail__branch-title {
+    font-size: 0.95rem;
+    color: rgba(191, 219, 254, 0.95);
+}
+
+.rebirth-detail__branch-desc,
+.rebirth-detail__branch-totals {
+    font-size: 0.85rem;
+    color: rgba(191, 219, 254, 0.85);
+    line-height: 1.4;
+}
+
+.rebirth-detail__action {
+    align-self: flex-end;
+    min-width: 140px;
 }
 
 .btn-rebirth {
@@ -1096,7 +1271,8 @@ h1,
     box-shadow: none;
 }
 
-#rebirthPanel[data-unlocked='false'] .rebirth__skills {
+#rebirthPanel[data-unlocked='false'] .rebirth-tree,
+#rebirthPanel[data-unlocked='false'] .rebirth-detail {
     opacity: 0.65;
 }
 
