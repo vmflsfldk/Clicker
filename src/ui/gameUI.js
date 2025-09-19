@@ -4235,7 +4235,7 @@ export class GameUI {
 
     handleEnemyDefeat() {
         const previousBest = this.state.currentRunHighestStage;
-        const { reward, drop, gacha, defeatedStage, bond } = this.state.goNextEnemy();
+        const { reward, drop, gacha, defeatedStage, bond, skillModules } = this.state.goNextEnemy();
         this.addLog(`스테이지 ${defeatedStage}의 적을 처치하고 ${formatNumber(reward)} 골드를 획득했습니다!`);
         if (drop) {
             this.handleEquipmentDrop(drop);
@@ -4252,6 +4252,13 @@ export class GameUI {
         }
         if (bond) {
             this.processBondGainResult(bond, { reason: 'stage', stage: defeatedStage });
+        }
+        if (skillModules?.amount) {
+            const amountText = formatNumber(skillModules.amount);
+            this.addLog(
+                `보스 제압 보상으로 스킬 모듈 ${amountText}개를 확보했습니다!`,
+                'success',
+            );
         }
         if (this.state.isBossStage()) {
             this.addLog(

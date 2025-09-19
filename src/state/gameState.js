@@ -78,6 +78,8 @@ const BOND_NEW_HERO_GAIN = 20;
 const BOND_MISSION_SALVAGE_GAIN = 1;
 const BOND_MISSION_REBIRTH_GAIN = 15;
 
+const SKILL_MODULE_BOSS_REWARD = 1;
+
 const clampEquipmentValue = (value, effectId = null) => {
     const effect = effectId ? EQUIPMENT_EFFECT_MAP.get(effectId) : null;
     const cap = effect?.maxValue ?? EQUIPMENT_MAX_VALUE;
@@ -2163,6 +2165,23 @@ export class GameState {
         return this.grantBondToUnlocked(amount, { reason: 'stage', stage });
     }
 
+    grantSkillModulesForStage(stage) {
+        if (!this.isBossStage(stage)) {
+            return null;
+        }
+        const reward = Math.max(0, Math.floor(SKILL_MODULE_BOSS_REWARD));
+        if (reward <= 0) {
+            return null;
+        }
+        this.skillModules += reward;
+        this.lastSave = Date.now();
+        return {
+            amount: reward,
+            stage,
+            reason: 'boss',
+        };
+    }
+
     grantBondForMission(trigger, amount = 1) {
         const normalizedAmount = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
         let perHero = 0;
@@ -2347,6 +2366,7 @@ export class GameState {
         const drop = this.tryDropEquipment(defeatedStage);
         const gacha = this.tryDropGachaToken(defeatedStage);
         const bond = this.grantBondForStage(defeatedStage);
+        const skillModules = this.grantSkillModulesForStage(defeatedStage);
         this.highestStage = Math.max(this.highestStage, defeatedStage);
         this.currentRunHighestStage = Math.max(this.currentRunHighestStage, defeatedStage);
         if (this.pendingBossEntry) {
@@ -2361,7 +2381,7 @@ export class GameState {
             }
         }
         this.resolveBossTimerFreeze(Date.now(), { force: !this.isBossStage() });
-        return { reward, drop, gacha, defeatedStage, bond };
+        return { reward, drop, gacha, defeatedStage, bond, skillModules };
     }
 
     reset() {
