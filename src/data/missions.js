@@ -37,10 +37,10 @@ const BASE_MISSION_GROUPS = [
             {
                 id: 'gacha_30',
                 name: '모집 전문가',
-                description: '학생 모집을 30회 진행하세요.',
+                description: '학생 모집을 20회 진행하세요.',
                 trigger: 'gachaRoll',
-                goal: 30,
-                reward: { type: 'gold', amount: 1200 },
+                goal: 20,
+                reward: { type: 'gachaTokens', amount: 2 },
             },
             {
                 id: 'salvage_20',
