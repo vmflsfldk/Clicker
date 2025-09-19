@@ -149,8 +149,45 @@ const GOLD_GAIN_UPGRADE_CONFIG = {
 
 const STAGE_REWARD_CONFIG = {
     base: 12,
-    growth: 1.1,
-    bossMultiplier: 5,
+    growth: 1.135,
+    stageBands: [
+        { start: 50, growth: 1.145 },
+        { start: 100, growth: 1.158 },
+        { start: 150, growth: 1.17 },
+    ],
+    bossMultiplier: 5.5,
+};
+
+const STAGE_REWARD_GROWTH_BANDS = Array.isArray(STAGE_REWARD_CONFIG.stageBands)
+    ? STAGE_REWARD_CONFIG.stageBands
+          .map((band) => {
+              const numericStart = Number(band?.start);
+              const numericGrowth = Number(band?.growth);
+              if (!Number.isFinite(numericStart) || !Number.isFinite(numericGrowth)) {
+                  return null;
+              }
+              return {
+                  start: Math.max(2, Math.floor(numericStart)),
+                  growth: Math.max(1, numericGrowth),
+              };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.start - b.start)
+    : [];
+
+const getStageRewardGrowthForLevel = (stage) => {
+    let growth = Number.isFinite(STAGE_REWARD_CONFIG.growth)
+        ? Math.max(1, STAGE_REWARD_CONFIG.growth)
+        : 1;
+    for (let index = 0; index < STAGE_REWARD_GROWTH_BANDS.length; index += 1) {
+        const band = STAGE_REWARD_GROWTH_BANDS[index];
+        if (stage >= band.start) {
+            growth = band.growth;
+            continue;
+        }
+        break;
+    }
+    return growth;
 };
 
 const normalizeLevel = (level) => {
@@ -184,8 +221,15 @@ const calculateClickDamageAtLevel = (level) => {
 
 const calculateStageRewardValue = (stage) => {
     const normalized = Number.isFinite(stage) ? Math.max(1, Math.floor(stage)) : 1;
-    const exponent = Math.max(0, normalized - 1);
-    return STAGE_REWARD_CONFIG.base * Math.pow(STAGE_REWARD_CONFIG.growth, exponent);
+    if (normalized === 1) {
+        return STAGE_REWARD_CONFIG.base;
+    }
+    let reward = STAGE_REWARD_CONFIG.base;
+    for (let level = 2; level <= normalized; level += 1) {
+        const growth = getStageRewardGrowthForLevel(level);
+        reward *= growth;
+    }
+    return reward;
 };
 
 const calculateStageReward = (stage, isBoss, goldBonus = 0) => {
