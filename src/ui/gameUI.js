@@ -1623,6 +1623,7 @@ export class GameUI {
             const levelText = `Lv.${result.level}/${result.maxLevel}`;
             const costText = formatNumber(Number(result.cost ?? 0));
             this.addLog(`${skillName} 강화 완료! (${levelText}, 소모 ${costText} 모듈)`, 'success');
+            this.handleMissionProgress('skillUpgrade', 1);
             this.updateSkillCooldowns();
             this.updateStats();
             saveGame(this.state);
@@ -1693,6 +1694,7 @@ export class GameUI {
         this.updateSkillCooldowns();
         this.updateStats();
         this.updateBossTimerUI();
+        this.handleMissionProgress('skillUse', 1);
         saveGame(this.state);
     }
 
@@ -1774,6 +1776,7 @@ export class GameUI {
         if (!hero) return;
         const rewardText = result.reward?.description ?? '추가 보너스 적용';
         this.addLog(`${hero.name} 호감도 Lv. ${result.level} 달성! ${rewardText}`, 'success');
+        this.handleMissionProgress('bondLevelUp', 1);
         this.updateHero(hero);
         this.updateStats();
         saveGame(this.state);
@@ -3285,7 +3288,14 @@ export class GameUI {
         ];
 
         orderedTypes.forEach((type) => {
-            const missionsForType = MISSIONS.filter((mission) => mission.type === type);
+            const missionsForType = MISSIONS.filter((mission) => mission.type === type).sort((a, b) => {
+                const goalA = Number.isFinite(a.goal) ? a.goal : Number.MAX_SAFE_INTEGER;
+                const goalB = Number.isFinite(b.goal) ? b.goal : Number.MAX_SAFE_INTEGER;
+                if (goalA !== goalB) {
+                    return goalA - goalB;
+                }
+                return (a.name ?? '').localeCompare(b.name ?? '', 'ko-KR');
+            });
             if (missionsForType.length === 0) {
                 return;
             }
@@ -3472,6 +3482,12 @@ export class GameUI {
                 return `모집권 ${amountText}개`;
             case 'rebirthPoints':
                 return `환생 포인트 ${amountText}P`;
+            case 'skillModules':
+                return `스킬 모듈 ${amountText}개`;
+            case 'upgradeMaterials':
+                return `강화 재료 ${amountText}개`;
+            case 'bondAll':
+                return `호감도 ${amountText}pt (전체)`;
             default:
                 return '알 수 없는 보상';
         }
@@ -3663,6 +3679,7 @@ export class GameUI {
                 `${prefix}${result.item.name} 강화 성공! Lv. ${previousLevel} → ${result.item.level}, ${label} ${previousValueText} → ${newValueText}${summaryText}`,
                 'success',
             );
+            this.handleMissionProgress('equipmentUpgrade', 1);
             if (result.materialsSpent > 0) {
                 const spentText = formatNumber(result.materialsSpent);
                 const remainingText = formatNumber(this.state.upgradeMaterials);
@@ -4269,6 +4286,7 @@ export class GameUI {
         if (previousBest < REBIRTH_STAGE_REQUIREMENT && defeatedStage >= REBIRTH_STAGE_REQUIREMENT) {
             this.addLog('환생의 기운이 깨어났습니다! 환생 메뉴에서 포인트를 획득하세요.', 'success');
         }
+        this.handleMissionProgress('stageClear', defeatedStage);
         this.handleMissionProgress('enemyDefeat', 1);
     }
 

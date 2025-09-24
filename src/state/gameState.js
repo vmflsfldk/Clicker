@@ -77,6 +77,10 @@ const BOND_DUPLICATE_GAIN_PER_LEVEL = 12;
 const BOND_NEW_HERO_GAIN = 20;
 const BOND_MISSION_SALVAGE_GAIN = 1;
 const BOND_MISSION_REBIRTH_GAIN = 15;
+const BOND_MISSION_SKILL_USE_GAIN = 1;
+const BOND_MISSION_SKILL_UPGRADE_GAIN = 3;
+const BOND_MISSION_EQUIPMENT_UPGRADE_GAIN = 2;
+const BOND_MISSION_BOND_LEVEL_GAIN = 6;
 
 const SKILL_MODULE_BOSS_REWARD = 1;
 
@@ -2236,6 +2240,18 @@ export class GameState {
             case 'rebirth':
                 perHero = normalizedAmount * BOND_MISSION_REBIRTH_GAIN;
                 break;
+            case 'skillUse':
+                perHero = normalizedAmount * BOND_MISSION_SKILL_USE_GAIN;
+                break;
+            case 'skillUpgrade':
+                perHero = normalizedAmount * BOND_MISSION_SKILL_UPGRADE_GAIN;
+                break;
+            case 'equipmentUpgrade':
+                perHero = normalizedAmount * BOND_MISSION_EQUIPMENT_UPGRADE_GAIN;
+                break;
+            case 'bondLevelUp':
+                perHero = normalizedAmount * BOND_MISSION_BOND_LEVEL_GAIN;
+                break;
             default:
                 perHero = 0;
                 break;
@@ -2663,8 +2679,17 @@ export class GameState {
             }
             if (!state || state.claimed) return;
             if (state.completed && state.progress >= mission.goal) return;
-            const previousProgress = state.progress;
-            state.progress = Math.min(mission.goal, previousProgress + normalizedAmount);
+            const previousProgress = state.progress ?? 0;
+            let nextProgress;
+            switch (trigger) {
+                case 'stageClear':
+                    nextProgress = Math.max(previousProgress, normalizedAmount);
+                    break;
+                default:
+                    nextProgress = previousProgress + normalizedAmount;
+                    break;
+            }
+            state.progress = Math.min(mission.goal, nextProgress);
             if (state.progress >= mission.goal) {
                 state.completed = true;
                 completed.push({ mission, state });
@@ -2710,6 +2735,19 @@ export class GameState {
             case 'rebirthPoints':
                 this.rebirthPoints += amount;
                 return { type: reward.type, amount };
+            case 'skillModules':
+                this.skillModules += amount;
+                return { type: reward.type, amount };
+            case 'upgradeMaterials':
+                this.upgradeMaterials += amount;
+                return { type: reward.type, amount };
+            case 'bondAll': {
+                const bondResult = this.grantBondToUnlocked(amount, {
+                    reason: 'missionReward',
+                    amount,
+                });
+                return { type: reward.type, amount, bondResult };
+            }
             default:
                 return null;
         }
