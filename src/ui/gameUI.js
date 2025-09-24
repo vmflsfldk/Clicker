@@ -3747,6 +3747,9 @@ export class GameUI {
         this.updateMissionUI();
         this.updateStats();
         this.updateGachaUI();
+        if (result.rewardResult?.type === 'rebirthPoints') {
+            this.updateRebirthUI();
+        }
         saveGame(this.state);
     }
 
@@ -3861,6 +3864,7 @@ export class GameUI {
         );
         this.renderHeroes();
         this.updateUI();
+        this.updateRebirthUI();
         this.handleMissionProgress('rebirth', 1);
         saveGame(this.state);
     }
