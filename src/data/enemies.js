@@ -1,4 +1,4 @@
-export const ENEMY_STAGE_INTERVAL = 5;
+export const ENEMY_STAGE_INTERVAL = 10;
 
 export const ENEMY_NAME_POOLS = {
     normal: [
@@ -52,7 +52,7 @@ export const ENEMY_STAGE_SEGMENTS = [
         id: 'supply-lane',
         type: 'normal',
         namePool: 'normal',
-        offsets: [0, 1],
+        offsets: [0, 1, 2],
         icon: '📦',
         label: '보급 강화 구간',
         description: '보급로가 안정되어 장비 보급이 크게 늘어납니다.',
@@ -67,7 +67,7 @@ export const ENEMY_STAGE_SEGMENTS = [
         id: 'finance-boost',
         type: 'normal',
         namePool: 'normal',
-        offsets: [2, 3],
+        offsets: [3, 4, 5, 6],
         icon: '💰',
         label: '재정 집중 구간',
         description: '학원 재무실이 추가 지원을 약속했습니다.',
@@ -80,10 +80,25 @@ export const ENEMY_STAGE_SEGMENTS = [
         },
     },
     {
+        id: 'assault-drill',
+        type: 'normal',
+        namePool: 'normal',
+        offsets: [7, 8],
+        icon: '🎯',
+        label: '집중 사격 훈련',
+        description: '전술 숙련도가 상승해 탭과 스킬 피해가 증가합니다.',
+        effects: ['전술 공격력 +12%', '전술 스킬 +8%'],
+        highlight: true,
+        alert: 'info',
+        modifiers: {
+            rewardMultiplier: 1.1,
+        },
+    },
+    {
         id: 'boss-overclock',
         type: 'boss',
         namePool: 'boss',
-        offsets: [4],
+        offsets: [9],
         icon: '⚠️',
         label: '위협 등급 상승',
         description: '강화된 모의 보스가 출현했습니다. 시간 내 제압이 필수입니다.',

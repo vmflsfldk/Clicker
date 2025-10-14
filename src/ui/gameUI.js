@@ -20,6 +20,7 @@ import {
 } from '../state/gameState.js';
 import { HERO_SET_BONUSES } from '../data/heroes.js';
 import { EQUIPMENT_TYPES, EQUIPMENT_DROP_CHANCE, EQUIPMENT_BOSS_DROP_CHANCE } from '../data/equipment.js';
+import { ARTIFACTS, ARTIFACT_MAP, formatArtifactEffectValue } from '../data/artifacts.js';
 import {
     REBIRTH_EFFECT_LABELS,
     REBIRTH_TREE,
@@ -30,10 +31,12 @@ import {
 import { SKILLS, SKILL_EFFECT_TYPES, SKILL_MAP } from '../data/skills.js';
 import { saveGame } from '../storage/save.js';
 import { formatNumber, formatPercent, formatSignedPercent, formatCountdown } from '../utils/format.js';
+import { BUILDS, BUILD_EFFECT_TYPES } from '../data/builds.js';
 
 const UI = {
     stage: document.getElementById('stage'),
     gold: document.getElementById('gold'),
+    relics: document.getElementById('relics'),
     upgradeMaterials: document.getElementById('upgradeMaterials'),
     skillModules: document.getElementById('skillModules'),
     gachaTokensHeader: document.getElementById('gachaTokensHeader'),
@@ -117,6 +120,13 @@ const UI = {
     rebirthBranchTitle: document.getElementById('rebirthBranchTitle'),
     rebirthBranchDescription: document.getElementById('rebirthBranchDescription'),
     rebirthBranchTotals: document.getElementById('rebirthBranchTotals'),
+    rebirthRelics: document.getElementById('rebirthRelics'),
+    rebirthRelicPotential: document.getElementById('rebirthRelicPotential'),
+    artifactList: document.getElementById('artifactList'),
+    artifactEmpty: document.getElementById('artifactEmpty'),
+    artifactSummary: document.getElementById('artifactSummary'),
+    buildList: document.getElementById('buildList'),
+    buildActiveLabel: document.getElementById('buildActiveLabel'),
     equipmentSummary: document.getElementById('equipmentSummary'),
     equipmentTapBonus: document.getElementById('equipmentTapBonus'),
     equipmentHeroBonus: document.getElementById('equipmentHeroBonus'),
@@ -161,6 +171,13 @@ const EQUIPMENT_TYPE_ICONS = new Map([
     ['skill', '📡'],
 ]);
 
+const BUILD_EFFECT_LABELS = {
+    [BUILD_EFFECT_TYPES.TAP]: '전술 공격력',
+    [BUILD_EFFECT_TYPES.SKILL]: '전술 스킬',
+    [BUILD_EFFECT_TYPES.HERO]: '지원 화력',
+    [BUILD_EFFECT_TYPES.GOLD]: '작전 보상',
+};
+
 const describeEquipmentEffect = (effectId, value = 0) => {
     const effect = EQUIPMENT_EFFECT_MAP.get(effectId);
     if (!effect) return null;
@@ -197,6 +214,32 @@ const formatSetBonusEffects = (effects) => {
         .map(([effectId, value]) => describeEquipmentEffect(effectId, Number(value) || 0))
         .filter(Boolean);
     return entries.length > 0 ? entries.join(' · ') : '추가 효과 없음';
+};
+
+const describeBuildEffects = (build) => {
+    if (!build || typeof build !== 'object' || !build.effect) {
+        return [];
+    }
+    return Object.entries(build.effect)
+        .map(([type, value]) => {
+            const label = BUILD_EFFECT_LABELS[type] ?? type;
+            const numeric = Number(value) || 0;
+            return `${label} ${formatPercent(Math.max(0, numeric))}`;
+        })
+        .filter(Boolean);
+};
+
+const formatArtifactDifference = (artifact, difference) => {
+    if (!artifact || !Number.isFinite(difference) || Math.abs(difference) < 1e-6) {
+        return ' (변화 없음)';
+    }
+    if (artifact.format === 'percent') {
+        const value = (difference * 100).toFixed(1);
+        const sign = difference >= 0 ? '+' : '';
+        return ` (${sign}${value}%)`;
+    }
+    const sign = difference >= 0 ? '+' : '';
+    return ` (${sign}${difference.toLocaleString('ko-KR')})`;
 };
 
 export class GameUI {
@@ -254,6 +297,10 @@ export class GameUI {
             this.equipmentDetailClose.setAttribute('aria-hidden', 'true');
             this.equipmentDetailClose.setAttribute('tabindex', '-1');
         }
+        this.artifactTemplate = document.getElementById('artifactTemplate');
+        this.artifactElements = new Map();
+        this.buildTemplate = document.getElementById('buildTemplate');
+        this.buildElements = new Map();
         this.handleDoubleClick = (event) => {
             event.preventDefault();
         };
@@ -268,6 +315,8 @@ export class GameUI {
         this.renderEquipmentUI();
         this.renderMissionUI();
         this.renderRebirthUI();
+        this.renderArtifacts();
+        this.renderBuilds();
         this.updateSortButton();
         this.updateUI();
         this.startLoops();
@@ -483,6 +532,12 @@ export class GameUI {
                     this.closeSalvageModal();
                 }
             });
+        }
+        if (UI.artifactList) {
+            UI.artifactList.addEventListener('click', (event) => this.handleArtifactListClick(event));
+        }
+        if (UI.buildList) {
+            UI.buildList.addEventListener('click', (event) => this.handleBuildListClick(event));
         }
         document.addEventListener('keydown', (event) => this.handleKeyDown(event));
         if (UI.missionList) {
@@ -2306,8 +2361,14 @@ export class GameUI {
         if (UI.rebirthPotential) {
             UI.rebirthPotential.textContent = formatNumber(this.state.pendingRebirthPoints);
         }
+        if (UI.rebirthRelicPotential) {
+            UI.rebirthRelicPotential.textContent = formatNumber(this.state.pendingRelics);
+        }
         if (UI.rebirthPoints) {
             UI.rebirthPoints.textContent = formatNumber(this.state.rebirthPoints);
+        }
+        if (UI.rebirthRelics) {
+            UI.rebirthRelics.textContent = formatNumber(this.state.relics);
         }
         if (UI.rebirthCores) {
             UI.rebirthCores.textContent = formatNumber(this.state.rebirthCores);
@@ -3858,8 +3919,14 @@ export class GameUI {
         const pointsText = formatNumber(result.pointsEarned);
         const totalPointsText = formatNumber(result.totalPoints);
         const rebirthCountText = formatNumber(result.rebirthCount);
+        const relicsEarnedText = formatNumber(result.relicsEarned ?? 0);
+        const relicsTotalText = formatNumber(result.totalRelics ?? this.state.relics);
+        const relicMessage =
+            (result.relicsEarned ?? 0) > 0
+                ? ` 유물 조각 ${relicsEarnedText}개 확보 (보유 ${relicsTotalText}개)`
+                : '';
         this.addLog(
-            `${stageText}층까지 돌파하여 환생 포인트 ${pointsText}점을 획득했습니다! (보유 ${totalPointsText}P, 총 ${rebirthCountText}회)`,
+            `${stageText}층까지 돌파하여 환생 포인트 ${pointsText}점을 획득했습니다! (보유 ${totalPointsText}P, 총 ${rebirthCountText}회)${relicMessage}`,
             'success',
         );
         this.renderHeroes();
@@ -3995,6 +4062,9 @@ export class GameUI {
     updateStats() {
         UI.stage.textContent = this.state.enemy.stage;
         UI.gold.textContent = formatNumber(this.state.gold);
+        if (UI.relics) {
+            UI.relics.textContent = formatNumber(this.state.relics);
+        }
         if (UI.upgradeMaterials) {
             UI.upgradeMaterials.textContent = formatNumber(this.state.upgradeMaterials);
         }
@@ -4215,6 +4285,278 @@ export class GameUI {
         controls.setAttribute('aria-hidden', visible ? 'false' : 'true');
     }
 
+    renderArtifacts() {
+        if (!UI.artifactList) return;
+        this.artifactElements.clear();
+        UI.artifactList.innerHTML = '';
+        const template = this.artifactTemplate?.content?.firstElementChild ?? null;
+        const hasArtifacts = ARTIFACTS.length > 0;
+        if (!hasArtifacts && UI.artifactEmpty) {
+            UI.artifactEmpty.classList.add('is-visible');
+        } else if (UI.artifactEmpty) {
+            UI.artifactEmpty.classList.remove('is-visible');
+        }
+        ARTIFACTS.forEach((artifact) => {
+            let element;
+            if (template) {
+                element = template.cloneNode(true);
+            } else {
+                element = document.createElement('li');
+                element.className = 'artifact-card';
+                element.innerHTML =
+                    '<div class="artifact-card__header">' +
+                    '<span class="artifact-card__icon"></span>' +
+                    '<span class="artifact-card__name"></span>' +
+                    '<span class="artifact-card__level"></span>' +
+                    '</div>' +
+                    '<p class="artifact-card__summary"></p>' +
+                    '<div class="artifact-card__effect"></div>' +
+                    '<div class="artifact-card__next"></div>' +
+                    '<div class="artifact-card__actions">' +
+                    '<button type="button" class="btn btn-secondary artifact-card__upgrade">강화</button>' +
+                    '<span class="artifact-card__cost"></span>' +
+                    '</div>';
+            }
+            element.dataset.artifactId = artifact.id;
+            const icon = element.querySelector('.artifact-card__icon');
+            const name = element.querySelector('.artifact-card__name');
+            const summary = element.querySelector('.artifact-card__summary');
+            const level = element.querySelector('.artifact-card__level');
+            const effect = element.querySelector('.artifact-card__effect');
+            const next = element.querySelector('.artifact-card__next');
+            const cost = element.querySelector('.artifact-card__cost');
+            const button = element.querySelector('.artifact-card__upgrade');
+            if (icon) {
+                icon.textContent = artifact.icon ?? '🗿';
+            }
+            if (name) {
+                name.textContent = artifact.name;
+            }
+            if (summary) {
+                summary.textContent = artifact.description ?? '';
+            }
+            if (button) {
+                button.dataset.artifactId = artifact.id;
+                button.type = 'button';
+            }
+            UI.artifactList.appendChild(element);
+            this.artifactElements.set(artifact.id, {
+                element,
+                icon,
+                name,
+                summary,
+                level,
+                effect,
+                next,
+                cost,
+                button,
+            });
+        });
+        this.updateArtifacts();
+    }
+
+    updateArtifacts() {
+        if (!UI.artifactList) return;
+        const hasArtifacts = ARTIFACTS.length > 0;
+        if (UI.artifactEmpty) {
+            UI.artifactEmpty.classList.toggle('is-visible', !hasArtifacts);
+        }
+        if (UI.artifactSummary) {
+            const relicsText = formatNumber(this.state.relics);
+            const potentialText = formatNumber(this.state.pendingRelics);
+            UI.artifactSummary.textContent = `보유 유물 조각 ${relicsText}개 · 이번 런 예상 ${potentialText}개`;
+        }
+        this.artifactElements.forEach((refs, artifactId) => {
+            const artifact = ARTIFACT_MAP.get(artifactId);
+            const levelValue = this.state.getArtifactLevel(artifactId);
+            if (refs.level) {
+                refs.level.textContent = `Lv. ${formatNumber(levelValue)}`;
+            }
+            if (refs.effect) {
+                refs.effect.textContent = `현재 효과: ${this.state.describeArtifactEffect(artifactId)}`;
+            }
+            if (refs.next) {
+                const nextLevel = levelValue + 1;
+                if (artifact) {
+                    const currentValue = this.state.getArtifactEffectValue(artifactId);
+                    const nextValue = this.state.getArtifactEffectValueAtLevel(artifactId, nextLevel);
+                    const nextText = formatArtifactEffectValue(artifact, nextValue);
+                    const diffText = formatArtifactDifference(artifact, nextValue - currentValue);
+                    refs.next.textContent = `다음 효과: ${nextText}${diffText}`;
+                } else {
+                    refs.next.textContent = '다음 효과: -';
+                }
+            }
+            if (refs.cost || refs.button) {
+                const cost = this.state.getArtifactUpgradeCost(artifactId);
+                if (refs.cost) {
+                    refs.cost.textContent = `필요 유물 조각 ${formatNumber(cost)}`;
+                }
+                if (refs.button) {
+                    refs.button.dataset.artifactId = artifactId;
+                    refs.button.disabled = cost > this.state.relics;
+                    refs.button.textContent = cost > 0 ? `강화 (${formatNumber(cost)})` : '강화 불가';
+                }
+                if (refs.element) {
+                    refs.element.classList.toggle('is-affordable', cost <= this.state.relics);
+                }
+            }
+        });
+    }
+
+    handleArtifactListClick(event) {
+        const button = event.target.closest('.artifact-card__upgrade');
+        if (!button) {
+            return;
+        }
+        const artifactId = button.dataset.artifactId ?? button.closest('[data-artifact-id]')?.dataset.artifactId;
+        if (!artifactId) {
+            return;
+        }
+        const result = this.state.upgradeArtifact(artifactId);
+        if (!result.success) {
+            if (result.message) {
+                this.addLog(result.message, 'warning');
+            }
+            return;
+        }
+        const artifactName = result.artifact?.name ?? '유물';
+        this.addLog(
+            `${artifactName} Lv.${formatNumber(result.newLevel)}로 강화되었습니다! (${result.effect})`,
+            'success',
+        );
+        this.updateStats();
+        this.updateArtifacts();
+        this.updateRebirthUI();
+        saveGame(this.state);
+    }
+
+    renderBuilds() {
+        if (!UI.buildList) return;
+        this.buildElements.clear();
+        UI.buildList.innerHTML = '';
+        const template = this.buildTemplate?.content?.firstElementChild ?? null;
+        BUILDS.forEach((build) => {
+            let element;
+            if (template) {
+                element = template.cloneNode(true);
+            } else {
+                element = document.createElement('li');
+                element.className = 'build-card';
+                element.innerHTML =
+                    '<div class="build-card__header">' +
+                    '<span class="build-card__icon"></span>' +
+                    '<div class="build-card__meta">' +
+                    '<span class="build-card__name"></span>' +
+                    '<p class="build-card__summary"></p>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="build-card__effects"></div>' +
+                    '<ul class="build-card__tips"></ul>' +
+                    '<button type="button" class="btn btn-primary build-card__select">빌드 선택</button>';
+            }
+            element.dataset.buildId = build.id;
+            element.setAttribute('role', 'listitem');
+            const icon = element.querySelector('.build-card__icon');
+            const name = element.querySelector('.build-card__name');
+            const summary = element.querySelector('.build-card__summary');
+            const effects = element.querySelector('.build-card__effects');
+            const tips = element.querySelector('.build-card__tips');
+            const button = element.querySelector('.build-card__select');
+            if (icon) {
+                icon.textContent = build.icon ?? '⚙️';
+            }
+            if (name) {
+                name.textContent = build.name;
+            }
+            if (summary) {
+                summary.textContent = build.summary ?? '';
+            }
+            if (effects) {
+                const descriptions = describeBuildEffects(build);
+                effects.textContent = descriptions.length > 0 ? `효과: ${descriptions.join(' · ')}` : '효과 정보 없음';
+            }
+            if (tips) {
+                tips.innerHTML = '';
+                if (Array.isArray(build.tips) && build.tips.length > 0) {
+                    build.tips.forEach((tip) => {
+                        const item = document.createElement('li');
+                        item.textContent = tip;
+                        tips.appendChild(item);
+                    });
+                } else {
+                    const item = document.createElement('li');
+                    item.textContent = '팁 정보가 없습니다.';
+                    tips.appendChild(item);
+                }
+            }
+            if (button) {
+                button.dataset.buildId = build.id;
+                button.type = 'button';
+            }
+            UI.buildList.appendChild(element);
+            this.buildElements.set(build.id, { element, icon, name, summary, effects, tips, button });
+        });
+        this.updateBuilds();
+    }
+
+    updateBuilds() {
+        if (!UI.buildList) return;
+        const activeBuild = this.state.getActiveBuild();
+        if (UI.buildActiveLabel) {
+            if (activeBuild) {
+                const icon = activeBuild.icon ? `${activeBuild.icon} ` : '';
+                UI.buildActiveLabel.textContent = `${icon}${activeBuild.name}`;
+            } else {
+                UI.buildActiveLabel.textContent = '선택된 빌드 없음';
+            }
+        }
+        this.buildElements.forEach((refs, buildId) => {
+            const isActive = activeBuild?.id === buildId;
+            if (refs.element) {
+                refs.element.classList.toggle('is-active', isActive);
+                refs.element.setAttribute('aria-current', isActive ? 'true' : 'false');
+            }
+            if (refs.button) {
+                refs.button.dataset.buildId = buildId;
+                refs.button.disabled = isActive;
+                refs.button.textContent = isActive ? '운용 중' : '빌드 선택';
+            }
+        });
+    }
+
+    handleBuildListClick(event) {
+        const button = event.target.closest('.build-card__select');
+        if (!button) {
+            return;
+        }
+        const buildId = button.dataset.buildId ?? button.closest('[data-build-id]')?.dataset.buildId;
+        if (!buildId) {
+            return;
+        }
+        this.selectBuild(buildId);
+    }
+
+    selectBuild(buildId) {
+        const result = this.state.setActiveBuild(buildId);
+        if (!result.success) {
+            if (result.message) {
+                this.addLog(result.message, 'warning');
+            }
+            return;
+        }
+        const build = result.build ?? BUILDS.find((entry) => entry.id === buildId) ?? null;
+        if (build) {
+            const icon = build.icon ? `${build.icon} ` : '';
+            const effects = describeBuildEffects(build).join(' · ');
+            const effectText = effects ? ` (${effects})` : '';
+            this.addLog(`${icon}${build.name} 빌드를 운용합니다${effectText}.`, 'success');
+        }
+        this.updateStats();
+        this.updateBuilds();
+        saveGame(this.state);
+    }
+
     updateUI() {
         this.updateStats();
         this.updateSkillCooldowns();
@@ -4225,6 +4567,8 @@ export class GameUI {
         this.updateEnemy();
         this.updateBossTimerUI();
         this.updateBossControls();
+        this.updateArtifacts();
+        this.updateBuilds();
     }
 
     handleTap() {
