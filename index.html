@@ -30,6 +30,10 @@
                                 <dd class="overview-stat__value"><span id="gold">0</span></dd>
                             </div>
                             <div class="overview-stat">
+                                <dt class="overview-stat__label">유물 조각</dt>
+                                <dd class="overview-stat__value"><span id="relics">0</span></dd>
+                            </div>
+                            <div class="overview-stat">
                                 <dt class="overview-stat__label">강화 재료</dt>
                                 <dd class="overview-stat__value"><span id="upgradeMaterials">0</span></dd>
                             </div>
@@ -156,6 +160,30 @@
                         tabindex="-1"
                     >
                         환생
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
+                        id="tab-artifacts"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-artifacts"
+                        data-tab-target="artifacts"
+                        tabindex="-1"
+                    >
+                        유물
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
+                        id="tab-builds"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-builds"
+                        data-tab-target="builds"
+                        tabindex="-1"
+                    >
+                        전술 빌드
                     </button>
                     <button
                         type="button"
@@ -397,8 +425,16 @@
                                         <strong id="rebirthPotential">0</strong>
                                     </div>
                                     <div class="rebirth__stat">
+                                        <span class="rebirth__label">이번 유물 조각 예상</span>
+                                        <strong id="rebirthRelicPotential">0</strong>
+                                    </div>
+                                    <div class="rebirth__stat">
                                         <span class="rebirth__label">보유 포인트</span>
                                         <strong id="rebirthPoints">0</strong>
+                                    </div>
+                                    <div class="rebirth__stat">
+                                        <span class="rebirth__label">보유 유물 조각</span>
+                                        <strong id="rebirthRelics">0</strong>
                                     </div>
                                 </div>
                                 <button id="rebirthButton" class="btn btn-rebirth" disabled>환생하기</button>
@@ -460,6 +496,52 @@
                                         강화
                                     </button>
                                 </section>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div
+                        class="panel-view"
+                        id="panel-artifacts"
+                        role="tabpanel"
+                        aria-labelledby="tab-artifacts"
+                        data-tab="artifacts"
+                        hidden
+                    >
+                        <section class="panel panel-card panel-card--artifacts" aria-labelledby="tab-artifacts">
+                            <header class="panel__header panel-card__header">
+                                <h2>유물 관리</h2>
+                            </header>
+                            <div class="panel__body panel-card__body">
+                                <p id="artifactSummary" class="panel__lead">
+                                    환생으로 얻은 유물 조각을 투자해 주요 아티팩트를 강화하세요.
+                                </p>
+                                <ul id="artifactList" class="artifact-list" role="list" aria-live="polite"></ul>
+                                <p id="artifactEmpty" class="empty-state" aria-live="polite">
+                                    아직 발견한 유물이 없습니다. 환생을 진행해 유물을 수집하세요.
+                                </p>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div
+                        class="panel-view"
+                        id="panel-builds"
+                        role="tabpanel"
+                        aria-labelledby="tab-builds"
+                        data-tab="builds"
+                        hidden
+                    >
+                        <section class="panel panel-card panel-card--builds" aria-labelledby="tab-builds">
+                            <header class="panel__header panel-card__header">
+                                <h2>전술 빌드</h2>
+                            </header>
+                            <div class="panel__body panel-card__body">
+                                <p class="panel__lead">
+                                    푸시와 파밍, 레이드에 맞춰 대표 빌드를 선택하고 운영 방향을 조율하세요.
+                                </p>
+                                <p class="panel__meta">현재 선택: <strong id="buildActiveLabel">선택된 빌드 없음</strong></p>
+                                <ul id="buildList" class="build-list" role="list" aria-live="polite"></ul>
                             </div>
                         </section>
                     </div>
@@ -819,6 +901,42 @@
                 <ul class="equipment-detail__status-list"></ul>
             </section>
         </article>
+    </template>
+
+    <template id="artifactTemplate">
+        <li class="artifact-card" data-artifact-id="">
+            <div class="artifact-card__header">
+                <span class="artifact-card__icon" aria-hidden="true"></span>
+                <span class="artifact-card__name"></span>
+                <span class="artifact-card__level">Lv. 0</span>
+            </div>
+            <p class="artifact-card__summary"></p>
+            <div class="artifact-card__effect">현재 효과: -</div>
+            <div class="artifact-card__next">다음 효과: -</div>
+            <div class="artifact-card__actions">
+                <button type="button" class="btn btn-secondary artifact-card__upgrade" data-artifact-id="">
+                    강화
+                </button>
+                <span class="artifact-card__cost">필요 유물 조각 0</span>
+            </div>
+        </li>
+    </template>
+
+    <template id="buildTemplate">
+        <li class="build-card" data-build-id="">
+            <div class="build-card__header">
+                <span class="build-card__icon" aria-hidden="true"></span>
+                <div class="build-card__meta">
+                    <span class="build-card__name"></span>
+                    <p class="build-card__summary"></p>
+                </div>
+            </div>
+            <div class="build-card__effects"></div>
+            <ul class="build-card__tips"></ul>
+            <button type="button" class="btn btn-primary build-card__select" data-build-id="">
+                빌드 선택
+            </button>
+        </li>
     </template>
 
     <script type="module" src="src/main.js"></script>

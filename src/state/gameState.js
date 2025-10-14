@@ -20,6 +20,14 @@ import {
 } from '../data/equipment.js';
 import { MISSIONS, MISSION_GROUPS } from '../data/missions.js';
 import {
+    ARTIFACTS,
+    ARTIFACT_MAP,
+    ARTIFACT_EFFECT_TYPES,
+    getArtifactEffectValue,
+    getArtifactUpgradeCost,
+    formatArtifactEffectValue,
+} from '../data/artifacts.js';
+import {
     REBIRTH_EFFECT_LABELS,
     REBIRTH_TREE,
     REBIRTH_NODES,
@@ -42,6 +50,13 @@ import {
     getEnemyStageGimmick,
     getEnemyNameForStage,
 } from '../data/enemies.js';
+import {
+    BUILDS,
+    BUILD_MAP,
+    BUILD_EFFECT_TYPES,
+    DEFAULT_BUILD_ID,
+    clampBuildEffect,
+} from '../data/builds.js';
 import { formatNumber } from '../utils/format.js';
 
 const HERO_TRAIT_GROUP_MAP = new Map(HERO_TRAIT_GROUPS.map((group) => [group.id, group]));
@@ -51,6 +66,10 @@ const HERO_TRAIT_MAP = HERO_TRAIT_GROUPS.reduce((acc, group) => {
 }, {});
 const HERO_RARITY_MAP = new Map(HERO_RARITIES.map((rarity) => [rarity.id, rarity]));
 const DEFAULT_HERO_RARITY_ID = 'common';
+
+const ARTIFACT_ID_SET = new Set(ARTIFACTS.map((artifact) => artifact.id));
+
+const BUILD_ID_SET = new Set(BUILDS.map((build) => build.id));
 
 const EQUIPMENT_EFFECT_MAP = new Map(EQUIPMENT_EFFECTS.map((effect) => [effect.id, effect]));
 const EQUIPMENT_TYPE_MAP = new Map(EQUIPMENT_TYPES.map((type) => [type.id, type]));
@@ -1059,6 +1078,8 @@ export class GameState {
         this.currentRunHighestStage = Number.isFinite(loadedCurrent) ? Math.max(0, loadedCurrent) : fallbackCurrent;
         const loadedPoints = Number(saved?.rebirthPoints ?? 0);
         this.rebirthPoints = Number.isFinite(loadedPoints) ? Math.max(0, Math.floor(loadedPoints)) : 0;
+        const savedRelics = Number(saved?.relics ?? 0);
+        this.relics = Number.isFinite(savedRelics) ? Math.max(0, Math.floor(savedRelics)) : 0;
         const loadedCores = Number(saved?.rebirthCores ?? 0);
         this.rebirthCores = Number.isFinite(loadedCores) ? Math.max(0, Math.floor(loadedCores)) : 0;
         const savedBranchFocus = typeof saved?.rebirthBranchFocus === 'string' ? saved.rebirthBranchFocus : null;
@@ -1071,12 +1092,15 @@ export class GameState {
         this.totalRebirths = Number.isFinite(loadedRebirths) ? Math.max(0, Math.floor(loadedRebirths)) : 0;
         this.initializeRebirthNodes(saved?.rebirthNodes, saved?.rebirthSkills);
         this.initializeMissions(saved?.missions);
+        this.initializeArtifacts(saved?.artifacts);
         this.normalizeEquippedState();
         const savedBossDeadline = Number(saved?.bossDeadline ?? 0);
         this.bossDeadline = Number.isFinite(savedBossDeadline)
             ? Math.max(0, Math.floor(savedBossDeadline))
             : 0;
         this.pendingBossEntry = Boolean(saved?.pendingBossEntry);
+        const savedBuild = typeof saved?.activeBuildId === 'string' ? saved.activeBuildId : null;
+        this.activeBuildId = BUILD_ID_SET.has(savedBuild) ? savedBuild : DEFAULT_BUILD_ID;
         if (!this.isBossStage()) {
             this.clearBossTimer();
         } else {
@@ -1495,7 +1519,9 @@ export class GameState {
         const rebirth = this.getRebirthBonusValue('tap');
         const setBonus = this.getSetBonusEffect('tap');
         const bond = this.getBondEffect('tap');
-        return equipment + rebirth + setBonus + bond;
+        const artifact = this.getArtifactBonusValue(ARTIFACT_EFFECT_TYPES.TAP);
+        const build = this.getBuildBonusValue(BUILD_EFFECT_TYPES.TAP);
+        return equipment + rebirth + setBonus + bond + artifact + build;
     }
 
     get heroTrainingBonus() {
@@ -1511,7 +1537,9 @@ export class GameState {
         const rebirth = this.getRebirthBonusValue('hero');
         const setBonus = this.getSetBonusEffect('hero');
         const bond = this.getBondEffect('hero');
-        return equipment + rebirth + this.heroTrainingBonus + setBonus + bond;
+        const artifact = this.getArtifactBonusValue(ARTIFACT_EFFECT_TYPES.HERO);
+        const build = this.getBuildBonusValue(BUILD_EFFECT_TYPES.HERO);
+        return equipment + rebirth + this.heroTrainingBonus + setBonus + bond + artifact + build;
     }
 
     get skillBonus() {
@@ -1519,7 +1547,9 @@ export class GameState {
         const rebirth = this.getRebirthBonusValue('skill');
         const setBonus = this.getSetBonusEffect('skill');
         const bond = this.getBondEffect('skill');
-        return equipment + rebirth + setBonus + bond;
+        const artifact = this.getArtifactBonusValue(ARTIFACT_EFFECT_TYPES.SKILL);
+        const build = this.getBuildBonusValue(BUILD_EFFECT_TYPES.SKILL);
+        return equipment + rebirth + setBonus + bond + artifact + build;
     }
 
     get goldBonus() {
@@ -1527,7 +1557,9 @@ export class GameState {
         const rebirth = this.getRebirthBonusValue('gold');
         const setBonus = this.getSetBonusEffect('gold');
         const bond = this.getBondEffect('gold');
-        return equipment + rebirth + this.goldTrainingBonus + setBonus + bond;
+        const artifact = this.getArtifactBonusValue(ARTIFACT_EFFECT_TYPES.GOLD);
+        const build = this.getBuildBonusValue(BUILD_EFFECT_TYPES.GOLD);
+        return equipment + rebirth + this.goldTrainingBonus + setBonus + bond + artifact + build;
     }
 
     get equipmentDropBonus() {
@@ -1551,6 +1583,13 @@ export class GameState {
         // 환생 포인트 증가는 기본 계산 이후 후처리로 적용합니다.
         const modified = Math.floor(basePoints * (1 + rebirthGain));
         return Math.max(1, modified);
+    }
+
+    get pendingRelics() {
+        const baseRelics = this.pendingRebirthPoints;
+        if (baseRelics <= 0) return 0;
+        const artifactBonus = this.getArtifactBonusValue(ARTIFACT_EFFECT_TYPES.RELIC_GAIN);
+        return Math.max(1, Math.floor(baseRelics * (1 + artifactBonus)));
     }
 
     get canRebirth() {
@@ -1726,6 +1765,10 @@ export class GameState {
             };
         }
         this.rebirthPoints += pointsEarned;
+        const relicsEarned = this.pendingRelics;
+        if (relicsEarned > 0) {
+            this.relics += relicsEarned;
+        }
         const coresEarned =
             pointsEarned > 0
                 ? Math.max(
@@ -1761,6 +1804,8 @@ export class GameState {
             coresTotal: this.rebirthCores,
             earnedFrom,
             totalPoints: this.rebirthPoints,
+            relicsEarned,
+            totalRelics: this.relics,
             rebirthCount: this.totalRebirths,
         };
     }
@@ -1866,7 +1911,10 @@ export class GameState {
         const rewardMultiplier = Number.isFinite(modifiers.rewardMultiplier)
             ? Math.max(0, modifiers.rewardMultiplier)
             : 1;
-        return Math.ceil(baseReward * rewardMultiplier);
+        const bossBonus = this.isBossStage(stage)
+            ? 1 + this.getArtifactBonusValue(ARTIFACT_EFFECT_TYPES.BOSS_GOLD)
+            : 1;
+        return Math.ceil(baseReward * rewardMultiplier * bossBonus);
     }
 
     enemyReward(stage = this.enemy.stage) {
@@ -2481,8 +2529,11 @@ export class GameState {
         this.goldGainLevel = 0;
         this.rebirthCores = 0;
         this.rebirthBranchFocus = REBIRTH_BRANCH_FOCUS_FALLBACK;
+        this.relics = 0;
+        this.activeBuildId = DEFAULT_BUILD_ID;
         this.initializeRebirthNodes({});
         this.initializeMissions({});
+        this.initializeArtifacts({});
     }
 
     toJSON() {
@@ -2514,9 +2565,12 @@ export class GameState {
             rebirthCores: this.rebirthCores,
             rebirthBranchFocus: this.rebirthBranchFocus,
             totalRebirths: this.totalRebirths,
+            relics: this.relics,
+            activeBuildId: this.activeBuildId,
             rebirthNodes: this.rebirthNodes,
             rebirthSkills: this.rebirthNodes,
             missions: this.serializeMissions(),
+            artifacts: this.serializeArtifacts(),
         };
     }
 
@@ -2529,6 +2583,23 @@ export class GameState {
                 .find((value) => Number.isFinite(value));
             const normalizedLevel = clampRebirthNodeLevel(node, savedLevel);
             this.rebirthNodes[node.id] = normalizedLevel;
+        });
+    }
+
+    initializeArtifacts(savedArtifacts = {}) {
+        this.artifactLevels = new Map();
+        ARTIFACTS.forEach((artifact) => {
+            const savedEntry = savedArtifacts?.[artifact.id];
+            const candidates = [];
+            if (typeof savedEntry === 'object' && savedEntry !== null) {
+                candidates.push(savedEntry.level, savedEntry.lvl, savedEntry.value);
+            }
+            candidates.push(savedEntry);
+            const savedLevel = candidates
+                .map((value) => Number(value))
+                .find((value) => Number.isFinite(value));
+            const level = Number.isFinite(savedLevel) ? Math.max(0, Math.floor(savedLevel)) : 0;
+            this.artifactLevels.set(artifact.id, level);
         });
     }
 
@@ -2584,6 +2655,17 @@ export class GameState {
             }
             return acc;
         }, {});
+    }
+
+    serializeArtifacts() {
+        const serialized = {};
+        ARTIFACTS.forEach((artifact) => {
+            const level = this.getArtifactLevel(artifact.id);
+            if (level > 0) {
+                serialized[artifact.id] = { level };
+            }
+        });
+        return serialized;
     }
 
     checkMissionResets(now = Date.now()) {
@@ -3139,6 +3221,116 @@ export class GameState {
             const value = Number(effects[effectId] ?? 0);
             return total + (Number.isFinite(value) ? value : 0);
         }, 0);
+    }
+
+    getArtifactLevel(artifactId) {
+        if (!ARTIFACT_ID_SET.has(artifactId)) return 0;
+        if (!this.artifactLevels) {
+            this.artifactLevels = new Map();
+        }
+        return this.artifactLevels.get(artifactId) ?? 0;
+    }
+
+    setArtifactLevel(artifactId, level) {
+        if (!ARTIFACT_ID_SET.has(artifactId)) return 0;
+        const normalized = Math.max(0, Math.floor(Number(level) || 0));
+        if (!this.artifactLevels) {
+            this.artifactLevels = new Map();
+        }
+        this.artifactLevels.set(artifactId, normalized);
+        return normalized;
+    }
+
+    getArtifactEffectValue(artifactId) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) return 0;
+        const level = this.getArtifactLevel(artifactId);
+        return getArtifactEffectValue(artifact, level);
+    }
+
+    getArtifactBonusValue(effectType) {
+        if (!effectType) return 0;
+        let total = 0;
+        ARTIFACTS.forEach((artifact) => {
+            if (artifact.effectType !== effectType) return;
+            total += this.getArtifactEffectValue(artifact.id);
+        });
+        return total;
+    }
+
+    getArtifactUpgradeCost(artifactId) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) return Infinity;
+        const level = this.getArtifactLevel(artifactId);
+        return getArtifactUpgradeCost(artifact, level);
+    }
+
+    describeArtifactEffect(artifactId) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) return '효과 없음';
+        const value = this.getArtifactEffectValue(artifactId);
+        return formatArtifactEffectValue(artifact, value);
+    }
+
+    getArtifactEffectValueAtLevel(artifactId, level) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) return 0;
+        const normalized = clampArtifactLevel(level);
+        if (normalized <= 0) return 0;
+        return getArtifactEffectValue(artifact, normalized);
+    }
+
+    describeArtifactEffectAtLevel(artifactId, level) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) return '효과 없음';
+        const value = this.getArtifactEffectValueAtLevel(artifactId, level);
+        return formatArtifactEffectValue(artifact, value);
+    }
+
+    upgradeArtifact(artifactId) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) {
+            return { success: false, message: '알 수 없는 유물입니다.' };
+        }
+        const cost = this.getArtifactUpgradeCost(artifactId);
+        if (cost > this.relics) {
+            return { success: false, message: '유물 조각이 부족합니다.', artifact, cost };
+        }
+        this.relics -= cost;
+        const previousLevel = this.getArtifactLevel(artifactId);
+        const newLevel = this.setArtifactLevel(artifactId, previousLevel + 1);
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            artifact,
+            previousLevel,
+            newLevel,
+            cost,
+            effect: this.describeArtifactEffect(artifactId),
+        };
+    }
+
+    getActiveBuild() {
+        return BUILD_MAP.get(this.activeBuildId) ?? null;
+    }
+
+    setActiveBuild(buildId) {
+        if (!BUILD_ID_SET.has(buildId)) {
+            return { success: false, message: '선택할 수 없는 빌드입니다.' };
+        }
+        if (this.activeBuildId === buildId) {
+            return { success: false, message: '이미 해당 빌드를 운용 중입니다.' };
+        }
+        this.activeBuildId = buildId;
+        this.lastSave = Date.now();
+        return { success: true, build: this.getActiveBuild() };
+    }
+
+    getBuildBonusValue(effectType) {
+        const build = this.getActiveBuild();
+        if (!build || !build.effect) return 0;
+        const raw = build.effect[effectType] ?? 0;
+        return clampBuildEffect(raw);
     }
 
     getHeroEffectiveDps(hero) {
