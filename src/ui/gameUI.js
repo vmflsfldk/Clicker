@@ -20,7 +20,7 @@ import {
 } from '../state/gameState.js';
 import { HERO_SET_BONUSES } from '../data/heroes.js';
 import { EQUIPMENT_TYPES, EQUIPMENT_DROP_CHANCE, EQUIPMENT_BOSS_DROP_CHANCE } from '../data/equipment.js';
-import { ARTIFACTS, ARTIFACT_MAP, formatArtifactEffectValue } from '../data/artifacts.js';
+import { ARTIFACTS, ARTIFACT_MAP, formatArtifactDamageValue } from '../data/artifacts.js';
 import {
     REBIRTH_EFFECT_LABELS,
     REBIRTH_TREE,
@@ -126,6 +126,13 @@ const UI = {
     artifactList: document.getElementById('artifactList'),
     artifactEmpty: document.getElementById('artifactEmpty'),
     artifactSummary: document.getElementById('artifactSummary'),
+    artifactDiscover: document.getElementById('artifactDiscover'),
+    artifactDiscoverInfo: document.getElementById('artifactDiscoverInfo'),
+    artifactAdBonus: document.getElementById('artifactAdBonus'),
+    artifactProgress: document.getElementById('artifactProgress'),
+    artifactPoolLabel: document.getElementById('artifactPoolLabel'),
+    artifactGraveyardList: document.getElementById('artifactGraveyardList'),
+    artifactGraveyardEmpty: document.getElementById('artifactGraveyardEmpty'),
     buildList: document.getElementById('buildList'),
     buildActiveLabel: document.getElementById('buildActiveLabel'),
     equipmentSummary: document.getElementById('equipmentSummary'),
@@ -182,6 +189,16 @@ const BUILD_EFFECT_LABELS = {
     [BUILD_EFFECT_TYPES.GOLD]: '작전 보상',
 };
 
+const ARTIFACT_CATEGORY_LABELS = {
+    economy: '프레스티지·경제',
+    globalDamage: '전체 피해',
+    heroDamage: '학생 피해',
+    buildDamage: '빌드 핵심',
+    skillSupport: '스킬 지원',
+    economySupport: '경제 지원',
+    combatSupport: '전투 보조',
+};
+
 const describeEquipmentEffect = (effectId, value = 0) => {
     const effect = EQUIPMENT_EFFECT_MAP.get(effectId);
     if (!effect) return null;
@@ -231,19 +248,6 @@ const describeBuildEffects = (build) => {
             return `${label} ${formatPercent(Math.max(0, numeric))}`;
         })
         .filter(Boolean);
-};
-
-const formatArtifactDifference = (artifact, difference) => {
-    if (!artifact || !Number.isFinite(difference) || Math.abs(difference) < 1e-6) {
-        return ' (변화 없음)';
-    }
-    if (artifact.format === 'percent') {
-        const value = (difference * 100).toFixed(1);
-        const sign = difference >= 0 ? '+' : '';
-        return ` (${sign}${value}%)`;
-    }
-    const sign = difference >= 0 ? '+' : '';
-    return ` (${sign}${difference.toLocaleString('ko-KR')})`;
 };
 
 export class GameUI {
@@ -302,7 +306,6 @@ export class GameUI {
             this.equipmentDetailClose.setAttribute('tabindex', '-1');
         }
         this.artifactTemplate = document.getElementById('artifactTemplate');
-        this.artifactElements = new Map();
         this.buildTemplate = document.getElementById('buildTemplate');
         this.buildElements = new Map();
         this.handleDoubleClick = (event) => {
@@ -540,6 +543,14 @@ export class GameUI {
         }
         if (UI.artifactList) {
             UI.artifactList.addEventListener('click', (event) => this.handleArtifactListClick(event));
+        }
+        if (UI.artifactGraveyardList) {
+            UI.artifactGraveyardList.addEventListener('click', (event) =>
+                this.handleArtifactListClick(event),
+            );
+        }
+        if (UI.artifactDiscover) {
+            UI.artifactDiscover.addEventListener('click', () => this.handleArtifactDiscover());
         }
         if (UI.buildList) {
             UI.buildList.addEventListener('click', (event) => this.handleBuildListClick(event));
@@ -4291,134 +4302,305 @@ export class GameUI {
     }
 
     renderArtifacts() {
-        if (!UI.artifactList) return;
-        this.artifactElements.clear();
-        UI.artifactList.innerHTML = '';
-        const template = this.artifactTemplate?.content?.firstElementChild ?? null;
-        const hasArtifacts = ARTIFACTS.length > 0;
-        if (!hasArtifacts && UI.artifactEmpty) {
-            UI.artifactEmpty.classList.add('is-visible');
-        } else if (UI.artifactEmpty) {
-            UI.artifactEmpty.classList.remove('is-visible');
-        }
-        ARTIFACTS.forEach((artifact) => {
-            let element;
-            if (template) {
-                element = template.cloneNode(true);
-            } else {
-                element = document.createElement('li');
-                element.className = 'artifact-card';
-                element.innerHTML =
-                    '<div class="artifact-card__header">' +
-                    '<span class="artifact-card__icon"></span>' +
-                    '<span class="artifact-card__name"></span>' +
-                    '<span class="artifact-card__level"></span>' +
-                    '</div>' +
-                    '<p class="artifact-card__summary"></p>' +
-                    '<div class="artifact-card__effect"></div>' +
-                    '<div class="artifact-card__next"></div>' +
-                    '<div class="artifact-card__actions">' +
-                    '<button type="button" class="btn btn-secondary artifact-card__upgrade">강화</button>' +
-                    '<span class="artifact-card__cost"></span>' +
-                    '</div>';
-            }
-            element.dataset.artifactId = artifact.id;
-            const icon = element.querySelector('.artifact-card__icon');
-            const name = element.querySelector('.artifact-card__name');
-            const summary = element.querySelector('.artifact-card__summary');
-            const level = element.querySelector('.artifact-card__level');
-            const effect = element.querySelector('.artifact-card__effect');
-            const next = element.querySelector('.artifact-card__next');
-            const cost = element.querySelector('.artifact-card__cost');
-            const button = element.querySelector('.artifact-card__upgrade');
-            if (icon) {
-                icon.textContent = artifact.icon ?? '🗿';
-            }
-            if (name) {
-                name.textContent = artifact.name;
-            }
-            if (summary) {
-                summary.textContent = artifact.description ?? '';
-            }
-            if (button) {
-                button.dataset.artifactId = artifact.id;
-                button.type = 'button';
-            }
-            UI.artifactList.appendChild(element);
-            this.artifactElements.set(artifact.id, {
-                element,
-                icon,
-                name,
-                summary,
-                level,
-                effect,
-                next,
-                cost,
-                button,
-            });
-        });
+        this.artifactTemplate = document.getElementById('artifactTemplate');
+        this.artifactGraveyardTemplate = document.getElementById('artifactGraveyardTemplate');
         this.updateArtifacts();
     }
 
     updateArtifacts() {
         if (!UI.artifactList) return;
-        const hasArtifacts = ARTIFACTS.length > 0;
-        if (UI.artifactEmpty) {
-            UI.artifactEmpty.classList.toggle('is-visible', !hasArtifacts);
+        const template = this.artifactTemplate?.content?.firstElementChild ?? null;
+        const graveyardTemplate = this.artifactGraveyardTemplate?.content?.firstElementChild ?? null;
+        UI.artifactList.innerHTML = '';
+        if (UI.artifactGraveyardList) {
+            UI.artifactGraveyardList.innerHTML = '';
         }
+
+        const discoveredCount = this.state.getDiscoveredArtifactCount();
+        const totalArtifacts = ARTIFACTS.length;
+        const adBonus = this.state.artifactDamageBonus;
+        const relicsText = formatNumber(this.state.relics);
+        const potentialText = formatNumber(this.state.pendingRelics);
         if (UI.artifactSummary) {
-            const relicsText = formatNumber(this.state.relics);
-            const potentialText = formatNumber(this.state.pendingRelics);
             UI.artifactSummary.textContent = `보유 유물 조각 ${relicsText}개 · 이번 런 예상 ${potentialText}개`;
         }
-        this.artifactElements.forEach((refs, artifactId) => {
-            const artifact = ARTIFACT_MAP.get(artifactId);
-            const levelValue = this.state.getArtifactLevel(artifactId);
-            if (refs.level) {
-                refs.level.textContent = `Lv. ${formatNumber(levelValue)}`;
+        if (UI.artifactAdBonus) {
+            UI.artifactAdBonus.textContent = formatArtifactDamageValue(adBonus);
+        }
+        if (UI.artifactProgress) {
+            UI.artifactProgress.textContent = `${formatNumber(discoveredCount)} / ${formatNumber(
+                totalArtifacts,
+            )}`;
+        }
+        const currentPool = this.state.getCurrentArtifactPool();
+        const poolProgress = currentPool
+            ? this.state.getArtifactPoolProgress(currentPool.id)
+            : { discovered: discoveredCount, total: totalArtifacts, remaining: 0 };
+        if (UI.artifactPoolLabel) {
+            if (currentPool) {
+                UI.artifactPoolLabel.textContent = `${currentPool.name} (${formatNumber(
+                    poolProgress.discovered,
+                )} / ${formatNumber(poolProgress.total)})`;
+                UI.artifactPoolLabel.title = currentPool.description ?? '';
+            } else {
+                UI.artifactPoolLabel.textContent = '모든 유물 발견';
+                UI.artifactPoolLabel.title = '현재 발견 가능한 유물이 없습니다.';
             }
-            if (refs.effect) {
-                refs.effect.textContent = `현재 효과: ${this.state.describeArtifactEffect(artifactId)}`;
-            }
-            if (refs.next) {
-                const nextLevel = levelValue + 1;
-                if (artifact) {
-                    const currentValue = this.state.getArtifactEffectValue(artifactId);
-                    const nextValue = this.state.getArtifactEffectValueAtLevel(artifactId, nextLevel);
-                    const nextText = formatArtifactEffectValue(artifact, nextValue);
-                    const diffText = formatArtifactDifference(artifact, nextValue - currentValue);
-                    refs.next.textContent = `다음 효과: ${nextText}${diffText}`;
-                } else {
-                    refs.next.textContent = '다음 효과: -';
+        }
+
+        const discoveryCost = this.state.getArtifactDiscoveryCostValue();
+        const getNextArtifact = this.state.getNextArtifactToDiscover;
+        const nextArtifactId =
+            typeof getNextArtifact === 'function' ? getNextArtifact.call(this.state) : null;
+        if (UI.artifactDiscoverInfo) {
+            UI.artifactDiscoverInfo.textContent = nextArtifactId
+                ? `발견 비용: ${formatNumber(discoveryCost)} 유물 조각`
+                : '모든 유물을 발견했습니다!';
+        }
+        if (UI.artifactDiscover) {
+            UI.artifactDiscover.disabled = !nextArtifactId || discoveryCost > this.state.relics;
+            UI.artifactDiscover.setAttribute(
+                'aria-disabled',
+                UI.artifactDiscover.disabled ? 'true' : 'false',
+            );
+        }
+
+        let activeCount = 0;
+        let graveyardCount = 0;
+        const salvageCostValue = this.state.getArtifactSalvageCostValue();
+        ARTIFACTS.forEach((artifact) => {
+            const discovered = this.state.isArtifactDiscovered(artifact.id);
+            const inGraveyard = this.state.isArtifactInGraveyard(artifact.id);
+            const level = this.state.getArtifactLevel(artifact.id);
+            const categoryLabel = ARTIFACT_CATEGORY_LABELS[artifact.category] ?? '기타';
+            if (discovered && !inGraveyard) {
+                activeCount += 1;
+                const element = template ? template.cloneNode(true) : document.createElement('li');
+                if (!template) {
+                    element.className = 'artifact-card';
+                    element.innerHTML =
+                        '<div class="artifact-card__header">' +
+                        '<span class="artifact-card__icon" aria-hidden="true"></span>' +
+                        '<div class="artifact-card__meta">' +
+                        '<span class="artifact-card__name"></span>' +
+                        '<span class="artifact-card__category"></span>' +
+                        '</div>' +
+                        '<span class="artifact-card__level">Lv. 0</span>' +
+                        '</div>' +
+                        '<p class="artifact-card__summary"></p>' +
+                        '<div class="artifact-card__ad">Artifact Damage <span class="artifact-card__ad-value">+0.0%</span></div>' +
+                        '<div class="artifact-card__effect">현재 효과: -</div>' +
+                        '<div class="artifact-card__next">다음 효과: -</div>' +
+                        '<div class="artifact-card__actions">' +
+                        '<button type="button" class="btn btn-secondary artifact-card__upgrade" data-action="upgrade">강화</button>' +
+                        '<button type="button" class="btn btn-ghost artifact-card__salvage" data-action="salvage">분해</button>' +
+                        '<span class="artifact-card__cost artifact-card__cost--upgrade"></span>' +
+                        '<span class="artifact-card__cost artifact-card__cost--salvage"></span>' +
+                        '</div>';
                 }
-            }
-            if (refs.cost || refs.button) {
-                const cost = this.state.getArtifactUpgradeCost(artifactId);
-                if (refs.cost) {
-                    refs.cost.textContent = `필요 유물 조각 ${formatNumber(cost)}`;
+                element.dataset.artifactId = artifact.id;
+                const icon = element.querySelector('.artifact-card__icon');
+                const name = element.querySelector('.artifact-card__name');
+                const category = element.querySelector('.artifact-card__category');
+                const summary = element.querySelector('.artifact-card__summary');
+                const levelNode = element.querySelector('.artifact-card__level');
+                const effect = element.querySelector('.artifact-card__effect');
+                const next = element.querySelector('.artifact-card__next');
+                const adValue = element.querySelector('.artifact-card__ad-value');
+                const upgradeCost = element.querySelector('.artifact-card__cost--upgrade');
+                const salvageCost = element.querySelector('.artifact-card__cost--salvage');
+                const upgradeButton = element.querySelector('.artifact-card__upgrade');
+                const salvageButton = element.querySelector('.artifact-card__salvage');
+
+                if (icon) {
+                    icon.textContent = artifact.icon ?? '🗿';
                 }
-                if (refs.button) {
-                    refs.button.dataset.artifactId = artifactId;
-                    refs.button.disabled = cost > this.state.relics;
-                    refs.button.textContent = cost > 0 ? `강화 (${formatNumber(cost)})` : '강화 불가';
+                if (name) {
+                    name.textContent = artifact.name;
                 }
-                if (refs.element) {
-                    refs.element.classList.toggle('is-affordable', cost <= this.state.relics);
+                if (category) {
+                    category.textContent = categoryLabel;
+                }
+                if (summary) {
+                    summary.textContent = artifact.description ?? '';
+                }
+                if (levelNode) {
+                    levelNode.textContent = `Lv. ${formatNumber(level)}`;
+                }
+                if (effect) {
+                    effect.textContent = `현재 효과: ${this.state.describeArtifactEffect(artifact.id)}`;
+                }
+                if (next) {
+                    const nextLevel = level + 1;
+                    next.textContent = `다음 효과: ${this.state.describeArtifactEffectAtLevel(
+                        artifact.id,
+                        nextLevel,
+                    )}`;
+                }
+                if (adValue) {
+                    adValue.textContent = formatArtifactDamageValue(
+                        this.state.getArtifactDamageValue(artifact.id),
+                    );
+                }
+                const upgradeCostValue = this.state.getArtifactUpgradeCost(artifact.id);
+                if (upgradeCost) {
+                    upgradeCost.textContent = `강화 비용 ${formatNumber(upgradeCostValue)}`;
+                }
+                if (upgradeButton) {
+                    upgradeButton.dataset.artifactId = artifact.id;
+                    upgradeButton.disabled = upgradeCostValue > this.state.relics;
+                    upgradeButton.textContent = `강화 (${formatNumber(upgradeCostValue)})`;
+                }
+                if (salvageButton) {
+                    salvageButton.dataset.artifactId = artifact.id;
+                    salvageButton.disabled = salvageCostValue > this.state.relics;
+                }
+                if (salvageCost) {
+                    salvageCost.textContent = `분해 비용 ${formatNumber(salvageCostValue)}`;
+                }
+                if (element) {
+                    element.classList.toggle('is-affordable', upgradeCostValue <= this.state.relics);
+                }
+                UI.artifactList.appendChild(element);
+            } else if (inGraveyard) {
+                graveyardCount += 1;
+                const element = graveyardTemplate
+                    ? graveyardTemplate.cloneNode(true)
+                    : document.createElement('li');
+                if (!graveyardTemplate) {
+                    element.className = 'artifact-card artifact-card--graveyard';
+                    element.innerHTML =
+                        '<div class="artifact-card__header">' +
+                        '<span class="artifact-card__icon" aria-hidden="true"></span>' +
+                        '<div class="artifact-card__meta">' +
+                        '<span class="artifact-card__name"></span>' +
+                        '<span class="artifact-card__category"></span>' +
+                        '</div>' +
+                        '<span class="artifact-card__level">Lv. 0</span>' +
+                        '</div>' +
+                        '<p class="artifact-card__summary"></p>' +
+                        '<div class="artifact-card__ad">Artifact Damage <span class="artifact-card__ad-value">+0.0%</span></div>' +
+                        '<div class="artifact-card__effect">현재 효과: 비활성화됨</div>' +
+                        '<div class="artifact-card__actions">' +
+                        '<button type="button" class="btn btn-secondary artifact-card__restore" data-action="restore">복구</button>' +
+                        '<span class="artifact-card__cost artifact-card__cost--restore"></span>' +
+                        '</div>';
+                }
+                element.dataset.artifactId = artifact.id;
+                const icon = element.querySelector('.artifact-card__icon');
+                const name = element.querySelector('.artifact-card__name');
+                const category = element.querySelector('.artifact-card__category');
+                const summary = element.querySelector('.artifact-card__summary');
+                const levelNode = element.querySelector('.artifact-card__level');
+                const adValue = element.querySelector('.artifact-card__ad-value');
+                const restoreCost = element.querySelector('.artifact-card__cost--restore');
+                const restoreButton = element.querySelector('.artifact-card__restore');
+
+                if (icon) {
+                    icon.textContent = artifact.icon ?? '🗿';
+                }
+                if (name) {
+                    name.textContent = artifact.name;
+                }
+                if (category) {
+                    category.textContent = categoryLabel;
+                }
+                if (summary) {
+                    summary.textContent = artifact.description ?? '';
+                }
+                if (levelNode) {
+                    levelNode.textContent = 'Lv. 0';
+                }
+                if (adValue) {
+                    adValue.textContent = formatArtifactDamageValue(0);
+                }
+                const restoreCostValue = this.state.getArtifactUpgradeCost(artifact.id);
+                if (restoreCost) {
+                    restoreCost.textContent = `복구 비용 ${formatNumber(restoreCostValue)}`;
+                }
+                if (restoreButton) {
+                    restoreButton.dataset.artifactId = artifact.id;
+                    restoreButton.disabled = restoreCostValue > this.state.relics;
+                }
+                if (UI.artifactGraveyardList) {
+                    UI.artifactGraveyardList.appendChild(element);
                 }
             }
         });
+
+        if (UI.artifactEmpty) {
+            UI.artifactEmpty.classList.toggle('is-visible', activeCount === 0);
+        }
+        if (UI.artifactGraveyardEmpty) {
+            UI.artifactGraveyardEmpty.classList.toggle('is-visible', graveyardCount === 0);
+        }
     }
 
     handleArtifactListClick(event) {
-        const button = event.target.closest('.artifact-card__upgrade');
+        const button = event.target.closest('button[data-artifact-id]');
         if (!button) {
             return;
         }
-        const artifactId = button.dataset.artifactId ?? button.closest('[data-artifact-id]')?.dataset.artifactId;
+        const artifactId =
+            button.dataset.artifactId ?? button.closest('[data-artifact-id]')?.dataset.artifactId;
         if (!artifactId) {
             return;
         }
-        const result = this.state.upgradeArtifact(artifactId);
+        const action = button.dataset.action ?? 'upgrade';
+        let result;
+        if (action === 'salvage') {
+            result = this.state.salvageArtifact(artifactId);
+            if (!result.success) {
+                if (result.message) {
+                    this.addLog(result.message, 'warning');
+                }
+                return;
+            }
+            const artifactName = result.artifact?.name ?? '유물';
+            this.addLog(
+                `${artifactName}을(를) 분해하여 무덤으로 이동했습니다. (비용 ${formatNumber(
+                    result.cost ?? 0,
+                )})`,
+                'warning',
+            );
+        } else if (action === 'restore') {
+            result = this.state.restoreArtifact(artifactId);
+            if (!result.success) {
+                if (result.message) {
+                    this.addLog(result.message, 'warning');
+                }
+                return;
+            }
+            const artifactName = result.artifact?.name ?? '유물';
+            this.addLog(
+                `${artifactName}을(를) 복구했습니다! (${this.state.describeArtifactEffect(artifactId)})`,
+                'success',
+            );
+        } else {
+            result = this.state.upgradeArtifact(artifactId);
+            if (!result.success) {
+                if (result.message) {
+                    this.addLog(result.message, 'warning');
+                }
+                return;
+            }
+            const artifactName = result.artifact?.name ?? '유물';
+            this.addLog(
+                `${artifactName} Lv.${formatNumber(result.newLevel)}로 강화되었습니다! (${result.effect})`,
+                'success',
+            );
+        }
+        this.updateStats();
+        this.updateArtifacts();
+        this.updateRebirthUI();
+        saveGame(this.state);
+    }
+
+    handleArtifactDiscover() {
+        if (typeof this.state.discoverArtifact !== 'function') {
+            return;
+        }
+        const result = this.state.discoverArtifact();
         if (!result.success) {
             if (result.message) {
                 this.addLog(result.message, 'warning');
@@ -4426,10 +4608,11 @@ export class GameUI {
             return;
         }
         const artifactName = result.artifact?.name ?? '유물';
-        this.addLog(
-            `${artifactName} Lv.${formatNumber(result.newLevel)}로 강화되었습니다! (${result.effect})`,
-            'success',
-        );
+        const effectText = result.artifact
+            ? this.state.describeArtifactEffect(result.artifact.id)
+            : null;
+        const detail = effectText ? ` (${effectText})` : '';
+        this.addLog(`${artifactName}을(를) 새롭게 발견했습니다!${detail}`, 'success');
         this.updateStats();
         this.updateArtifacts();
         this.updateRebirthUI();

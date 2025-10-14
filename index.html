@@ -539,13 +539,59 @@
                                 <h2>유물 관리</h2>
                             </header>
                             <div class="panel__body panel-card__body">
-                                <p id="artifactSummary" class="panel__lead">
-                                    환생으로 얻은 유물 조각을 투자해 주요 아티팩트를 강화하세요.
-                                </p>
-                                <ul id="artifactList" class="artifact-list" role="list" aria-live="polite"></ul>
-                                <p id="artifactEmpty" class="empty-state" aria-live="polite">
-                                    아직 발견한 유물이 없습니다. 환생을 진행해 유물을 수집하세요.
-                                </p>
+                                <div class="artifact-overview">
+                                    <p id="artifactSummary" class="panel__lead" aria-live="polite">
+                                        환생으로 얻은 유물 조각을 투자해 주요 아티팩트를 강화하세요.
+                                    </p>
+                                    <div class="artifact-overview__stats">
+                                        <div class="artifact-overview__stat">
+                                            <span>총 AD 보너스</span>
+                                            <strong id="artifactAdBonus">+0.0%</strong>
+                                        </div>
+                                        <div class="artifact-overview__stat">
+                                            <span>발견한 유물</span>
+                                            <strong id="artifactProgress">0 / 0</strong>
+                                        </div>
+                                        <div class="artifact-overview__stat">
+                                            <span>현재 발견 풀</span>
+                                            <strong id="artifactPoolLabel">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="artifact-overview__actions">
+                                        <button id="artifactDiscover" type="button" class="btn btn-primary">
+                                            새 유물 발견
+                                        </button>
+                                        <p id="artifactDiscoverInfo" class="artifact-discover__info">
+                                            발견 비용: 0 유물 조각
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="artifact-columns">
+                                    <div class="artifact-column">
+                                        <h3 class="artifact-column__title">보유 유물</h3>
+                                        <ul
+                                            id="artifactList"
+                                            class="artifact-list"
+                                            role="list"
+                                            aria-live="polite"
+                                        ></ul>
+                                        <p id="artifactEmpty" class="empty-state" aria-live="polite">
+                                            아직 발견한 유물이 없습니다. 환생을 진행해 유물을 수집하세요.
+                                        </p>
+                                    </div>
+                                    <div class="artifact-column artifact-column--graveyard">
+                                        <h3 class="artifact-column__title">무덤</h3>
+                                        <ul
+                                            id="artifactGraveyardList"
+                                            class="artifact-list artifact-list--graveyard"
+                                            role="list"
+                                            aria-live="polite"
+                                        ></ul>
+                                        <p id="artifactGraveyardEmpty" class="empty-state" aria-live="polite">
+                                            무덤에 보관된 유물이 없습니다.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </section>
                     </div>
@@ -957,17 +1003,62 @@
         <li class="artifact-card" data-artifact-id="">
             <div class="artifact-card__header">
                 <span class="artifact-card__icon" aria-hidden="true"></span>
-                <span class="artifact-card__name"></span>
+                <div class="artifact-card__meta">
+                    <span class="artifact-card__name"></span>
+                    <span class="artifact-card__category"></span>
+                </div>
                 <span class="artifact-card__level">Lv. 0</span>
             </div>
             <p class="artifact-card__summary"></p>
+            <div class="artifact-card__ad">Artifact Damage <span class="artifact-card__ad-value">+0.0%</span></div>
             <div class="artifact-card__effect">현재 효과: -</div>
             <div class="artifact-card__next">다음 효과: -</div>
             <div class="artifact-card__actions">
-                <button type="button" class="btn btn-secondary artifact-card__upgrade" data-artifact-id="">
+                <button
+                    type="button"
+                    class="btn btn-secondary artifact-card__upgrade"
+                    data-artifact-id=""
+                    data-action="upgrade"
+                >
                     강화
                 </button>
-                <span class="artifact-card__cost">필요 유물 조각 0</span>
+                <button
+                    type="button"
+                    class="btn btn-ghost artifact-card__salvage"
+                    data-artifact-id=""
+                    data-action="salvage"
+                >
+                    분해
+                </button>
+                <span class="artifact-card__cost artifact-card__cost--upgrade">필요 유물 조각 0</span>
+                <span class="artifact-card__cost artifact-card__cost--salvage">분해 비용 0</span>
+            </div>
+        </li>
+    </template>
+
+    <template id="artifactGraveyardTemplate">
+        <li class="artifact-card artifact-card--graveyard" data-artifact-id="">
+            <div class="artifact-card__header">
+                <span class="artifact-card__icon" aria-hidden="true"></span>
+                <div class="artifact-card__meta">
+                    <span class="artifact-card__name"></span>
+                    <span class="artifact-card__category"></span>
+                </div>
+                <span class="artifact-card__level">Lv. 0</span>
+            </div>
+            <p class="artifact-card__summary"></p>
+            <div class="artifact-card__ad">Artifact Damage <span class="artifact-card__ad-value">+0.0%</span></div>
+            <div class="artifact-card__effect">현재 효과: 비활성화됨</div>
+            <div class="artifact-card__actions">
+                <button
+                    type="button"
+                    class="btn btn-secondary artifact-card__restore"
+                    data-artifact-id=""
+                    data-action="restore"
+                >
+                    복구
+                </button>
+                <span class="artifact-card__cost artifact-card__cost--restore">복구 비용 0</span>
             </div>
         </li>
     </template>
