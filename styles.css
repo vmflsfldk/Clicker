@@ -1963,6 +1963,79 @@ h1,
     color: var(--subtext-color);
 }
 
+.artifact-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    margin-bottom: 1.5rem;
+}
+
+.artifact-overview__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.artifact-overview__stat {
+    flex: 1 1 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    background: rgba(30, 41, 59, 0.65);
+    box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.12);
+}
+
+.artifact-overview__stat span {
+    font-size: 0.85rem;
+    color: var(--subtext-color);
+}
+
+.artifact-overview__stat strong {
+    font-size: 1.05rem;
+}
+
+.artifact-overview__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.artifact-discover__info {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--subtext-color);
+}
+
+.artifact-columns {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.artifact-column__title {
+    margin: 0 0 0.75rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.artifact-column--graveyard .artifact-column__title {
+    color: rgba(248, 113, 113, 0.9);
+}
+
+.artifact-list--graveyard .artifact-card {
+    border-color: rgba(148, 163, 184, 0.2);
+    background: rgba(12, 18, 32, 0.65);
+}
+
+.artifact-list--graveyard .artifact-card__actions {
+    justify-content: flex-start;
+}
+
 .empty-state {
     margin-top: 1.25rem;
     text-align: center;
@@ -2018,6 +2091,11 @@ h1,
     gap: 0.25rem;
 }
 
+.artifact-card__category {
+    font-size: 0.85rem;
+    color: var(--subtext-color);
+}
+
 .artifact-card__level {
     margin-left: auto;
     font-size: 0.9rem;
@@ -2037,6 +2115,17 @@ h1,
     font-size: 0.95rem;
 }
 
+.artifact-card__ad {
+    font-size: 0.9rem;
+    color: var(--subtext-color);
+}
+
+.artifact-card__ad-value {
+    font-weight: 600;
+    color: var(--accent-color);
+    margin-left: 0.25rem;
+}
+
 .artifact-card__next {
     font-size: 0.9rem;
     color: var(--subtext-color);
@@ -2052,6 +2141,11 @@ h1,
 .artifact-card__cost {
     font-size: 0.9rem;
     color: var(--subtext-color);
+}
+
+.artifact-card__cost--salvage,
+.artifact-card__cost--restore {
+    font-size: 0.85rem;
 }
 
 .artifact-card.is-affordable {
@@ -2078,6 +2172,10 @@ h1,
     content: '•';
     margin-right: 0.35rem;
     color: var(--accent-color);
+}
+
+.artifact-card--graveyard .artifact-card__effect {
+    color: rgba(248, 113, 113, 0.85);
 }
 
 .build-card.is-active {

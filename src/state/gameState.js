@@ -23,9 +23,15 @@ import {
     ARTIFACTS,
     ARTIFACT_MAP,
     ARTIFACT_EFFECT_TYPES,
+    ARTIFACT_POOLS,
+    ARTIFACT_POOL_MAP,
     getArtifactEffectValue,
+    getArtifactDamageValue,
     getArtifactUpgradeCost,
     formatArtifactEffectValue,
+    formatArtifactDamageValue,
+    getArtifactDiscoveryCost,
+    getArtifactSalvageCost,
 } from '../data/artifacts.js';
 import {
     REBIRTH_EFFECT_LABELS,
@@ -68,6 +74,7 @@ const HERO_RARITY_MAP = new Map(HERO_RARITIES.map((rarity) => [rarity.id, rarity
 const DEFAULT_HERO_RARITY_ID = 'common';
 
 const ARTIFACT_ID_SET = new Set(ARTIFACTS.map((artifact) => artifact.id));
+const ARTIFACT_POOL_SEQUENCE = ARTIFACT_POOLS.map((pool) => pool.id);
 
 const BUILD_ID_SET = new Set(BUILDS.map((build) => build.id));
 
@@ -1511,7 +1518,15 @@ export class GameState {
         const heroMultiplier = 1 + this.heroBonus;
         const heroCritMultiplier = this.heroCritAverageMultiplier;
         const skillMultiplier = this.getActiveDpsMultiplier();
-        return heroDps * heroMultiplier * heroCritMultiplier * skillMultiplier;
+        return heroDps * heroMultiplier * heroCritMultiplier * skillMultiplier * this.artifactDamageMultiplier;
+    }
+
+    get artifactDamageBonus() {
+        return this.getTotalArtifactDamage();
+    }
+
+    get artifactDamageMultiplier() {
+        return 1 + this.artifactDamageBonus;
     }
 
     get tapBonus() {
@@ -1811,7 +1826,7 @@ export class GameState {
     }
 
     get effectiveClickDamage() {
-        return this.clickDamage * (1 + this.tapBonus);
+        return this.clickDamage * (1 + this.tapBonus) * this.artifactDamageMultiplier;
     }
 
     get clickCritChance() {
@@ -1938,7 +1953,8 @@ export class GameState {
                 CLICK_UPGRADE_CONFIG.flatIncrease +
                 Math.pow(CLICK_UPGRADE_CONFIG.damageGrowth, simulatedLevel),
         );
-        const nextDamage = nextBaseDamage * (1 + this.tapBonus);
+        const artifactMultiplier = this.artifactDamageMultiplier;
+        const nextDamage = nextBaseDamage * (1 + this.tapBonus) * artifactMultiplier;
         const expectedCurrent = this.expectedClickDamage;
         const expectedNext = nextDamage * this.clickCritAverageMultiplier;
         const damageGain = expectedNext - expectedCurrent;
@@ -2588,6 +2604,8 @@ export class GameState {
 
     initializeArtifacts(savedArtifacts = {}) {
         this.artifactLevels = new Map();
+        this.discoveredArtifacts = new Set();
+        this.artifactGraveyard = new Set();
         ARTIFACTS.forEach((artifact) => {
             const savedEntry = savedArtifacts?.[artifact.id];
             const candidates = [];
@@ -2600,6 +2618,17 @@ export class GameState {
                 .find((value) => Number.isFinite(value));
             const level = Number.isFinite(savedLevel) ? Math.max(0, Math.floor(savedLevel)) : 0;
             this.artifactLevels.set(artifact.id, level);
+
+            const wasDiscovered = Boolean(
+                level > 0 || (typeof savedEntry === 'object' && savedEntry?.discovered),
+            );
+            if (wasDiscovered) {
+                this.discoveredArtifacts.add(artifact.id);
+            }
+            const wasSalvaged = Boolean(savedEntry?.graveyard) && level <= 0;
+            if (wasSalvaged && wasDiscovered) {
+                this.artifactGraveyard.add(artifact.id);
+            }
         });
     }
 
@@ -2661,8 +2690,14 @@ export class GameState {
         const serialized = {};
         ARTIFACTS.forEach((artifact) => {
             const level = this.getArtifactLevel(artifact.id);
-            if (level > 0) {
-                serialized[artifact.id] = { level };
+            const discovered = this.isArtifactDiscovered(artifact.id);
+            const inGraveyard = this.isArtifactInGraveyard(artifact.id);
+            if (level > 0 || discovered || inGraveyard) {
+                serialized[artifact.id] = {
+                    level,
+                    discovered,
+                    graveyard: inGraveyard,
+                };
             }
         });
         return serialized;
@@ -3241,11 +3276,64 @@ export class GameState {
         return normalized;
     }
 
+    isArtifactDiscovered(artifactId) {
+        if (!ARTIFACT_ID_SET.has(artifactId)) return false;
+        return this.discoveredArtifacts?.has(artifactId) ?? false;
+    }
+
+    isArtifactInGraveyard(artifactId) {
+        if (!ARTIFACT_ID_SET.has(artifactId)) return false;
+        return this.artifactGraveyard?.has(artifactId) ?? false;
+    }
+
+    getDiscoveredArtifactCount() {
+        return this.discoveredArtifacts?.size ?? 0;
+    }
+
+    getActiveArtifactCount() {
+        if (!this.artifactLevels) return 0;
+        let total = 0;
+        this.artifactLevels.forEach((level, artifactId) => {
+            if (level > 0 && !this.isArtifactInGraveyard(artifactId)) {
+                total += 1;
+            }
+        });
+        return total;
+    }
+
     getArtifactEffectValue(artifactId) {
         const artifact = ARTIFACT_MAP.get(artifactId);
         if (!artifact) return 0;
         const level = this.getArtifactLevel(artifactId);
+        if (level <= 0 || this.isArtifactInGraveyard(artifactId)) {
+            return 0;
+        }
         return getArtifactEffectValue(artifact, level);
+    }
+
+    getArtifactDamageValue(artifactId) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) return 0;
+        const level = this.getArtifactLevel(artifactId);
+        if (level <= 0 || this.isArtifactInGraveyard(artifactId)) {
+            return 0;
+        }
+        return getArtifactDamageValue(artifact, level);
+    }
+
+    getTotalArtifactDamage() {
+        let total = 0;
+        ARTIFACTS.forEach((artifact) => {
+            const level = this.getArtifactLevel(artifact.id);
+            if (level <= 0 || this.isArtifactInGraveyard(artifact.id)) {
+                return;
+            }
+            total += getArtifactDamageValue(artifact, level);
+            if (artifact.effectType === ARTIFACT_EFFECT_TYPES.ARTIFACT_DAMAGE) {
+                total += getArtifactEffectValue(artifact, level);
+            }
+        });
+        return Math.max(0, total);
     }
 
     getArtifactBonusValue(effectType) {
@@ -3269,7 +3357,19 @@ export class GameState {
         const artifact = ARTIFACT_MAP.get(artifactId);
         if (!artifact) return '효과 없음';
         const value = this.getArtifactEffectValue(artifactId);
-        return formatArtifactEffectValue(artifact, value);
+        const baseText = value > 0 ? formatArtifactEffectValue(artifact, value) : null;
+        const adValue = this.getArtifactDamageValue(artifactId);
+        const adText = adValue > 0 ? formatArtifactDamageValue(adValue) : null;
+        if (baseText && adText) {
+            return `${baseText} / AD ${adText}`;
+        }
+        if (baseText) {
+            return baseText;
+        }
+        if (adText) {
+            return `AD ${adText}`;
+        }
+        return '효과 없음';
     }
 
     getArtifactEffectValueAtLevel(artifactId, level) {
@@ -3280,11 +3380,167 @@ export class GameState {
         return getArtifactEffectValue(artifact, normalized);
     }
 
+    getArtifactDamageValueAtLevel(artifactId, level) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) return 0;
+        const normalized = clampArtifactLevel(level);
+        if (normalized <= 0) return 0;
+        return getArtifactDamageValue(artifact, normalized);
+    }
+
     describeArtifactEffectAtLevel(artifactId, level) {
         const artifact = ARTIFACT_MAP.get(artifactId);
         if (!artifact) return '효과 없음';
         const value = this.getArtifactEffectValueAtLevel(artifactId, level);
-        return formatArtifactEffectValue(artifact, value);
+        const baseText = value > 0 ? formatArtifactEffectValue(artifact, value) : null;
+        const adValue = this.getArtifactDamageValueAtLevel(artifactId, level);
+        const adText = adValue > 0 ? formatArtifactDamageValue(adValue) : null;
+        if (baseText && adText) {
+            return `${baseText} / AD ${adText}`;
+        }
+        if (baseText) {
+            return baseText;
+        }
+        if (adText) {
+            return `AD ${adText}`;
+        }
+        return '효과 없음';
+    }
+
+    getArtifactPoolProgress(poolId) {
+        const pool = ARTIFACT_POOL_MAP.get(poolId);
+        if (!pool) {
+            return { pool: null, discovered: 0, total: 0, remaining: 0 };
+        }
+        const total = Array.isArray(pool.artifacts) ? pool.artifacts.length : 0;
+        const discovered = (pool.artifacts ?? []).reduce((count, artifactId) => {
+            return count + (this.isArtifactDiscovered(artifactId) ? 1 : 0);
+        }, 0);
+        const remaining = Math.max(0, total - discovered);
+        return { pool, discovered, total, remaining };
+    }
+
+    getCurrentArtifactPoolId() {
+        for (let index = 0; index < ARTIFACT_POOL_SEQUENCE.length; index += 1) {
+            const poolId = ARTIFACT_POOL_SEQUENCE[index];
+            const progress = this.getArtifactPoolProgress(poolId);
+            if (progress.remaining > 0) {
+                return poolId;
+            }
+        }
+        return ARTIFACT_POOL_SEQUENCE[ARTIFACT_POOL_SEQUENCE.length - 1] ?? null;
+    }
+
+    getCurrentArtifactPool() {
+        const poolId = this.getCurrentArtifactPoolId();
+        return poolId ? ARTIFACT_POOL_MAP.get(poolId) ?? null : null;
+    }
+
+    getNextArtifactToDiscover() {
+        const pool = this.getCurrentArtifactPool();
+        if (!pool) return null;
+        return (pool.artifacts ?? []).find((artifactId) => !this.isArtifactDiscovered(artifactId)) ?? null;
+    }
+
+    getArtifactDiscoveryCostValue() {
+        const discoveredCount = this.getDiscoveredArtifactCount();
+        return getArtifactDiscoveryCost(discoveredCount);
+    }
+
+    getArtifactSalvageCostValue() {
+        const discoveredCount = this.getDiscoveredArtifactCount();
+        return getArtifactSalvageCost(discoveredCount);
+    }
+
+    discoverArtifact() {
+        const artifactId = this.getNextArtifactToDiscover();
+        if (!artifactId) {
+            return { success: false, message: '발견 가능한 유물이 없습니다.' };
+        }
+        const cost = this.getArtifactDiscoveryCostValue();
+        if (cost > this.relics) {
+            return {
+                success: false,
+                message: '유물 조각이 부족합니다.',
+                cost,
+            };
+        }
+        this.relics -= cost;
+        if (!this.discoveredArtifacts) {
+            this.discoveredArtifacts = new Set();
+        }
+        this.discoveredArtifacts.add(artifactId);
+        if (this.artifactGraveyard?.has(artifactId)) {
+            this.artifactGraveyard.delete(artifactId);
+        }
+        const previousLevel = this.getArtifactLevel(artifactId);
+        if (previousLevel <= 0) {
+            this.setArtifactLevel(artifactId, 1);
+        }
+        this.lastSave = Date.now();
+        return {
+            success: true,
+            artifact: ARTIFACT_MAP.get(artifactId),
+            cost,
+            newLevel: this.getArtifactLevel(artifactId),
+            discoveredCount: this.getDiscoveredArtifactCount(),
+            pool: this.getCurrentArtifactPool(),
+        };
+    }
+
+    salvageArtifact(artifactId) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) {
+            return { success: false, message: '알 수 없는 유물입니다.' };
+        }
+        if (!this.isArtifactDiscovered(artifactId)) {
+            return { success: false, message: '아직 발견하지 않은 유물입니다.' };
+        }
+        if (this.isArtifactInGraveyard(artifactId)) {
+            return { success: false, message: '이미 무덤에 보관된 유물입니다.' };
+        }
+        const level = this.getArtifactLevel(artifactId);
+        if (level <= 0) {
+            return { success: false, message: '분해할 유물 레벨이 없습니다.' };
+        }
+        const cost = this.getArtifactSalvageCostValue();
+        if (cost > this.relics) {
+            return { success: false, message: '유물 조각이 부족합니다.', cost };
+        }
+        this.relics -= cost;
+        this.setArtifactLevel(artifactId, 0);
+        if (!this.artifactGraveyard) {
+            this.artifactGraveyard = new Set();
+        }
+        this.artifactGraveyard.add(artifactId);
+        if (!this.discoveredArtifacts) {
+            this.discoveredArtifacts = new Set();
+        }
+        this.discoveredArtifacts.add(artifactId);
+        this.lastSave = Date.now();
+        return { success: true, artifact, cost };
+    }
+
+    restoreArtifact(artifactId) {
+        const artifact = ARTIFACT_MAP.get(artifactId);
+        if (!artifact) {
+            return { success: false, message: '알 수 없는 유물입니다.' };
+        }
+        if (!this.isArtifactDiscovered(artifactId)) {
+            return { success: false, message: '발견하지 않은 유물입니다.' };
+        }
+        if (!this.isArtifactInGraveyard(artifactId)) {
+            return { success: false, message: '무덤에 보관된 유물이 아닙니다.' };
+        }
+        const cost = this.getArtifactUpgradeCost(artifactId);
+        if (cost > this.relics) {
+            return { success: false, message: '유물 조각이 부족합니다.', cost };
+        }
+        this.relics -= cost;
+        this.artifactGraveyard.delete(artifactId);
+        const newLevel = this.setArtifactLevel(artifactId, Math.max(1, this.getArtifactLevel(artifactId) || 1));
+        this.lastSave = Date.now();
+        return { success: true, artifact, cost, newLevel };
     }
 
     upgradeArtifact(artifactId) {
@@ -3292,11 +3548,18 @@ export class GameState {
         if (!artifact) {
             return { success: false, message: '알 수 없는 유물입니다.' };
         }
+        if (this.isArtifactInGraveyard(artifactId)) {
+            return { success: false, message: '무덤에 보관된 유물은 복구 후 강화할 수 있습니다.' };
+        }
         const cost = this.getArtifactUpgradeCost(artifactId);
         if (cost > this.relics) {
             return { success: false, message: '유물 조각이 부족합니다.', artifact, cost };
         }
         this.relics -= cost;
+        if (!this.discoveredArtifacts) {
+            this.discoveredArtifacts = new Set();
+        }
+        this.discoveredArtifacts.add(artifactId);
         const previousLevel = this.getArtifactLevel(artifactId);
         const newLevel = this.setArtifactLevel(artifactId, previousLevel + 1);
         this.lastSave = Date.now();
