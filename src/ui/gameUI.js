@@ -32,6 +32,7 @@ import { SKILLS, SKILL_EFFECT_TYPES, SKILL_MAP } from '../data/skills.js';
 import { saveGame } from '../storage/save.js';
 import { formatNumber, formatPercent, formatSignedPercent, formatCountdown } from '../utils/format.js';
 import { BUILDS, BUILD_EFFECT_TYPES } from '../data/builds.js';
+import { RESOURCE_GUIDE } from '../data/resourceGuide.js';
 
 const UI = {
     stage: document.getElementById('stage'),
@@ -148,6 +149,9 @@ const UI = {
     equipmentDetailBackdrop: document.getElementById('equipmentDetailBackdrop'),
     equipmentDetailClose: document.getElementById('equipmentDetailClose'),
     equipmentDetailContent: document.getElementById('equipmentDetailContent'),
+    resourceGuideSummary: document.getElementById('resourceGuideSummary'),
+    resourceGuideNav: document.getElementById('resourceGuideNav'),
+    resourceGuideContent: document.getElementById('resourceGuideContent'),
     missionSummary: document.getElementById('missionSummary'),
     missionList: document.getElementById('missionList'),
     missionEmpty: document.getElementById('missionEmpty'),
@@ -317,6 +321,7 @@ export class GameUI {
         this.renderRebirthUI();
         this.renderArtifacts();
         this.renderBuilds();
+        this.renderResourceGuide();
         this.updateSortButton();
         this.updateUI();
         this.startLoops();
@@ -4498,6 +4503,218 @@ export class GameUI {
             this.buildElements.set(build.id, { element, icon, name, summary, effects, tips, button });
         });
         this.updateBuilds();
+    }
+
+    renderResourceGuide() {
+        if (!UI.resourceGuideContent) {
+            return;
+        }
+        const content = UI.resourceGuideContent;
+        const navList = UI.resourceGuideNav;
+        content.innerHTML = '';
+        if (navList) {
+            navList.innerHTML = '';
+        }
+        if (!Array.isArray(RESOURCE_GUIDE) || RESOURCE_GUIDE.length === 0) {
+            if (UI.resourceGuideSummary) {
+                UI.resourceGuideSummary.textContent = '표시할 자원 정보가 없습니다.';
+            }
+            return;
+        }
+        const fragment = document.createDocumentFragment();
+        const navFragment = document.createDocumentFragment();
+        RESOURCE_GUIDE.forEach((entry) => {
+            if (!entry || !entry.id || !entry.name) {
+                return;
+            }
+            const anchorId = `resource-${entry.id}`;
+            const article = document.createElement('article');
+            article.className = 'resource-guide__entry';
+            article.id = anchorId;
+
+            const header = document.createElement('header');
+            header.className = 'resource-guide__header';
+
+            const title = document.createElement('h3');
+            title.className = 'resource-guide__title';
+            if (entry.icon) {
+                const icon = document.createElement('span');
+                icon.className = 'resource-guide__icon';
+                icon.textContent = entry.icon;
+                title.appendChild(icon);
+            }
+            const titleText = document.createElement('span');
+            titleText.textContent = entry.name;
+            title.appendChild(titleText);
+            header.appendChild(title);
+
+            if (entry.summary) {
+                const summary = document.createElement('p');
+                summary.className = 'resource-guide__tagline';
+                summary.textContent = entry.summary;
+                header.appendChild(summary);
+            }
+
+            const body = document.createElement('div');
+            body.className = 'resource-guide__body';
+            if (Array.isArray(entry.sections)) {
+                entry.sections.forEach((section) => {
+                    const sectionElement = this.createResourceGuideSection(section);
+                    if (sectionElement) {
+                        body.appendChild(sectionElement);
+                    }
+                });
+            }
+
+            article.appendChild(header);
+            article.appendChild(body);
+            fragment.appendChild(article);
+
+            if (navList) {
+                const navItem = document.createElement('li');
+                navItem.className = 'resource-guide__nav-item';
+                const link = document.createElement('a');
+                link.className = 'resource-guide__nav-link';
+                link.href = `#${anchorId}`;
+                link.textContent = entry.name;
+                link.setAttribute('data-resource-id', entry.id);
+                navItem.appendChild(link);
+                navFragment.appendChild(navItem);
+            }
+        });
+
+        content.appendChild(fragment);
+        if (navList) {
+            navList.appendChild(navFragment);
+        }
+        if (UI.resourceGuideSummary) {
+            UI.resourceGuideSummary.textContent = `Tap Titans 2의 ${RESOURCE_GUIDE.length}가지 핵심 자원 흐름과 운용법을 정리했습니다.`;
+        }
+    }
+
+    createResourceGuideSection(section) {
+        if (!section) {
+            return null;
+        }
+        const container = document.createElement('section');
+        container.className = 'resource-guide__section';
+        if (section.title) {
+            const heading = document.createElement('h4');
+            heading.className = 'resource-guide__section-title';
+            heading.textContent = section.title;
+            container.appendChild(heading);
+        }
+        const type = section.type ?? 'paragraph';
+        if (type === 'paragraph') {
+            if (section.text) {
+                const paragraph = document.createElement('p');
+                paragraph.className = 'resource-guide__text';
+                paragraph.textContent = section.text;
+                container.appendChild(paragraph);
+            }
+        } else if (type === 'list') {
+            const list = this.createResourceGuideList(section.items, section.variant);
+            if (list) {
+                container.appendChild(list);
+            }
+        } else if (type === 'table') {
+            const table = this.createResourceGuideTable(section.headers, section.rows, section.caption);
+            if (table) {
+                container.appendChild(table);
+            }
+        }
+        if (container.childElementCount === 0) {
+            return null;
+        }
+        return container;
+    }
+
+    createResourceGuideList(items, variant = 'unordered') {
+        if (!Array.isArray(items) || items.length === 0) {
+            return null;
+        }
+        const isOrdered = variant === 'ordered';
+        const list = document.createElement(isOrdered ? 'ol' : 'ul');
+        list.className = 'resource-guide__list';
+        if (isOrdered) {
+            list.classList.add('resource-guide__list--ordered');
+        }
+        items.forEach((item) => {
+            if (item === null || item === undefined) {
+                return;
+            }
+            const entry = document.createElement('li');
+            if (typeof item === 'string') {
+                entry.textContent = item;
+            } else if (typeof item === 'object') {
+                const emphasis = item.emphasis ?? item.label ?? null;
+                const description = item.text ?? item.detail ?? item.description ?? null;
+                if (emphasis) {
+                    const strong = document.createElement('strong');
+                    strong.textContent = emphasis;
+                    entry.appendChild(strong);
+                    if (description) {
+                        entry.append(`: ${description}`);
+                    } else if (Array.isArray(item.subItems) && item.subItems.length > 0) {
+                        entry.append(':');
+                    }
+                } else if (description) {
+                    entry.textContent = description;
+                }
+                if (!emphasis && !description && item.value) {
+                    entry.textContent = item.value;
+                }
+                if (Array.isArray(item.subItems) && item.subItems.length > 0) {
+                    const subList = this.createResourceGuideList(item.subItems, item.subVariant);
+                    if (subList) {
+                        entry.appendChild(subList);
+                    }
+                }
+            }
+            list.appendChild(entry);
+        });
+        if (list.childElementCount === 0) {
+            return null;
+        }
+        return list;
+    }
+
+    createResourceGuideTable(headers, rows, caption = null) {
+        if (!Array.isArray(headers) || headers.length === 0 || !Array.isArray(rows) || rows.length === 0) {
+            return null;
+        }
+        const table = document.createElement('table');
+        table.className = 'resource-guide__table';
+        if (caption) {
+            const captionElement = document.createElement('caption');
+            captionElement.textContent = caption;
+            table.appendChild(captionElement);
+        }
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headers.forEach((headerText) => {
+            const th = document.createElement('th');
+            th.textContent = headerText;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        rows.forEach((row) => {
+            if (!Array.isArray(row) || row.length === 0) {
+                return;
+            }
+            const tr = document.createElement('tr');
+            row.forEach((cell) => {
+                const td = document.createElement('td');
+                td.textContent = cell;
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        return table;
     }
 
     updateBuilds() {
