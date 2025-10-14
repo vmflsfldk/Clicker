@@ -16,98 +16,112 @@
         </header>
 
         <main class="game__main">
-            <section class="game__overview" aria-label="전술 상황 요약">
-                <div class="overview-bar">
-                    <section class="overview-group" aria-labelledby="overview-resources-title">
-                        <h2 id="overview-resources-title" class="overview-group__title">자원 현황</h2>
-                        <dl class="overview-stats">
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">스테이지</dt>
-                                <dd class="overview-stat__value"><span id="stage">1</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">골드</dt>
-                                <dd class="overview-stat__value"><span id="gold">0</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">유물 조각</dt>
-                                <dd class="overview-stat__value"><span id="relics">0</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">강화 재료</dt>
-                                <dd class="overview-stat__value"><span id="upgradeMaterials">0</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">스킬 모듈</dt>
-                                <dd class="overview-stat__value"><span id="skillModules">0</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">모집권</dt>
-                                <dd class="overview-stat__value"><span id="gachaTokensHeader">0</span></dd>
-                            </div>
-                        </dl>
-                    </section>
-                    <section class="overview-group" aria-labelledby="overview-combat-title">
-                        <h2 id="overview-combat-title" class="overview-group__title">전투 능력치</h2>
-                        <dl class="overview-stats">
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">전술 공격력</dt>
-                                <dd class="overview-stat__value"><span id="clickDamage">1</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">총 지원 화력</dt>
-                                <dd class="overview-stat__value"><span id="totalDps">0</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">학생 치명타 확률</dt>
-                                <dd class="overview-stat__value"><span id="heroCritChance">0%</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">학생 치명타 배율</dt>
-                                <dd class="overview-stat__value"><span id="heroCritMultiplier">0배</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">치명타 확률</dt>
-                                <dd class="overview-stat__value"><span id="critChance">0%</span></dd>
-                            </div>
-                            <div class="overview-stat">
-                                <dt class="overview-stat__label">치명타 배율</dt>
-                                <dd class="overview-stat__value"><span id="critMultiplier">0배</span></dd>
-                            </div>
-                        </dl>
-                    </section>
+            <section class="battle-hud" aria-label="전술 상황 요약">
+                <div class="hud-column hud-column--resources" aria-labelledby="overview-resources-title">
+                    <h2 id="overview-resources-title" class="hud-column__title">자원 현황</h2>
+                    <dl class="hud-stat-grid">
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">골드</dt>
+                            <dd class="hud-stat__value"><span id="gold">0</span></dd>
+                        </div>
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">유물 조각</dt>
+                            <dd class="hud-stat__value"><span id="relics">0</span></dd>
+                        </div>
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">강화 재료</dt>
+                            <dd class="hud-stat__value"><span id="upgradeMaterials">0</span></dd>
+                        </div>
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">스킬 모듈</dt>
+                            <dd class="hud-stat__value"><span id="skillModules">0</span></dd>
+                        </div>
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">모집권</dt>
+                            <dd class="hud-stat__value"><span id="gachaTokensHeader">0</span></dd>
+                        </div>
+                    </dl>
                 </div>
-            </section>
-            <section class="game__enemy">
-                <div class="enemy__info">
-                    <div id="enemyName" class="enemy__name">훈련용 타깃</div>
-                    <div class="enemy__health-bar">
-                        <div id="enemyHealthBar" class="enemy__health-bar-fill"></div>
-                    </div>
-                    <div class="enemy__health">
-                        <span id="enemyCurrentHp">10</span> / <span id="enemyMaxHp">10</span>
-                    </div>
-                    <div id="bossTimer" class="boss-timer" aria-live="polite"></div>
-                    <div id="stageGimmick" class="stage-gimmick" aria-live="polite" aria-hidden="true">
-                        <div id="stageGimmickIcon" class="stage-gimmick__icon" aria-hidden="true"></div>
-                        <div class="stage-gimmick__content">
-                            <div id="stageGimmickLabel" class="stage-gimmick__label"></div>
-                            <div id="stageGimmickDescription" class="stage-gimmick__description"></div>
-                            <div id="stageGimmickReward" class="stage-gimmick__reward"></div>
+                <div class="hud-stage" aria-live="polite">
+                    <div class="stage-core">
+                        <div class="stage-core__ring">
+                            <div class="stage-core__stage-label">STAGE</div>
+                            <div class="stage-core__stage-value"><span id="stage">1</span></div>
+                        </div>
+                        <div class="stage-core__status">
+                            <div class="stage-metric">
+                                <span class="stage-metric__label">전술 공격력</span>
+                                <span class="stage-metric__value" id="clickDamage">1</span>
+                            </div>
+                            <div class="stage-metric">
+                                <span class="stage-metric__label">총 지원 화력</span>
+                                <span class="stage-metric__value" id="totalDps">0</span>
+                            </div>
+                            <div class="stage-metric stage-metric--timer">
+                                <span class="stage-metric__label">보스 제한 시간</span>
+                                <span class="stage-metric__value boss-timer" id="bossTimer"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div id="enemy" class="enemy">
-                    <div class="enemy__sprite"></div>
-                    <div id="damageIndicator" class="damage-indicator"></div>
+                <div class="hud-column hud-column--combat" aria-labelledby="overview-combat-title">
+                    <h2 id="overview-combat-title" class="hud-column__title">전투 능력치</h2>
+                    <dl class="hud-stat-grid">
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">학생 치명타 확률</dt>
+                            <dd class="hud-stat__value"><span id="heroCritChance">0%</span></dd>
+                        </div>
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">학생 치명타 배율</dt>
+                            <dd class="hud-stat__value"><span id="heroCritMultiplier">0배</span></dd>
+                        </div>
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">치명타 확률</dt>
+                            <dd class="hud-stat__value"><span id="critChance">0%</span></dd>
+                        </div>
+                        <div class="hud-stat">
+                            <dt class="hud-stat__label">치명타 배율</dt>
+                            <dd class="hud-stat__value"><span id="critMultiplier">0배</span></dd>
+                        </div>
+                    </dl>
                 </div>
-                <button id="tapButton" class="btn btn-primary">공격!</button>
-                <div id="bossControls" class="boss-controls">
-                    <button id="bossRetreat" class="btn btn-ghost boss-control__button" type="button">보스 퇴각</button>
-                    <button id="bossAdvance" class="btn btn-secondary boss-control__button" type="button">보스 돌입</button>
+            </section>
+            <section class="battle-field" aria-labelledby="enemyName">
+                <div class="battle-field__content">
+                    <div class="enemy-display">
+                        <div id="enemy" class="enemy">
+                            <div class="enemy__aura"></div>
+                            <div class="enemy__sprite"></div>
+                            <div id="damageIndicator" class="damage-indicator"></div>
+                        </div>
+                        <button id="tapButton" class="battle-controls__attack btn btn-primary">공격!</button>
+                    </div>
+                    <div class="enemy-hud">
+                        <div id="enemyName" class="enemy-hud__name">훈련용 타깃</div>
+                        <div class="enemy-hud__health-bar">
+                            <div id="enemyHealthBar" class="enemy-hud__health-bar-fill"></div>
+                        </div>
+                        <div class="enemy-hud__health">
+                            <span id="enemyCurrentHp">10</span> / <span id="enemyMaxHp">10</span>
+                        </div>
+                        <div id="stageGimmick" class="stage-gimmick" aria-live="polite" aria-hidden="true">
+                            <div id="stageGimmickIcon" class="stage-gimmick__icon" aria-hidden="true"></div>
+                            <div class="stage-gimmick__content">
+                                <div id="stageGimmickLabel" class="stage-gimmick__label"></div>
+                                <div id="stageGimmickDescription" class="stage-gimmick__description"></div>
+                                <div id="stageGimmickReward" class="stage-gimmick__reward"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="game__progress">
-                    <div class="progress-track" id="stageProgressTrack"></div>
+                <div class="battle-controls">
+                    <div id="bossControls" class="boss-controls">
+                        <button id="bossRetreat" class="btn btn-ghost boss-control__button" type="button">보스 퇴각</button>
+                        <button id="bossAdvance" class="btn btn-secondary boss-control__button" type="button">보스 돌입</button>
+                    </div>
+                    <div class="battle-progress">
+                        <div class="progress-track" id="stageProgressTrack"></div>
+                    </div>
                 </div>
             </section>
 
