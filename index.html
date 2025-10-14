@@ -200,6 +200,18 @@
                     <button
                         type="button"
                         class="panel-tab"
+                        id="tab-resource-guide"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panel-resource-guide"
+                        data-tab-target="resources"
+                        tabindex="-1"
+                    >
+                        자원 가이드
+                    </button>
+                    <button
+                        type="button"
+                        class="panel-tab"
                         id="tab-salvage"
                         role="tab"
                         aria-selected="false"
@@ -600,6 +612,30 @@
                                     </p>
                                     <ul id="equipmentCollection" class="equipment-list"></ul>
                                 </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div
+                        class="panel-view"
+                        id="panel-resource-guide"
+                        role="tabpanel"
+                        aria-labelledby="tab-resource-guide"
+                        data-tab="resources"
+                        hidden
+                    >
+                        <section class="panel panel-card panel-card--resources" aria-label="자원 가이드">
+                            <header class="panel__header panel-card__header">
+                                <h2>성장 자원 가이드</h2>
+                                <p id="resourceGuideSummary" class="resource-guide__summary">
+                                    Tap Titans 2의 핵심 자원 흐름을 정리했습니다.
+                                </p>
+                            </header>
+                            <div class="panel__body panel-card__body">
+                                <nav class="resource-guide__nav" aria-label="자원 범주 바로가기">
+                                    <ol id="resourceGuideNav" class="resource-guide__nav-list"></ol>
+                                </nav>
+                                <div id="resourceGuideContent" class="resource-guide" aria-live="polite"></div>
                             </div>
                         </section>
                     </div>

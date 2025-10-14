@@ -3030,6 +3030,209 @@ h1,
     text-align: center;
 }
 
+.panel-card--resources {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.resource-guide__summary {
+    font-size: 0.9rem;
+    color: rgba(148, 163, 184, 0.85);
+}
+
+.resource-guide__nav {
+    background: rgba(15, 23, 42, 0.55);
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.12);
+    margin-bottom: 1.25rem;
+}
+
+.resource-guide__nav-list {
+    list-style: none;
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    margin: 0;
+    padding: 0;
+}
+
+.resource-guide__nav-item {
+    margin: 0;
+}
+
+.resource-guide__nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.12);
+    color: inherit;
+    text-decoration: none;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.resource-guide__nav-link::before {
+    content: '→';
+    font-size: 0.85rem;
+    color: rgba(56, 189, 248, 0.85);
+}
+
+.resource-guide__nav-link:hover,
+.resource-guide__nav-link:focus-visible {
+    background: rgba(56, 189, 248, 0.2);
+    transform: translateY(-1px);
+    outline: 2px solid rgba(56, 189, 248, 0.45);
+    outline-offset: 2px;
+}
+
+.resource-guide {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.resource-guide__entry {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 18px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.resource-guide__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.resource-guide__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.3rem;
+}
+
+.resource-guide__icon {
+    font-size: 1.4rem;
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.3));
+}
+
+.resource-guide__tagline {
+    font-size: 0.95rem;
+    color: rgba(148, 163, 184, 0.85);
+    line-height: 1.45;
+}
+
+.resource-guide__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.resource-guide__section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.resource-guide__section-title {
+    font-size: 1.05rem;
+    color: rgba(148, 163, 184, 0.95);
+}
+
+.resource-guide__text {
+    font-size: 0.95rem;
+    color: rgba(226, 232, 240, 0.92);
+    line-height: 1.6;
+}
+
+.resource-guide__list {
+    margin: 0;
+    padding-left: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+    color: rgba(226, 232, 240, 0.92);
+    line-height: 1.5;
+}
+
+.resource-guide__list--ordered {
+    padding-left: 1.75rem;
+}
+
+.resource-guide__list li {
+    margin: 0;
+}
+
+.resource-guide__list .resource-guide__list {
+    margin-top: 0.35rem;
+}
+
+.resource-guide__list strong {
+    color: rgba(56, 189, 248, 0.85);
+    font-weight: 600;
+}
+
+.resource-guide__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    color: rgba(226, 232, 240, 0.92);
+    overflow: hidden;
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.12);
+}
+
+.resource-guide__table thead {
+    background: rgba(56, 189, 248, 0.15);
+}
+
+.resource-guide__table th,
+.resource-guide__table td {
+    padding: 0.65rem 0.85rem;
+    text-align: left;
+}
+
+.resource-guide__table tbody tr:nth-child(even) {
+    background: rgba(148, 163, 184, 0.08);
+}
+
+.resource-guide__table tbody tr:hover {
+    background: rgba(56, 189, 248, 0.12);
+}
+
+.resource-guide__table caption {
+    caption-side: bottom;
+    font-size: 0.85rem;
+    color: rgba(148, 163, 184, 0.75);
+    padding: 0.5rem 0.85rem 0.75rem;
+}
+
+@media (max-width: 720px) {
+    .resource-guide__nav-list {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+
+    .resource-guide__entry {
+        padding: 1rem 1.1rem;
+    }
+
+    .resource-guide__title {
+        font-size: 1.15rem;
+    }
+
+    .resource-guide__table th,
+    .resource-guide__table td {
+        padding: 0.5rem 0.65rem;
+    }
+}
+
 .equipment-item[data-rarity='common'],
 .equipment-slot__button[data-rarity='common'] {
     border-color: rgba(148, 163, 184, 0.35);
