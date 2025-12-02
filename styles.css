@@ -4046,3 +4046,54 @@ body.modal-open {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(148, 163, 184, 0.5);
 }
+
+/* Mobile polish for song database views */
+.song-list__row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.song-list__time {
+    min-width: 3.5rem;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.song-list__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.filter-button {
+    white-space: nowrap;
+    min-width: fit-content;
+}
+
+@media (max-width: 640px) {
+    .song-list__row {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            'title'
+            'meta';
+        row-gap: 0.35rem;
+    }
+
+    .song-list__title {
+        grid-area: title;
+    }
+
+    .song-list__meta {
+        grid-area: meta;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .song-list__actions {
+        margin-left: auto;
+    }
+}
